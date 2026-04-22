@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trippi - All Trips</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Manrope:wght@200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-surface": "#f9f9f9",
+                    "background": "#0e0e0e",
+                    "tertiary-fixed": "#ff81f5",
+                    "surface-container-highest": "#262626",
+                    "on-primary-fixed": "#003f43",
+                    "on-primary": "#005d63",
+                    "on-tertiary-fixed-variant": "#6a006a",
+                    "outline-variant": "#484848",
+                    "on-tertiary": "#400040",
+                    "on-error": "#490006",
+                    "primary-fixed-dim": "#00deec",
+                    "on-primary-container": "#005359",
+                    "on-tertiary-fixed": "#320032",
+                    "primary": "#8ff5ff",
+                    "on-primary-fixed-variant": "#005e64",
+                    "surface-bright": "#2c2c2c",
+                    "secondary": "#c3f400",
+                    "on-surface": "#ffffff",
+                    "on-background": "#ffffff",
+                    "inverse-primary": "#006a71",
+                    "on-secondary-fixed-variant": "#4e6300",
+                    "tertiary": "#ff51fa",
+                    "tertiary-dim": "#ff51fa",
+                    "error": "#ff716c",
+                    "error-dim": "#d7383b",
+                    "inverse-on-surface": "#555555",
+                    "secondary-fixed": "#c3f400",
+                    "primary-fixed": "#00eefc",
+                    "surface-container-low": "#131313",
+                    "surface-container-high": "#1f1f1f",
+                    "on-secondary-container": "#efffbc",
+                    "tertiary-fixed-dim": "#ff61f8",
+                    "on-surface-variant": "#ababab",
+                    "on-secondary": "#455900",
+                    "surface-tint": "#8ff5ff",
+                    "on-secondary-fixed": "#354500",
+                    "surface-variant": "#262626",
+                    "secondary-fixed-dim": "#b7e500",
+                    "error-container": "#9f0519",
+                    "surface-dim": "#0e0e0e",
+                    "on-tertiary-container": "#230023",
+                    "secondary-container": "#506600",
+                    "tertiary-container": "#fe00fe",
+                    "on-error-container": "#ffa8a3",
+                    "primary-dim": "#00deec",
+                    "outline": "#757575",
+                    "surface": "#0e0e0e",
+                    "surface-container-lowest": "#000000",
+                    "secondary-dim": "#b7e500",
+                    "primary-container": "#00eefc",
+                    "surface-container": "#191919"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Manrope"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .kinetic-title {
+            letter-spacing: -0.04em;
+            line-height: 0.9;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0e0e0e; }
+        ::-webkit-scrollbar-thumb { background: #262626; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8ff5ff; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-surface-container-lowest">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="hidden md:flex flex-col h-full py-8 bg-[#131313] h-screen w-64 fixed left-0 top-0 shadow-2xl font-['Manrope'] font-medium z-50">
+<div class="px-6 mb-10">
+<span class="text-[#8ff5ff] font-black text-2xl tracking-tighter">Trippi</span>
+</div>
+<div class="flex-1 space-y-1">
+<a class="flex items-center gap-3 text-[#ababab] px-4 py-3 mx-2 hover:bg-[#262626] rounded-xl transition-all hover:translate-x-1 duration-300" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span>Gallery</span>
+</a>
+<!-- Active State: Bookings (Mapping "All Trips" intent to Bookings/Itineraries) -->
+<a class="flex items-center gap-3 bg-[#c3f400] text-[#0e0e0e] rounded-xl px-4 py-3 mx-2 hover:translate-x-1 duration-300" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+<span>Bookings</span>
+</a>
+<a class="flex items-center gap-3 text-[#ababab] px-4 py-3 mx-2 hover:bg-[#262626] rounded-xl transition-all hover:translate-x-1 duration-300" href="#">
+<span class="material-symbols-outlined">map</span>
+<span>Itineraries</span>
+</a>
+<a class="flex items-center gap-3 text-[#ababab] px-4 py-3 mx-2 hover:bg-[#262626] rounded-xl transition-all hover:translate-x-1 duration-300" href="#">
+<span class="material-symbols-outlined">person</span>
+<span>Profile</span>
+</a>
+</div>
+<div class="px-6 mb-8">
+<button class="w-full py-4 bg-secondary text-on-secondary font-bold rounded-xl shadow-[0_0_20px_rgba(195,244,0,0.2)] active:scale-95 transition-transform">
+                Start New Trip
+            </button>
+</div>
+<div class="mt-auto space-y-1 border-t border-outline-variant/10 pt-4">
+<a class="flex items-center gap-3 text-[#ababab] px-4 py-3 mx-2 hover:bg-[#262626] rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-3 text-[#ababab] px-4 py-3 mx-2 hover:bg-[#262626] rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<span>Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="md:ml-64 min-h-screen">
+<!-- TopNavBar (Authority: JSON) -->
+<header class="flex justify-between items-center px-6 py-4 w-full bg-[#0e0e0e] top-0 sticky z-40">
+<div class="flex items-center gap-8">
+<span class="md:hidden text-2xl font-bold tracking-tighter text-[#8ff5ff] font-['Space_Grotesk']">Trippi</span>
+<nav class="hidden lg:flex gap-6">
+<a class="text-[#8ff5ff] font-bold border-b-2 border-[#8ff5ff] font-['Space_Grotesk'] tracking-tight" href="#">All Trips</a>
+<a class="text-[#ababab] hover:text-[#8ff5ff] transition-colors font-['Space_Grotesk'] tracking-tight" href="#">Explore</a>
+<a class="text-[#ababab] hover:text-[#8ff5ff] transition-colors font-['Space_Grotesk'] tracking-tight" href="#">Deals</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group hidden sm:block">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#ababab] material-symbols-outlined text-sm">search</span>
+<input class="bg-surface-container-lowest border-none rounded-full pl-10 pr-4 py-2 text-sm w-64 focus:ring-1 focus:ring-primary placeholder:text-[#ababab]/50" placeholder="Search trips..." type="text"/>
+</div>
+<button class="p-2 text-[#ababab] hover:text-primary transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-secondary/20">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="close-up professional headshot of a stylish traveler with a cinematic city bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsODgYez34RfvqIlIt_2JvdZG5bReSClvBdLNwePz40cAKoP15MGjNuuuLpHqInqbD8MGcUfu4vZIrVYx8rrgXtoCAajyt2pZkrEHOluK5If9bZ8-w0vT9kwfwB9zaen_TQZABf1gnS7hLVWCbivFnrHLDjb8LAv2b6BTt_5yW3emoTxgXP9P-3qpuRwppooywUfddz67_AqtqHur1xO-13BU31Jo43fPINaFR_k0QMwmqU65MDnCOlh9Fh5Pdf9xXSFIMwJepZ-NH"/>
+</div>
+</div>
+</header>
+<div class="px-6 py-8 max-w-7xl mx-auto space-y-12">
+<!-- Section 1: Current Adventure (Featured) -->
+<section>
+<div class="flex items-end justify-between mb-6">
+<div>
+<span class="font-label text-xs uppercase tracking-[0.2em] text-secondary font-bold">In Progress</span>
+<h2 class="text-4xl md:text-6xl font-headline font-bold kinetic-title mt-1">Current Adventure</h2>
+</div>
+</div>
+<div class="relative group overflow-hidden rounded-[2rem] h-[500px] bg-surface-container-low shadow-2xl">
+<img alt="Neon Tokyo Dreams" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="cinematic wide shot of Tokyo streets at night with neon lights reflecting on wet pavement and futuristic architecture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBv-jLowYwt-P631Sr1scDW97AlwltsG1PEM4FIoHypRyoq1FpYTYWP2yrrP4UmFvqtzwM38mRye4QEqcPzME7TMVPX--ZG-YAyjxOdEgTVYpkcAOKQxUbb8rScaOFTtgdkYxSCBKvpSZ8IdaqNmWXigVeUaIdRaVd7c6CE45_mkW1xZ83KZdPT-qKN_YIUHNIgCUs4JfFWzpcA4Y_dENGzfPBcYCcUhdQYTf5ZzC7LJLX1oXZLgNSFFbAz0PSYObTJc7NbliJQzi57"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent"></div>
+<div class="absolute bottom-0 left-0 w-full p-8 md:p-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div class="space-y-4">
+<h3 class="text-5xl md:text-7xl font-headline font-black text-primary leading-tight">Neon Tokyo Dreams</h3>
+<div class="flex flex-wrap gap-4 items-center">
+<div class="glass-card px-4 py-2 rounded-full border border-white/10 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+<span class="text-sm font-medium">Oct 12 — Oct 24</span>
+</div>
+<div class="glass-card px-4 py-2 rounded-full border border-white/10 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">group</span>
+<span class="text-sm font-medium">2 Travelers</span>
+</div>
+</div>
+</div>
+<button class="bg-primary text-on-primary-fixed px-8 py-4 rounded-xl font-bold flex items-center gap-3 hover:shadow-[0_0_30px_rgba(143,245,255,0.4)] transition-all active:scale-95">
+                            View Itinerary
+                            <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 2: Upcoming Expeditions (Bento Grid) -->
+<section>
+<div class="flex items-end justify-between mb-8">
+<h2 class="text-3xl font-headline font-bold">Upcoming Expeditions</h2>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-1 text-sm font-medium transition-colors" href="#">
+                        View All
+                        <span class="material-symbols-outlined text-xs">open_in_new</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Expedition Card 1 -->
+<div class="group relative aspect-[4/5] bg-surface-container rounded-3xl overflow-hidden hover:translate-y-[-4px] transition-all duration-300">
+<img alt="Parisian Romance" class="absolute inset-0 w-full h-full object-cover" data-alt="sunset view of Eiffel tower through ornate wrought iron balcony with soft Parisian golden light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCz0mlI-qPm-uPewmkceoFy04IOglzn9jj2ETXyB9aCPY4DJDLQyu39cA0Zaa3esYi0n1prl-itbrXEc52cXBLy2w0TbE1bpaZHQnU4z47ncb4YivP20fArXVl87NlmXf_cdRWvJ_lsTBBdFJOTdhaKW9nKuP5gghN0Fi0Ic6YflST-9UR357CEjhZLS5IKrKPnyUaEoShUYQ6oiXK8zqqM0DUPr9y0w5G9k8P6Y97uZmdsKeXl-IX0Yvoa4BTx9HZZ5wXgvERKp2m-"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent opacity-80"></div>
+<div class="absolute top-4 right-4">
+<span class="bg-surface-container-highest/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase tracking-wider border border-white/10">Planning</span>
+</div>
+<div class="absolute bottom-0 left-0 p-6 w-full">
+<p class="text-xs font-label text-secondary font-bold mb-1 tracking-widest uppercase">Dec 2024</p>
+<h4 class="text-2xl font-headline font-bold text-white mb-4">Parisian Romance</h4>
+<div class="flex items-center gap-3 text-xs text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">person</span> 1</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">hotel</span> 6 Nights</span>
+</div>
+</div>
+</div>
+<!-- Expedition Card 2 -->
+<div class="group relative aspect-[4/5] bg-surface-container rounded-3xl overflow-hidden hover:translate-y-[-4px] transition-all duration-300 md:col-span-2 md:aspect-auto">
+<img alt="Amalfi Coast Drive" class="absolute inset-0 w-full h-full object-cover" data-alt="panoramic view of pastel houses on Italian cliffs overlooking turquoise Mediterranean sea under bright summer sun" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj180zODLCt1nGrZZcWMrgNXlpYWEmaR6kwVCfhBCHqah4Ejzg0p_PWRHkylpVM18TU4as_1E1iD4XQ5VvQJOrL0p96OGGXU3h8V-p-prVLICDqFfcSdjSnEwsVRlIWsFSwIgLTNp6mJIK9T7LZEGLhfY2XpRsLETloqEhIf4OqWJOrTrGVqCp_dG9gJzfdlt6u0XykmeyE3BQZU_Z1GmqEhuiyi8OQouNQZFoVsJl5g3CgMdv7jjbrSbSVAUp9YcjxFT_iQugv1Kq"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent opacity-80"></div>
+<div class="absolute top-4 right-4">
+<span class="bg-surface-container-highest/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-label font-bold uppercase tracking-wider border border-white/10">Confirmed</span>
+</div>
+<div class="absolute bottom-0 left-0 p-8 w-full flex justify-between items-end">
+<div>
+<p class="text-xs font-label text-secondary font-bold mb-1 tracking-widest uppercase">Aug 2025</p>
+<h4 class="text-4xl font-headline font-bold text-white">Amalfi Coast Drive</h4>
+</div>
+<div class="flex -space-x-3">
+<div class="w-10 h-10 rounded-full border-2 border-surface-container overflow-hidden">
+<img alt="Traveler" data-alt="portrait of a young smiling woman in sunglasses with a sea background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmEYFqi9Cz97m8OCgu4qNbOs-6hN5wXELDC8mV6eM3-r-Ijd-czrUX6rMMJC-Jwp38xibHKcQ86K4CEoppPybJzV9_akZPxdcUUZ9RKAaSN8M03KjCbpoRR_i2gRvYHsaYFmBQ-g-q6ishh-cx4Vr6nYLBEdAMJCBv7Sz-E3Y6Ia7_N1K-NVKKrljig96wLH0kmCxQQwQahqRNh-MNz_K61a27WHSF7QR0IFsG89HanQDDzPNH6p6LhSufVS6vcyi78m61l1y__uO5"/>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-surface-container overflow-hidden bg-primary text-on-primary-fixed flex items-center justify-center text-xs font-bold">
+                                    +3
+                                </div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Past Memories (Asymmetric List) -->
+<section class="pb-24">
+<div class="flex items-end justify-between mb-8">
+<h2 class="text-3xl font-headline font-bold">Past Memories</h2>
+</div>
+<div class="space-y-4">
+<!-- Past Trip 1 -->
+<div class="group flex flex-col md:flex-row items-center bg-surface-container-low hover:bg-surface-container transition-colors rounded-[1.5rem] overflow-hidden p-3 border border-transparent hover:border-primary/20">
+<div class="w-full md:w-48 h-32 rounded-xl overflow-hidden mb-4 md:mb-0">
+<img alt="The Taj Mahal" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="ethereal early morning view of the Taj Mahal reflecting in water with soft misty atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjqsnlPlzZdIYHTw6-LIfmLl5ocQr7xeeLQofzatsbZJ6lkC7UsEmJ9_Vu-oxTrnY1F5tMZivRRsEM65FmdVYT3D-Lo16dQz83G-ceMygylDmviRt5Z6DifhRptoj8hhop_Dd9-mCiOPxdjfHIeUsofa02-HBiOwhp_5W_B3gOEpkierJ-hqWTmi6gsd5PvVrJ7HkRS7Yt0E9--zsYqZW6srh5NOEWb7q9smImvuDLwPzI56w2qKTjaw84KxONLCY-HhSKL-rX5Iys"/>
+</div>
+<div class="flex-1 px-6">
+<h5 class="text-xl font-headline font-bold">Sacred India Expedition</h5>
+<p class="text-sm text-on-surface-variant">Agra, Varanasi, Jaipur</p>
+</div>
+<div class="hidden lg:block px-6 border-l border-outline-variant/20">
+<p class="text-xs font-label uppercase tracking-widest text-[#ababab] mb-1">Dates</p>
+<p class="text-sm font-medium">Jan 2024 — Feb 2024</p>
+</div>
+<div class="px-6 flex items-center gap-6">
+<div class="text-right">
+<span class="inline-block px-3 py-1 rounded-full bg-surface-container-highest text-[10px] font-bold uppercase tracking-tighter text-[#ababab]">Completed</span>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Past Trip 2 -->
+<div class="group flex flex-col md:flex-row items-center bg-surface-container-low hover:bg-surface-container transition-colors rounded-[1.5rem] overflow-hidden p-3 border border-transparent hover:border-primary/20">
+<div class="w-full md:w-48 h-32 rounded-xl overflow-hidden mb-4 md:mb-0">
+<img alt="Swiss Alps" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" data-alt="dramatic snow-capped peaks of the Swiss Alps reflecting in a perfectly still mirror-like alpine lake" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNa9ht3l5ATQQL6m22jtZ520ur2M84U_mqiYfoUUyASf7vtnNj8VzgUcuqUfR7HekrffeUsmrqPMXCO69nlk5BuTRwEtwNeKT2slgVWUmN9ooRBqf9nJV6TP1bUbvSMRWWe1FoI3b0SNUHd3BLDtN_evPbP6CObLYp118NsdAbgUlR5asMU7vSArvrFAaKmLAxwIfz7l9Yu9TtQWx-d1NJvrEfGRGOgzmQd0jmGr7H6hNz9tAG4dMc7_R5_47Sc6QzapO5IR5akwKH"/>
+</div>
+<div class="flex-1 px-6">
+<h5 class="text-xl font-headline font-bold">Alpine Summit Trek</h5>
+<p class="text-sm text-on-surface-variant">Zermatt, Switzerland</p>
+</div>
+<div class="hidden lg:block px-6 border-l border-outline-variant/20">
+<p class="text-xs font-label uppercase tracking-widest text-[#ababab] mb-1">Dates</p>
+<p class="text-sm font-medium">Sept 2023</p>
+</div>
+<div class="px-6 flex items-center gap-6">
+<div class="text-right">
+<span class="inline-block px-3 py-1 rounded-full bg-surface-container-highest text-[10px] font-bold uppercase tracking-tighter text-[#ababab]">Completed</span>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Mobile Bottom Navigation (Authority: Contextual Design System Rule) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-surface-container-low/80 backdrop-blur-xl border-t border-white/5 px-6 py-4 flex justify-between items-center z-50">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">confirmation_number</span>
+<span class="text-[10px] font-label font-bold">Trips</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-[#ababab]" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="text-[10px] font-label">Explore</span>
+</a>
+<div class="relative -top-8">
+<button class="w-14 h-14 bg-secondary text-on-secondary rounded-full shadow-[0_0_20px_rgba(195,244,0,0.4)] flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+</div>
+<a class="flex flex-col items-center gap-1 text-[#ababab]" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="text-[10px] font-label">Gallery</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-[#ababab]" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-label">Profile</span>
+</a>
+</nav>
+</body></html>

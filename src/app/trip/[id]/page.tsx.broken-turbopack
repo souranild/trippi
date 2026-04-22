@@ -1,0 +1,1810 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import { Trip, loadTrips, updateTrip, updatePlace, removePlace, Document, Link as PlaceLink } from '@/lib/storage'
+import { useTrips } from '@/context/TripContext'
+import { searchWallpapers, getRandomPlaceholder } from '@/lib/wallpaper-search'
+import TripForm from '@/components/TripForm'
+import TimePicker from '@/components/TimePicker'
+import type { Event as TripEvent, Accommodation, Place, Transport, TransportMode } from '@/lib/storage'
+import type { PlaceSearchHit } from '@/lib/places-search'
+import {
+  TRANSPORT_MODES,
+  normalizeTransportMode,
+  transportModeIcon,
+  transportModeLabel,
+} from '@/lib/transport-options'
+
+const emojis = [
+  '✈️', '🏖️', '🏔️', '🏙️', '🌴', '🏰', '🗽', '🗼', '🎭', '🍜', '🏃', '🎨', '🎵', '🍷', '🏂', '🚀',
+  '🌍', '🏕️', '🏝️', '🌄', '🌅', '🏞️', '🏜️', '🏯', '🕌', '⛩️', '🏛️', '🎡', '🎢', '🎠', '🏟️', '🎪',
+  '🍕', '🍔', '🍟', '🌭', '🍿', '🍩', '🍪', '🎂', '🍰', '🧁', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼',
+  '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸', '🥅', '🏒', '🏑', '🏏', '⛳', '🏹',
+  '🎸', '🎹', '🥁', '🎷', '🎺', '🪕', '🎻', '🎤', '🎧', '🎼', '🎶', '🎙️', '🎚️', '🎛️', '🎯',
+  '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🏍️', '🛵', '🚲',
+  '⛵', '🛶', '🚤', '🛳️', '⛴️', '🚢', '🛩️', '🛫', '🛬', '🚁', '🚟', '🚠', '🚡', '🛤️', '🛸'
+]
+
+const Map = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => <div className="h-[600px] w-full bg-neutral-900 animate-pulse rounded-xl" />,
+})
+
+export default function TripDetail() {
+  const { id } = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { updateTrip: updateTripContext } = useTrips()
+  const [trip, setTrip] = useState<Trip | null>(null)
+  const [places, setPlaces] = useState<Place[]>([])
+  const [isPlaceSearchOpen, setIsPlaceSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<PlaceSearchHit[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [selectedSearchResult, setSelectedSearchResult] = useState<PlaceSearchHit | null>(null)
+  const searchAbortRef = useRef<AbortController | null>(null)
+  const [manualPlaceName, setManualPlaceName] = useState('')
+  const [manualPlaceLocation, setManualPlaceLocation] = useState('')
+  const [manualPlaceCountry, setManualPlaceCountry] = useState('')
+  const [newPlaceArrival, setNewPlaceArrival] = useState('')
+  const [newPlaceDeparture, setNewPlaceDeparture] = useState('')
+  const [newPlaceDay, setNewPlaceDay] = useState<number>(1)
+  const [newPlaceNotes, setNewPlaceNotes] = useState('')
+  const [newPlaceDocuments, setNewPlaceDocuments] = useState<Document[]>([])
+  const [newPlaceLinks, setNewPlaceLinks] = useState<PlaceLink[]>([])
+  const [newPlaceEvents, setNewPlaceEvents] = useState<TripEvent[]>([])
+  const [mapsUrlInput, setMapsUrlInput] = useState('')
+  const [mapPreviewCoords, setMapPreviewCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [transportBetweenIndex, setTransportBetweenIndex] = useState<number | null>(null)
+  const [transportToPlaceId, setTransportToPlaceId] = useState<string | null>(null)
+  const [isTransportModalOpen, setIsTransportModalOpen] = useState(false)
+  const [selectedTransportMode, setSelectedTransportMode] = useState<TransportMode | null>(null)
+  const [transportLegDeparture, setTransportLegDeparture] = useState('')
+  const [transportLegArrival, setTransportLegArrival] = useState('')
+  const [transportLegDuration, setTransportLegDuration] = useState('')
+  const [editingTransportLegId, setEditingTransportLegId] = useState<string | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false)
+  const [wallpaperOpacity, setWallpaperOpacity] = useState(1)
+  const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
+  const [mapError, setMapError] = useState(false)
+  const [editingPlace, setEditingPlace] = useState<Place | null>(null)
+  const [editPlaceName, setEditPlaceName] = useState('')
+  const [editPlaceLocation, setEditPlaceLocation] = useState('')
+  const [editPlaceCountry, setEditPlaceCountry] = useState('')
+  const [editArrivalTime, setEditArrivalTime] = useState('')
+  const [editDepartureTime, setEditDepartureTime] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editDay, setEditDay] = useState(1)
+  const [isPlaceDetailModalOpen, setIsPlaceDetailModalOpen] = useState(false)
+  const [selectedPlaceForDetail, setSelectedPlaceForDetail] = useState<Place | null>(null)
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false)
+  const [eventPlaceId, setEventPlaceId] = useState<string>('')
+  const [eventTitle, setEventTitle] = useState('')
+  const [eventDescription, setEventDescription] = useState('')
+  const [eventDate, setEventDate] = useState('')
+  const [eventTime, setEventTime] = useState('')
+
+  // Calculate all days in the trip
+  const getAllDaysInTrip = () => {
+    if (!trip?.startDate) return []
+    
+    const startDate = new Date(trip.startDate)
+    const endDate = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
+    
+    const days = []
+    const currentDate = new Date(startDate)
+    let dayNumber = 1
+    
+    while (currentDate <= endDate) {
+      days.push({
+        dayNumber,
+        date: new Date(currentDate),
+        formattedDate: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' }).toUpperCase(),
+        places: places.filter(place => place.day === dayNumber || (dayNumber === 1 && !place.day))
+      })
+      
+      currentDate.setDate(currentDate.getDate() + 1)
+      dayNumber++
+    }
+    
+    return days
+  }
+
+  // Helper function to migrate places to ensure they have required arrays
+  const migratePlaces = (places: Place[]): Place[] => {
+    return places.map(place => ({
+      ...place,
+      events: place.events || [],
+      documents: place.documents || [],
+      links: place.links || []
+    }))
+  }
+  const openEditModal = () => {
+    if (!trip) return
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditSubmit = (data: {
+    emoji: string
+    title: string
+    description: string
+    startDate: string
+    endDate: string
+    wallpaper: string
+  }) => {
+    if (!trip) return
+
+    setIsEditSubmitting(true)
+
+    const updatedTrip = {
+      ...trip,
+      title: data.title,
+      description: data.description,
+      emoji: data.emoji,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      wallpaper: data.wallpaper
+    }
+
+    // Update context and storage
+    updateTripContext(updatedTrip)
+    
+    // Update local state
+    setTrip(updatedTrip)
+    setIsEditModalOpen(false)
+    setIsEditSubmitting(false)
+  }
+
+  const searchEditWallpapers = async (query: string) => {
+    // Dummy function - TripForm handles wallpaper search internally
+  }
+
+
+  const deleteTransportLeg = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!editingTransportLegId || !trip) return
+    if (confirm('Delete this transport leg?')) {
+      const updatedPlaces = [...places]
+      if (transportBetweenIndex === -1) {
+        // From home - stored in first place
+        if (updatedPlaces[0]) {
+          updatedPlaces[0] = {
+            ...updatedPlaces[0],
+            transport: updatedPlaces[0].transport?.filter(t => t.id !== editingTransportLegId)
+          }
+        }
+      } else if (transportBetweenIndex !== null && updatedPlaces[transportBetweenIndex]) {
+        updatedPlaces[transportBetweenIndex] = {
+          ...updatedPlaces[transportBetweenIndex],
+          transport: updatedPlaces[transportBetweenIndex].transport?.filter(t => t.id !== editingTransportLegId)
+        }
+      }
+      setPlaces(updatedPlaces)
+      savePlacesToTrip(updatedPlaces)
+      closeTransportModal()
+    }
+  }
+
+  useEffect(() => {
+    if (!isPlaceSearchOpen) return
+
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      setSearchResults([])
+      setSearchError(null)
+      setIsSearching(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      searchAbortRef.current?.abort()
+      const ac = new AbortController()
+      searchAbortRef.current = ac
+      setIsSearching(true)
+      setSearchError(null)
+
+      fetch(`/api/places/search?q=${encodeURIComponent(q)}`, { signal: ac.signal })
+        .then(async (res) => {
+          const data = (await res.json()) as { results?: PlaceSearchHit[]; error?: string }
+          setSearchResults(data.results ?? [])
+          setSearchError(
+            data.error ??
+              (res.ok ? null : 'Search request failed. Try again or add a place manually.'),
+          )
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return
+          if (err instanceof Error && err.name === 'AbortError') return
+          setSearchResults([])
+          setSearchError('Could not reach the app. Check your connection and try again.')
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setIsSearching(false)
+        })
+    }, 400)
+
+    return () => {
+      clearTimeout(timer)
+      searchAbortRef.current?.abort()
+    }
+  }, [searchQuery, isPlaceSearchOpen])
+
+  const getMapUrl = () => {
+    if (places.length === 0) return 'https://maps.google.com/maps?q=popular+destinations&output=embed&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|visibility:simplified&style=element:labels|visibility:off&style=feature:administrative|visibility:off&style=feature:landscape|element:geometry|color:0x1a1a1a&style=feature:water|element:geometry|color:0x0e0e0e&style=feature:road|element:geometry|color:0x2d2d2d'
+
+    if (places.length === 1) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(places[0].name + ', ' + places[0].location)}&output=embed&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|visibility:simplified&style=element:labels|visibility:off&style=feature:administrative|visibility:off&style=feature:landscape|element:geometry|color:0x1a1a1a&style=feature:water|element:geometry|color:0x0e0e0e&style=feature:road|element:geometry|color:0x2d2d2d`
+    }
+
+    // For multiple places, create a route
+    const waypoints = places.map(p => encodeURIComponent(p.name + ', ' + p.location))
+    return `https://maps.google.com/maps/dir/${waypoints.join('/')}/&output=embed&style=feature:poi|visibility:off&style=feature:transit|visibility:off&style=feature:road|visibility:simplified&style=element:labels|visibility:off&style=feature:administrative|visibility:off&style=feature:landscape|element:geometry|color:0x1a1a1a&style=feature:water|element:geometry|color:0x0e0e0e&style=feature:road|element:geometry|color:0x2d2d2d`
+  }
+
+  const savePlacesToTrip = (updatedPlaces: Place[]) => {
+    if (trip) {
+      const updatedTrip = { ...trip, places: updatedPlaces }
+      updateTripContext(updatedTrip)
+      setTrip(updatedTrip)
+    }
+  }
+
+  const selectPlaceFromSearch = (place: PlaceSearchHit) => {
+    setSelectedSearchResult(place)
+    setManualPlaceName(place.name)
+    // For cities/districts, location should be the city name
+    // For landmarks, location should be the city part
+    const isCityOrDistrict = place.type === 'district' || place.type === 'city'
+    const placeLocation = isCityOrDistrict ? place.name : (place.city || place.location.split(',')[0]?.trim() || place.name)
+    setManualPlaceLocation(placeLocation)
+    setManualPlaceCountry(place.country || place.location.split(',').pop()?.trim() || '')
+  }
+
+  const parseGoogleMapsUrl = (url: string) => {
+    try {
+      // Handle various Google Maps URL formats
+      // Format 1: https://maps.google.com/maps?q=place+name
+      // Format 2: https://goo.gl/maps/xxxxx
+      // Format 3: https://www.google.com/maps/place/place+name/@lat,lng
+      // Format 4: https://maps.google.com/?q=lat,lng
+      
+      const urlObj = new URL(url)
+      let placeName = ''
+      let coords: { lat: number; lng: number } | null = null
+      
+      // Try to extract from query parameter
+      const q = urlObj.searchParams.get('q')
+      if (q) {
+        // Check if it's coordinates
+        const coordsMatch = q.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/)
+        if (coordsMatch) {
+          coords = { lat: parseFloat(coordsMatch[1]), lng: parseFloat(coordsMatch[2]) }
+        } else {
+          placeName = decodeURIComponent(q).replace(/\+/g, ' ')
+        }
+      }
+      
+      // Try to extract from path (for maps.google.com/maps/place/...)
+      const placeMatch = urlObj.pathname.match(/\/place\/([^/]+)/)
+      if (placeMatch && !placeName) {
+        placeName = decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ')
+      }
+      
+      // Try to extract coordinates from @lat,lng format
+      const pathCoords = urlObj.hash.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/)
+      if (pathCoords) {
+        coords = { lat: parseFloat(pathCoords[1]), lng: parseFloat(pathCoords[2]) }
+      }
+      
+      if (placeName) {
+        setManualPlaceName(placeName)
+        setManualPlaceLocation(placeName)
+        setMapsUrlInput('')
+      }
+      
+      if (coords) {
+        setMapPreviewCoords(coords)
+      }
+      
+      return true
+    } catch (error) {
+      console.error('Failed to parse Google Maps URL:', error)
+      return false
+    }
+  }
+
+  const addPlace = () => {
+    if (selectedSearchResult) {
+      // Add from search result
+      const country =
+        selectedSearchResult.country?.trim() ||
+        selectedSearchResult.location.split(',').pop()?.trim() ||
+        'Unknown'
+      const isCityOrDistrict = selectedSearchResult.type === 'district' || selectedSearchResult.type === 'city'
+      const location = isCityOrDistrict ? selectedSearchResult.name : selectedSearchResult.location
+      const newPlace: Place = {
+        id: Date.now().toString(),
+        name: selectedSearchResult.name,
+        location,
+        country,
+        lat: selectedSearchResult.coordinates.lat,
+        lng: selectedSearchResult.coordinates.lng,
+        day: newPlaceDay,
+        events: newPlaceEvents,
+        documents: newPlaceDocuments,
+        links: newPlaceLinks,
+        ...(newPlaceArrival && { arrival: newPlaceArrival }),
+        ...(newPlaceDeparture && { departure: newPlaceDeparture }),
+        ...(newPlaceNotes && { notes: newPlaceNotes }),
+      }
+      const updatedPlaces = [...places, newPlace]
+      setPlaces(updatedPlaces)
+      savePlacesToTrip(updatedPlaces)
+      resetPlaceModal()
+    } else if (manualPlaceName.trim() && manualPlaceLocation.trim() && manualPlaceCountry.trim()) {
+      // Add manually
+      const newPlace: Place = {
+        id: Date.now().toString(),
+        name: manualPlaceName,
+        location: manualPlaceLocation,
+        country: manualPlaceCountry,
+        day: newPlaceDay,
+        events: newPlaceEvents,
+        documents: newPlaceDocuments,
+        links: newPlaceLinks,
+        ...(newPlaceArrival && { arrival: newPlaceArrival }),
+        ...(newPlaceDeparture && { departure: newPlaceDeparture }),
+        ...(newPlaceNotes && { notes: newPlaceNotes }),
+      }
+      const updatedPlaces = [...places, newPlace]
+      setPlaces(updatedPlaces)
+      savePlacesToTrip(updatedPlaces)
+      resetPlaceModal()
+    }
+  }
+
+  const resetPlaceModal = () => {
+    searchAbortRef.current?.abort()
+    setIsPlaceSearchOpen(false)
+    setSearchQuery('')
+    setSearchResults([])
+    setSearchError(null)
+    setSelectedSearchResult(null)
+    setManualPlaceName('')
+    setManualPlaceLocation('')
+    setManualPlaceCountry('')
+    setNewPlaceArrival('')
+    setNewPlaceDeparture('')
+    setNewPlaceDay(Math.max(1, places.length + 1))
+    setNewPlaceNotes('')
+    setNewPlaceDocuments([])
+    setNewPlaceLinks([])
+    setEditingPlace(null)
+    setNewPlaceEvents([])
+    setMapsUrlInput('')
+    setMapPreviewCoords(null)
+  }
+
+  const startEditingPlace = (place: Place) => {
+    setEditingPlace(place)
+    setEditPlaceName(place.name)
+    setEditPlaceLocation(place.location)
+    setEditPlaceCountry(place.country)
+    setEditArrivalTime(place.arrival || '')
+    setEditDepartureTime(place.departure || '')
+    setEditDay(place.day || 1)
+    setEditNotes(place.notes || '')
+    setNewPlaceDocuments(place.documents || [])
+    setNewPlaceLinks(place.links || [])
+    setIsPlaceSearchOpen(true)
+  }
+
+  const savePlaceEdits = () => {
+    if (!editingPlace || !trip) return
+
+    updatePlace(trip.id, editingPlace.id, {
+      name: editPlaceName,
+      location: editPlaceLocation,
+      country: editPlaceCountry,
+      arrival: editArrivalTime || undefined,
+      departure: editDepartureTime || undefined,
+      day: editDay,
+      notes: editNotes
+    })
+
+    const updatedTrips = loadTrips()
+    const found = updatedTrips.find(t => t.id === id)
+    if (found) {
+      setTrip(found)
+      setPlaces(migratePlaces(found.places || []))
+    }
+    setEditingPlace(null)
+  }
+
+  const deletePlace = (placeId: string) => {
+    if (!trip) return
+    if (confirm('Are you sure you want to delete this place?')) {
+      removePlace(trip.id, placeId)
+      const updatedTrips = loadTrips()
+      const found = updatedTrips.find(t => t.id === id)
+      if (found) {
+        setTrip(found)
+        setPlaces(migratePlaces(found.places || []))
+      }
+      setEditingPlace(null)
+    }
+  }
+
+
+    setEventPlaceId(placeId)
+    setIsEventModalOpen(true)
+    // Set default date to the place's day
+    const place = places.find(p => p.id === placeId)
+    if (place && trip && trip.startDate) {
+      const placeDate = new Date(trip.startDate)
+      placeDate.setDate(placeDate.getDate() + (place.day || 1) - 1)
+      setEventDate(placeDate.toISOString().split('T')[0])
+    }
+  }
+
+  const saveEvent = () => {
+    if (!eventTitle.trim() || !eventPlaceId) return
+
+    const newEvent: TripEvent = {
+      id: Date.now().toString(),
+      title: eventTitle.trim(),
+      description: eventDescription.trim(),
+      date: eventDate,
+      ...(eventTime && { time: eventTime }),
+      type: 'activity',
+      documents: []
+    }
+
+    const updatedPlaces = places.map(place => {
+      if (place.id === eventPlaceId) {
+        return {
+          ...place,
+          events: [...place.events, newEvent]
+        }
+      }
+      return place
+    })
+
+    setPlaces(updatedPlaces)
+    savePlacesToTrip(updatedPlaces)
+    resetEventModal()
+  }
+
+  const resetEventModal = () => {
+    setIsEventModalOpen(false)
+    setEventPlaceId('')
+    setEventTitle('')
+    setEventDescription('')
+    setEventDate('')
+    setEventTime('')
+  }
+
+  const closeTransportModal = () => {
+    setIsTransportModalOpen(false)
+    setTransportBetweenIndex(null)
+    setTransportToPlaceId(null)
+    setSelectedTransportMode(null)
+    setTransportLegDeparture('')
+    setTransportLegArrival('')
+    setTransportLegDuration('')
+    setEditingTransportLegId(null)
+  }
+
+  const openTransportModal = (fromPlaceId: string, toPlaceId: string, legId?: string) => {
+    const fromIdx = fromPlaceId === 'home' ? -1 : places.findIndex((p) => p.id === fromPlaceId)
+    if (fromIdx < 0 && fromPlaceId !== 'home') return
+    setTransportBetweenIndex(fromIdx)
+    setTransportToPlaceId(toPlaceId)
+
+    const fromPlace = fromPlaceId === 'home' ? null : places[fromIdx]
+    const existing = legId ? fromPlace?.transport?.find((t) => t.id === legId) : fromPlace?.transport?.find((t) => t.to === toPlaceId)
+    if (existing) {
+      setEditingTransportLegId(existing.id)
+      setSelectedTransportMode(normalizeTransportMode(existing.type))
+      setTransportLegDeparture(existing.departure || '')
+      setTransportLegArrival(existing.arrival || '')
+      setTransportLegDuration(existing.duration || '')
+    } else {
+      setEditingTransportLegId(null)
+      setSelectedTransportMode(null)
+      setTransportLegDeparture('')
+      setTransportLegArrival('')
+      setTransportLegDuration('')
+    }
+    setIsTransportModalOpen(true)
+  }
+
+  const saveTransportLeg = () => {
+    if (!transportToPlaceId || !selectedTransportMode) return
+    let fromPlaceId = ''
+    if (transportBetweenIndex === -1) {
+      fromPlaceId = 'home'
+    } else if (typeof transportBetweenIndex === 'number') {
+      const place = places[transportBetweenIndex]
+      if (!place) return
+      fromPlaceId = place.id
+    } else {
+      return
+    }
+    const toPlace = transportToPlaceId === 'home' ? null : places.find((p) => p.id === transportToPlaceId)
+    if (transportToPlaceId !== 'home' && !toPlace) return
+
+    const leg: Transport = {
+      id: editingTransportLegId ?? Date.now().toString(),
+      type: selectedTransportMode,
+      from: fromPlaceId,
+      to: transportToPlaceId,
+      departure: transportLegDeparture,
+      arrival: transportLegArrival,
+      ...(transportLegDuration.trim() && { duration: transportLegDuration.trim() }),
+      documents: editingTransportLegId ? (fromPlaceId === 'home' ? [] : (transportBetweenIndex !== null ? places[transportBetweenIndex]?.transport?.find((t) => t.id === editingTransportLegId)?.documents ?? [] : [])) : [],
+    }
+
+    if (fromPlaceId === 'home') {
+      // For transport from home, we need to add it to the first place
+      const firstPlace = places[0]
+      if (!firstPlace) return
+      const prev = firstPlace.transport?.filter((t) => t.id !== editingTransportLegId) ?? []
+      const updatedPlaces = places.map((p) =>
+        p.id === firstPlace.id ? { ...p, transport: [...prev, leg] } : p,
+      )
+      setPlaces(updatedPlaces)
+      savePlacesToTrip(updatedPlaces)
+    } else if (transportBetweenIndex !== null) {
+      const fromPlace = places[transportBetweenIndex]
+      if (!fromPlace) return
+      const prev = fromPlace.transport?.filter((t) => t.id !== editingTransportLegId) ?? []
+      const updatedPlaces = places.map((p) =>
+        p.id === fromPlace.id ? { ...p, transport: [...prev, leg] } : p,
+      )
+      setPlaces(updatedPlaces)
+      savePlacesToTrip(updatedPlaces)
+    }
+    closeTransportModal()
+  }
+
+  useEffect(() => {
+    const trips = loadTrips()
+    const found = trips.find(t => t.id === id)
+    if (found) {
+      setTrip(found)
+      // Load places from trip data and migrate to ensure required arrays exist
+      setPlaces(migratePlaces(found.places || []))
+    }
+  }, [id])
+
+  // Fade in wallpaper when trip wallpaper changes
+  useEffect(() => {
+    if (trip?.wallpaper) {
+      setWallpaperOpacity(0)
+      const timer = setTimeout(() => setWallpaperOpacity(1), 50)
+      return () => clearTimeout(timer)
+    }
+  }, [trip?.wallpaper])
+
+  // Check for addFirstPlace parameter
+  useEffect(() => {
+    if (searchParams.get('addFirstPlace') === 'true' && trip) {
+      setIsPlaceSearchOpen(true)
+      // Clean up the URL
+      router.replace(`/trip/${id}`)
+    }
+  }, [searchParams, trip, id, router])
+
+  if (!trip) {
+    return (
+      <div className="min-h-screen bg-background text-on-surface font-body flex items-center justify-center">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-6xl text-neutral-600 mb-4">flight_takeoff</span>
+          <p className="text-neutral-500">Loading trip...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const wallpaperUrl = trip.wallpaper?.trim()
+
+  return (
+    <div className="relative min-h-screen bg-background text-on-surface font-body">
+      {wallpaperUrl ? (
+        <>
+          <div
+            className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-700"
+            style={{ backgroundImage: `url(${wallpaperUrl})`, opacity: wallpaperOpacity }}
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none fixed inset-0 z-0 bg-black/10 backdrop-blur-sm"
+            aria-hidden
+          />
+        </>
+      ) : null}
+      {/* Top Header - starts after hamburger menu */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between bg-neutral-900/40 pl-20 pr-6 py-4 shadow-[inset_0_1px_0_rgba(143,245,255,0.1)] backdrop-blur-xl">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="text-xl sm:text-2xl font-bold text-[#8ff5ff] font-['Space Grotesk'] tracking-tight hover:text-[#c3f400] transition-colors duration-300"
+          >
+            trippi
+          </Link>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 overflow-hidden">
+            <img alt="Profile" src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face" />
+          </div>
+        </div>
+      </header>
+
+      {/* Floating Back Button */}
+      <Link href="/" className="fixed top-20 left-4 z-60 w-8 h-8 bg-neutral-900/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-800/60 hover:text-white transition-all duration-300 active:scale-95 shadow-lg">
+        <span className="material-symbols-outlined text-sm">arrow_back</span>
+      </Link>
+
+      {/* Main Content */}
+      <main className="relative z-10 min-h-screen pt-24 pb-32 px-4 sm:px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto">
+          {/* Trip Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">{trip.emoji}</span>
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold font-headline text-white">{trip.title}</h1>
+                <p className="text-neutral-400">{trip.startDate}{trip.endDate && ` - ${trip.endDate}`}</p>
+              </div>
+              <button
+                onClick={openEditModal}
+                className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800/50 rounded-lg transition-colors"
+                title="Edit trip details"
+              >
+                <span className="material-symbols-outlined">edit</span>
+              </button>
+            </div>
+            {trip.description && (
+              <p className="text-neutral-300 text-lg">{trip.description}</p>
+            )}
+          </div>
+
+          {/* Three Main Sections */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Section 1: Unified Timeline */}
+            <div className="space-y-4">
+              <div className="bg-neutral-900/30 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 animate-in slide-in-from-left-4 duration-500 shadow-2xl">
+                <div className="flex items-center justify-between mb-8 border-b border-neutral-800 pb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white font-headline flex items-center gap-3">
+                      <span className="material-symbols-outlined text-primary">timeline</span>
+                      Itinerary
+                    </h2>
+                    <p className="text-neutral-500 text-sm mt-1">Plan your journey day by day</p>
+                  </div>
+                </div>
+
+                <div className="space-y-8 relative">
+                  {trip.places.length === 0 ? (
+                    <div className="text-center py-12">
+                      <span className="material-symbols-outlined text-6xl text-neutral-600 mb-4">location_on</span>
+                      <h3 className="text-xl font-bold text-white mb-2">No places added yet</h3>
+                      <p className="text-neutral-400 mb-4">Start building your itinerary by adding your first place</p>
+                      <button
+                        onClick={() => setIsPlaceSearchOpen(true)}
+                        className="w-full bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 flex items-center justify-center gap-2 hover:bg-primary/20 hover:border-primary/60 transition-all text-primary font-semibold group active:scale-95 duration-150"
+                      >
+                        <span className="material-symbols-outlined text-lg">add_circle</span>
+                        <span className="text-sm font-bold uppercase tracking-wider">Add your first place</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {allDays.map((day) => (
+                        <div key={day.dayNumber} className="relative ml-[15px]">
+                          {/* Day Header */}
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs font-bold text-primary font-mono uppercase tracking-wider">Day {day.dayNumber}</div>
+                              <div className="text-sm text-neutral-400">•</div>
+                              <div className="text-sm text-neutral-300">{day.formattedDate}</div>
+                              <div className="text-xs text-neutral-500">({day.places.length} place{day.places.length !== 1 ? 's' : ''})</div>
+                            </div>
+                          </div>
+
+                          {/* Vertical Timeline for the Day */}
+                          <div className="relative">
+                            {/* Vertical Line */}
+                            <div className="absolute left-0 top-0 bottom-0 w-px bg-neutral-700"></div>
+
+                            {day.places.length === 0 ? (
+                              <div className="relative flex items-center gap-4 mb-4">
+                                <div className="flex flex-col items-end gap-1 w-[50px] shrink-0">
+                                  <div className="w-8 h-8 bg-neutral-600/20 rounded-full flex items-center justify-center border border-neutral-600/30">
+                                    <span className="material-symbols-outlined text-neutral-600 text-sm">location_on</span>
+                                  </div>
+                                </div>
+                                <div className="flex-1 bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-xl p-4 text-center">
+                                  <span className="material-symbols-outlined text-4xl text-neutral-600 mb-2">location_on</span>
+                                  <h4 className="text-white font-medium mb-1">No places yet</h4>
+                                  <p className="text-neutral-400 text-sm mb-3">Add your first place to this day</p>
+                                  <button
+                                    onClick={() => {
+                                      setNewPlaceDay(day.dayNumber)
+                                      setIsPlaceSearchOpen(true)
+                                    }}
+                                    className="text-primary hover:text-primary/80 font-medium text-sm underline"
+                                  >
+                                    Add your first place
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {day.places.map((place, idx) => {
+                                  const isLastInDay = idx === day.places.length - 1;
+
+                                  return (
+                                    <div key={place.id} className="relative flex items-center gap-4 mb-4">
+                                      {/* Timeline Section with Times */}
+                                      <div className="flex flex-col items-end gap-1 w-[50px] shrink-0">
+                                        {/* Timeline Dot */}
+                                        <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
+                                          <span className="material-symbols-outlined text-primary text-sm">location_on</span>
+                                        </div>
+
+                                        {/* Arrival Time */}
+                                        <div className="flex flex-col items-end">
+                                          <span className="text-xs font-bold text-white font-mono leading-none">{place.arrival || '--:--'}</span>
+                                          <span className="text-[8px] text-neutral-500 uppercase font-bold tracking-tighter">Arr</span>
+                                        </div>
+
+                                        {/* Departure Time */}
+                                        <div className="flex flex-col items-end mt-1">
+                                          <span className="text-xs font-bold text-neutral-400 font-mono leading-none">{place.departure || '--:--'}</span>
+                                          <span className="text-[8px] text-neutral-600 uppercase font-bold tracking-tighter">Dep</span>
+                                        </div>
+                                      </div>
+
+                                      {/* Place Card */}
+                                      <div className="flex-1 bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-xl p-4 hover:bg-neutral-800/30 transition-all duration-300 group cursor-pointer"
+                                           onClick={() => {
+                                             setSelectedPlaceForDetail(place)
+                                             setIsPlaceDetailModalOpen(true)
+                                           }}>
+                                        <div className="flex items-start justify-between">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <div className="w-40 overflow-hidden">
+                                                <h4 className="text-sm font-bold text-white group-hover:text-primary transition-colors w-full line-clamp-2 leading-tight text-justify">{place.name}</h4>
+                                                <p className="text-neutral-500 text-xs line-clamp-1">{place.location}</p>
+                                              </div>
+                                            </div>
+
+                                            {/* Events for this place */}
+                                            {place.events && place.events.length > 0 && (
+                                              <div className="mt-3 space-y-2">
+                                                {place.events.map((event, eventIdx) => (
+                                                  <div key={eventIdx} className="flex items-center gap-2 p-2 bg-neutral-800/30 rounded-lg">
+                                                    <span className="text-sm">{event.emoji || '📅'}</span>
+                                                    <div className="flex-1">
+                                                      <div className="text-white text-sm font-medium">{event.title}</div>
+                                                      {event.time && <div className="text-neutral-400 text-xs">🕐 {event.time}</div>}
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Action buttons */}
+                                          <div className="flex items-center gap-1 ml-4">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                setEventPlaceId(place.id)
+                                                setIsEventModalOpen(true)
+                                              }}
+                                              className="p-1.5 text-neutral-500 hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                                              title="Add event"
+                                            >
+                                              <span className="material-symbols-outlined text-base">event</span>
+                                            </button>
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                if (confirm(`Remove "${place.name}" from your itinerary?`)) {
+                                                  const updatedPlaces = places.filter(p => p.id !== place.id)
+                                                  setPlaces(updatedPlaces)
+                                                  savePlacesToTrip(updatedPlaces)
+                                                }
+                                              }}
+                                              className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                              title="Remove place"
+                                            >
+                                              <span className="material-symbols-outlined text-base">delete</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Add Place Button at the end of the timeline */}
+                                <div className="relative flex items-center gap-4 mb-4">
+                                  <div className="flex flex-col items-end gap-1 w-[50px] shrink-0">
+                                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
+                                      <span className="material-symbols-outlined text-primary text-sm">add_circle</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <button
+                                      onClick={() => {
+                                        setNewPlaceDay(day.dayNumber)
+                                        setIsPlaceSearchOpen(true)
+                                      }}
+                                      className="w-full bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 flex items-center justify-center gap-2 hover:bg-primary/20 hover:border-primary/60 transition-all text-primary font-semibold group active:scale-95 duration-150"
+                                    >
+                                      <span className="text-sm font-bold uppercase tracking-wider">Add Place</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Map with Itinerary */}
+            <div className="space-y-4">
+              <div className="bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden sticky top-24 shadow-2xl">
+                <div className="p-4 border-b border-neutral-700">
+                  <h2 className="text-lg font-bold text-white font-headline">Trip Map</h2>
+                  <p className="text-neutral-400 text-sm">All places with connecting routes</p>
+                </div>
+                {places.length > 0 ? (
+                  <div className="relative">
+                    <Map 
+                      places={places} 
+                      emoji={trip?.emoji} 
+                      focusedPlaceId={focusedPlaceId}
+                      showDayNumbers={true}
+                    />
+                  </div>
+                ) : (
+                  <div className="h-96 flex items-center justify-center bg-neutral-800/10 rounded-b-xl border border-dashed border-neutral-700 m-4">
+                    <div className="text-center p-8">
+                      <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="material-symbols-outlined text-neutral-500 text-3xl">map</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-white mb-2">No Map Data</h3>
+                      <p className="text-neutral-400 max-w-xs mx-auto">Add at least one place with a location to see your route on the map.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Place Search Modal */}
+      {isPlaceSearchOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-md animate-in fade-in duration-300 sm:items-center sm:p-4">
+          <div className="flex h-[95vh] max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-2xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl animate-in slide-in-from-bottom-4 duration-500 sm:h-[85vh] sm:max-h-[85vh] sm:rounded-2xl">
+            {/* Header — fixed */}
+            <div className="flex shrink-0 flex-col border-b border-white/10 p-3 sm:p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-headline text-lg font-bold text-white sm:text-xl">
+                  {editingPlace ? 'Edit place' : 'Add place'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => resetPlaceModal()}
+                  className="rounded-full p-1.5 text-neutral-400 transition-colors hover:bg-white/10 active:scale-95"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+              {/* Left Side: Search & Manual Input */}
+              <div className="flex flex-[1.2] flex-col border-b border-neutral-700 overflow-hidden md:border-b-0 md:border-r">
+                <div className="shrink-0 p-3 sm:p-4 pb-2">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search cities, landmarks, addresses…"
+                      className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm py-2.5 pl-10 pr-10 text-sm text-white outline-none placeholder:text-neutral-400 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    />
+                    <span className="material-symbols-outlined pointer-events-none absolute left-3 top-2.5 text-neutral-400 text-lg">
+                      search
+                    </span>
+                    {isSearching && (
+                      <span className="material-symbols-outlined absolute right-3 top-2.5 animate-spin text-primary text-lg">
+                        refresh
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[10px] text-neutral-500 uppercase font-bold tracking-wider">
+                    OpenStreetMap Search
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-3 sm:px-4 pb-4">
+                  {searchResults.length > 0 ? (
+                    <div className="space-y-2 mt-2">
+                      {searchResults.map((place) => (
+                        <button
+                          key={place.id}
+                          type="button"
+                          onClick={() => selectPlaceFromSearch(place)}
+                          className={`w-full rounded-lg border p-3 text-left transition-all text-sm ${
+                            selectedSearchResult?.id === place.id
+                              ? 'border-primary bg-primary/20 ring-1 ring-primary/40'
+                              : 'border-white/10 bg-white/5 hover:border-primary/40 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/20">
+                              <span className="material-symbols-outlined text-primary text-lg">
+                                {place.type === 'landmark' ? 'location_on' : 'place'}
+                              </span>
+                            </div>
+                            <div className="w-40 overflow-hidden">
+                              <span className="font-bold text-white text-base leading-tight block w-full line-clamp-2 text-justify">{place.name}</span>
+                              <p className="text-sm text-neutral-400 truncate mt-0.5">{place.location}</p>
+                            </div>
+                            {selectedSearchResult?.id === place.id && (
+                              <span className="material-symbols-outlined shrink-0 text-primary">check_circle</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : searchQuery.trim().length >= 2 && !isSearching ? (
+                    <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                      <span className="material-symbols-outlined mb-3 text-4xl text-neutral-600">search_off</span>
+                      <h3 className="text-lg font-bold text-white">No matches</h3>
+                      <p className="mt-1 max-w-sm text-sm text-neutral-400">Try another term or fill in details manually.</p>
+                    </div>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center p-6 text-center opacity-40">
+                      <span className="material-symbols-outlined mb-3 text-5xl text-neutral-600">travel_explore</span>
+                      <p className="text-sm text-neutral-400">Type to search destinations</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Entry Section */}
+                <div className="shrink-0 border-t border-white/10 p-3 sm:p-4 space-y-4">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                     Or Enter Manually <div className="h-px flex-1 bg-neutral-800"></div>
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-neutral-500 uppercase ml-1">Place Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Tokyo Tower"
+                        value={editingPlace ? editPlaceName : manualPlaceName}
+                        onChange={(e) => editingPlace ? setEditPlaceName(e.target.value) : setManualPlaceName(e.target.value)}
+                        className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-2 text-xs text-white focus:border-primary outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">City / Area</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Minato City"
+                        value={editingPlace ? editPlaceLocation : manualPlaceLocation}
+                        onChange={(e) => editingPlace ? setEditPlaceLocation(e.target.value) : setManualPlaceLocation(e.target.value)}
+                        className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-2 text-xs text-white focus:border-primary outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Country</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Japan"
+                        value={editingPlace ? editPlaceCountry : manualPlaceCountry}
+                        onChange={(e) => editingPlace ? setEditPlaceCountry(e.target.value) : setManualPlaceCountry(e.target.value)}
+                        className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-2 text-xs text-white focus:border-primary outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Place Details & Additional Fields */}
+              {(selectedSearchResult || (manualPlaceName.trim() && manualPlaceLocation.trim()) || editingPlace) && (
+              <div className="flex flex-1 flex-col overflow-hidden bg-black/10">
+                <div className="flex-1 overflow-y-auto space-y-8 p-4 sm:p-8 flex flex-col">
+                  {/* Selected Place Preview */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       {editingPlace ? 'Editing Place' : 'Selected Place'} <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
+                          <span className="material-symbols-outlined text-primary text-xl">place</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-white text-lg leading-tight block">
+                            {editingPlace ? editPlaceName : (selectedSearchResult ? selectedSearchResult.name : manualPlaceName)}
+                          </span>
+                          <p className="text-sm text-neutral-400 mt-1">
+                            {editingPlace ? `${editPlaceLocation}${editPlaceCountry ? `, ${editPlaceCountry}` : ''}` : (selectedSearchResult ? selectedSearchResult.location : `${manualPlaceLocation}${manualPlaceCountry ? `, ${manualPlaceCountry}` : ''}`)}
+                          </p>
+                        </div>
+                        {((selectedSearchResult || manualPlaceName) && !editingPlace) && (
+                          <button
+                            onClick={() => {
+                              setSelectedSearchResult(null)
+                              setManualPlaceName('')
+                              setManualPlaceLocation('')
+                              setManualPlaceCountry('')
+                            }}
+                            className="shrink-0 p-1 text-neutral-400 hover:text-white transition-colors"
+                            title="Clear selection"
+                          >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Times */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       Timing <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Day</label>
+                        <select
+                          value={editingPlace ? editDay : newPlaceDay}
+                          onChange={(e) => editingPlace ? setEditDay(parseInt(e.target.value) || 1) : setNewPlaceDay(parseInt(e.target.value) || 1)}
+                          className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-2 text-xs text-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
+                        >
+                          {(() => {
+                            const days = []
+                            if (trip?.startDate) {
+                              const start = new Date(trip.startDate)
+                              const end = trip?.endDate ? new Date(trip.endDate) : new Date(start.getTime() + 10 * 24 * 60 * 60 * 1000)
+                              const dayCount = Math.max(10, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+                              
+                              for (let i = 1; i <= dayCount; i++) {
+                                days.push(<option key={i} value={i}>Day {i}</option>)
+                              }
+                            }
+                            return days
+                          })()}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Arrival</label>
+                        <TimePicker
+                          value={editingPlace ? editArrivalTime : newPlaceArrival}
+                          onChange={editingPlace ? setEditArrivalTime : setNewPlaceArrival}
+                          placeholder="Arrival"
+                          className="text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-neutral-400 uppercase ml-1">Departure</label>
+                        <TimePicker
+                          value={editingPlace ? editDepartureTime : newPlaceDeparture}
+                          onChange={editingPlace ? setEditDepartureTime : setNewPlaceDeparture}
+                          placeholder="Departure"
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       Notes <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <textarea
+                      value={editingPlace ? editNotes : newPlaceNotes}
+                      onChange={(e) => editingPlace ? setEditNotes(e.target.value) : setNewPlaceNotes(e.target.value)}
+                      placeholder="Add any notes about this place..."
+                      rows={3}
+                      className="w-full rounded-lg border border-white/20 bg-white/10 backdrop-blur-sm px-3 py-2 text-xs text-white focus:border-primary outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Documents */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       Documents <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <div className="space-y-2">
+                      {newPlaceDocuments.length > 0 ? (
+                        newPlaceDocuments.map((doc, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-800/30 rounded-lg">
+                            <span className="material-symbols-outlined text-primary">description</span>
+                            <div className="flex-1">
+                              <div className="text-white text-sm font-medium">{doc.name}</div>
+                              <div className="text-neutral-400 text-xs">{doc.type}</div>
+                            </div>
+                            <button
+                              onClick={() => setNewPlaceDocuments(prev => prev.filter((_, i) => i !== idx))}
+                              className="p-1 text-neutral-400 hover:text-red-400"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-neutral-500">
+                          <span className="material-symbols-outlined text-2xl mb-1 block">description</span>
+                          <p className="text-xs">No documents added yet</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          const name = prompt('Document name:')
+                          const type = prompt('Document type (ticket, reservation, etc.):') as Document['type']
+                          if (name && type) {
+                            setNewPlaceDocuments(prev => [...prev, {
+                              id: Date.now().toString(),
+                              name,
+                              type: type || 'other'
+                            }])
+                          }
+                        }}
+                        className="w-full py-2 px-4 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        <span className="text-xs font-medium">Add Document</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Links */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       Links <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <div className="space-y-2">
+                      {newPlaceLinks.length > 0 ? (
+                        newPlaceLinks.map((link, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-800/30 rounded-lg">
+                            <span className="material-symbols-outlined text-primary">link</span>
+                            <div className="flex-1">
+                              <div className="text-white text-sm font-medium">{link.title}</div>
+                              <div className="text-neutral-400 text-xs">{link.url}</div>
+                            </div>
+                            <button
+                              onClick={() => setNewPlaceLinks(prev => prev.filter((_, i) => i !== idx))}
+                              className="p-1 text-neutral-400 hover:text-red-400"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-neutral-500">
+                          <span className="material-symbols-outlined text-2xl mb-1 block">link</span>
+                          <p className="text-xs">No links added yet</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          const title = prompt('Link title:')
+                          const url = prompt('Link URL:')
+                          if (title && url) {
+                            setNewPlaceLinks(prev => [...prev, {
+                              id: Date.now().toString(),
+                              title,
+                              url
+                            }])
+                          }
+                        }}
+                        className="w-full py-2 px-4 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        <span className="text-xs font-medium">Add Link</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Events */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 flex items-center gap-2">
+                       Events <div className="h-px flex-1 bg-neutral-800"></div>
+                    </h3>
+                    <div className="space-y-2">
+                      {newPlaceEvents.length > 0 ? (
+                        newPlaceEvents.map((event, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-800/30 rounded-lg">
+                            <span className="material-symbols-outlined text-primary">event</span>
+                            <div className="flex-1">
+                              <div className="text-white text-sm font-medium">{event.title}</div>
+                              <div className="text-neutral-400 text-xs">{event.type} • {event.time || event.date}</div>
+                            </div>
+                            <button
+                              onClick={() => setNewPlaceEvents(prev => prev.filter((_, i) => i !== idx))}
+                              className="p-1 text-neutral-400 hover:text-red-400"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-neutral-500">
+                          <span className="material-symbols-outlined text-2xl mb-1 block">event</span>
+                          <p className="text-xs">No events added yet</p>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          const title = prompt('Event title:')
+                          const type = prompt('Event type (activity, dining, sightseeing, etc.):') as TripEvent['type']
+                          const time = prompt('Event time (optional):')
+                          if (title && type) {
+                            setNewPlaceEvents(prev => [...prev, {
+                              id: Date.now().toString(),
+                              title,
+                              type: (type as TripEvent['type']) || 'other',
+                              date: new Date().toISOString().split('T')[0],
+                              time: time || undefined,
+                              documents: []
+                            }])
+                          }
+                        }}
+                        className="w-full py-2 px-4 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        <span className="text-xs font-medium">Add Event</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto shrink-0 border-t border-white/10 p-3 sm:p-4 space-y-2">
+                    <button
+                      type="button"
+                      onClick={editingPlace ? savePlaceEdits : addPlace}
+                      disabled={
+                        editingPlace ? false : (
+                          !selectedSearchResult &&
+                          (!manualPlaceName.trim() || !manualPlaceLocation.trim() || !manualPlaceCountry.trim())
+                        )
+                      }
+                      className="w-full rounded-lg bg-primary py-2 text-xs font-bold text-black shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] hover:bg-primary/90 disabled:opacity-30 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">{editingPlace ? 'save' : 'add_location_alt'}</span>
+                      {editingPlace ? 'Save Changes' : 'Add Place'}
+                    </button>
+                    <button
+                      onClick={() => resetPlaceModal()}
+                      className="w-full py-1.5 text-neutral-400 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest"
+                    >
+                      Cancel
+                    </button>
+                    {editingPlace && (
+                      <button
+                        onClick={() => deletePlace(editingPlace.id)}
+                        className="w-full py-1.5 text-red-400 hover:text-red-300 transition-colors text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        Remove from Trip
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              )}
+              {/* Empty State - No Place Selected */}
+              {!(selectedSearchResult || (manualPlaceName.trim() && manualPlaceLocation.trim()) || editingPlace) && (
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-neutral-800/50 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-3xl text-neutral-500">place</span>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-white">Select a Place</h3>
+                      <p className="text-sm text-neutral-400 max-w-sm">
+                        Search for a place above or enter details manually to start adding timing, notes, documents, links, and events.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
+      {/* Event Modal */}
+      {isEventModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-container rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-neutral-700">
+              <h2 className="text-xl font-bold text-white font-headline">Add Event</h2>
+              <button
+                onClick={resetEventModal}
+                className="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Event Form */}
+            <div className="p-6 space-y-4">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-bold text-white">Create New Event</h3>
+                <p className="text-neutral-400 text-sm">
+                  {places.find(p => p.id === eventPlaceId)?.name}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Event Title</label>
+                  <input
+                    type="text"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                    placeholder="Enter event title"
+                    className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white placeholder-neutral-500 focus:border-primary outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Description</label>
+                  <textarea
+                    value={eventDescription}
+                    onChange={(e) => setEventDescription(e.target.value)}
+                    placeholder="Event description (optional)"
+                    rows={3}
+                    className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white placeholder-neutral-500 focus:border-primary outline-none resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Date</label>
+                  <select
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white focus:border-primary outline-none"
+                  >
+                    <option value="">Select a date</option>
+                    {(() => {
+                      const options = []
+                      if (trip.startDate && trip.endDate) {
+                        const start = new Date(trip.startDate)
+                        const end = new Date(trip.endDate)
+                        const dayCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                        
+                        for (let i = 0; i < dayCount; i++) {
+                          const dayDate = new Date(start)
+                          dayDate.setDate(start.getDate() + i)
+                          const dateValue = dayDate.toISOString().split('T')[0]
+                          const formattedDate = dayDate.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })
+                          options.push(
+                            <option key={dateValue} value={dateValue}>
+                              Day {i + 1} - {formattedDate}
+                            </option>
+                          )
+                        }
+                      }
+                      return options
+                    })()}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white mb-2">Time (Optional)</label>
+                  <TimePicker
+                    value={eventTime}
+                    onChange={setEventTime}
+                    placeholder="Select event time"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={resetEventModal}
+                  className="flex-1 px-4 py-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEvent}
+                  disabled={!eventTitle.trim()}
+                  className="flex-1 px-4 py-2 bg-primary text-black rounded-lg font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Event
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transport leg: mode + times (saved on trip places) */}
+      {isTransportModalOpen && transportBetweenIndex !== null && transportToPlaceId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface-container shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-700 p-5">
+              <h2 className="font-headline text-xl font-bold text-white">Transport</h2>
+              <div className="flex items-center gap-2">
+                {editingTransportLegId && (
+                  <button
+                    onClick={deleteTransportLeg}
+                    className="p-2 text-red-400 hover:bg-red-400/10 rounded-full transition-colors"
+                    title="Delete Transport"
+                  >
+                    <span className="material-symbols-outlined">delete</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={closeTransportModal}
+                  className="rounded-full p-2 text-neutral-400 hover:bg-neutral-800/50"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <p className="text-center text-sm text-neutral-400">
+                <span className="font-medium text-white">{places[transportBetweenIndex]?.name}</span>
+                <span className="mx-1">→</span>
+                <span className="font-medium text-white">
+                  {places.find((p) => p.id === transportToPlaceId)?.name}
+                </span>
+              </p>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-white">How are you traveling?</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {TRANSPORT_MODES.map((m) => (
+                    <button
+                      key={m.type}
+                      type="button"
+                      onClick={() => setSelectedTransportMode(m.type)}
+                      className={`flex flex-col items-center gap-1 rounded-xl border p-3 transition-all ${
+                        selectedTransportMode === m.type
+                          ? 'border-primary bg-primary/15 ring-1 ring-primary/50'
+                          : 'border-neutral-700 bg-surface-container-highest hover:border-neutral-500'
+                      }`}
+                    >
+                      <span className={`material-symbols-outlined text-2xl ${m.color}`}>{m.icon}</span>
+                      <span className="text-xs font-medium text-white">{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-white">Leave (depart)</label>
+                  <TimePicker
+                    value={transportLegDeparture}
+                    onChange={setTransportLegDeparture}
+                    placeholder="Departure time"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-white">Arrive</label>
+                  <TimePicker
+                    value={transportLegArrival}
+                    onChange={setTransportLegArrival}
+                    placeholder="Arrival time"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-white">Duration (optional)</label>
+                <input
+                  type="text"
+                  value={transportLegDuration}
+                  onChange={(e) => setTransportLegDuration(e.target.value)}
+                  placeholder="e.g. 2h 30m"
+                  className="w-full rounded-lg border border-outline-variant bg-surface-container-highest px-3 py-2.5 text-white placeholder:text-neutral-500 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeTransportModal}
+                  className="flex-1 rounded-lg px-4 py-2.5 text-neutral-400 hover:bg-neutral-800/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveTransportLeg}
+                  disabled={!selectedTransportMode}
+                  className="flex-1 rounded-lg bg-primary px-4 py-2.5 font-bold text-black hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Save transport
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Place Detail Modal */}
+      {isPlaceDetailModalOpen && selectedPlaceForDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-surface-container rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-neutral-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center border border-primary/30">
+                  <span className="material-symbols-outlined text-primary">location_on</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white font-headline">{selectedPlaceForDetail.name}</h2>
+                  <p className="text-neutral-400 text-sm">{selectedPlaceForDetail.location}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPlaceDetailModalOpen(false)
+                  setSelectedPlaceForDetail(null)
+                }}
+                className="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest">Basic Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Place Name</label>
+                    <input
+                      type="text"
+                      value={selectedPlaceForDetail.name}
+                      onChange={(e) => {
+                        const updatedPlace = { ...selectedPlaceForDetail, name: e.target.value }
+                        setSelectedPlaceForDetail(updatedPlace)
+                        updatePlace(trip.id, selectedPlaceForDetail.id, { name: e.target.value })
+                        const updatedTrips = loadTrips()
+                        const found = updatedTrips.find(t => t.id === id)
+                        if (found) {
+                          setTrip(found)
+                          setPlaces(migratePlaces(found.places || []))
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white placeholder-neutral-500 focus:border-primary outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Location</label>
+                    <input
+                      type="text"
+                      value={selectedPlaceForDetail.location}
+                      onChange={(e) => {
+                        const updatedPlace = { ...selectedPlaceForDetail, location: e.target.value }
+                        setSelectedPlaceForDetail(updatedPlace)
+                        updatePlace(trip.id, selectedPlaceForDetail.id, { location: e.target.value })
+                        const updatedTrips = loadTrips()
+                        const found = updatedTrips.find(t => t.id === id)
+                        if (found) {
+                          setTrip(found)
+                          setPlaces(migratePlaces(found.places || []))
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white placeholder-neutral-500 focus:border-primary outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Timing */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest">Timing</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Arrival Time *</label>
+                    <TimePicker
+                      value={selectedPlaceForDetail.arrival || ''}
+                      onChange={(value) => {
+                        const updatedPlace = { ...selectedPlaceForDetail, arrival: value }
+                        setSelectedPlaceForDetail(updatedPlace)
+                        updatePlace(trip.id, selectedPlaceForDetail.id, { arrival: value })
+                        const updatedTrips = loadTrips()
+                        const found = updatedTrips.find(t => t.id === id)
+                        if (found) {
+                          setTrip(found)
+                          setPlaces(migratePlaces(found.places || []))
+                        }
+                      }}
+                      placeholder="Select arrival time"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white mb-2">Departure Time</label>
+                    <TimePicker
+                      value={selectedPlaceForDetail.departure || ''}
+                      onChange={(value) => {
+                        const updatedPlace = { ...selectedPlaceForDetail, departure: value }
+                        setSelectedPlaceForDetail(updatedPlace)
+                        updatePlace(trip.id, selectedPlaceForDetail.id, { departure: value })
+                        const updatedTrips = loadTrips()
+                        const found = updatedTrips.find(t => t.id === id)
+                        if (found) {
+                          setTrip(found)
+                          setPlaces(migratePlaces(found.places || []))
+                        }
+                      }}
+                      placeholder="Select departure time"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest">Notes</h3>
+                <textarea
+                  value={selectedPlaceForDetail.notes || ''}
+                  onChange={(e) => {
+                    const updatedPlace = { ...selectedPlaceForDetail, notes: e.target.value }
+                    setSelectedPlaceForDetail(updatedPlace)
+                    updatePlace(trip.id, selectedPlaceForDetail.id, { notes: e.target.value })
+                    const updatedTrips = loadTrips()
+                    const found = updatedTrips.find(t => t.id === id)
+                    if (found) {
+                      setTrip(found)
+                      setPlaces(migratePlaces(found.places || []))
+                    }
+                  }}
+                  placeholder="Add notes about this place..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white placeholder-neutral-500 focus:border-primary outline-none resize-none"
+                />
+              </div>
+
+              {/* Documents */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest">Documents</h3>
+                <div className="space-y-2">
+                  {selectedPlaceForDetail.documents && selectedPlaceForDetail.documents.length > 0 ? (
+                    selectedPlaceForDetail.documents.map((doc, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-800/30 rounded-lg">
+                        <span className="material-symbols-outlined text-primary">description</span>
+                        <div className="flex-1">
+                          <div className="text-white text-sm font-medium">{doc.name}</div>
+                          <div className="text-neutral-400 text-xs">{doc.type}</div>
+                        </div>
+                        <button className="p-1 text-neutral-400 hover:text-red-400">
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-neutral-500">
+                      <span className="material-symbols-outlined text-3xl mb-2 block">description</span>
+                      <p className="text-sm">No documents added yet</p>
+                    </div>
+                  )}
+                  <button className="w-full py-2 px-4 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined">add</span>
+                    <span className="text-sm font-medium">Add Document</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Links */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest">Links</h3>
+                <div className="space-y-2">
+                  {selectedPlaceForDetail.links && selectedPlaceForDetail.links.length > 0 ? (
+                    selectedPlaceForDetail.links.map((link, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-800/30 rounded-lg">
+                        <span className="material-symbols-outlined text-primary">link</span>
+                        <div className="flex-1">
+                          <div className="text-white text-sm font-medium">{link.title}</div>
+                          <div className="text-neutral-400 text-xs">{link.url}</div>
+                        </div>
+                        <button className="p-1 text-neutral-400 hover:text-red-400">
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-neutral-500">
+                      <span className="material-symbols-outlined text-3xl mb-2 block">link</span>
+                      <p className="text-sm">No links added yet</p>
+                    </div>
+                  )}
+                  <button className="w-full py-2 px-4 bg-primary/10 border border-primary/30 rounded-lg text-primary hover:bg-primary/20 transition-colors flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined">add</span>
+                    <span className="text-sm font-medium">Add Link</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation (Mobile) */}
+      <div className="md:hidden fixed bottom-8 w-full flex justify-center z-50">
+        <nav className="bg-neutral-950/80 backdrop-blur-2xl w-[90%] max-w-md rounded-full border border-white/10 flex justify-between items-center p-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+          <Link className="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1" href="/">
+            <span className="material-symbols-outlined">grid_view</span>
+            <span className="font-headline text-[8px] uppercase">Home</span>
+          </Link>
+          <Link className="bg-cyan-400 text-black rounded-full px-6 py-2 flex items-center gap-2 scale-105 transition-transform" href={`/trip/${id}`}>
+            <span className="material-symbols-outlined text-[20px]">map</span>
+            <span className="font-headline text-[10px] uppercase font-bold">Trip</span>
+          </Link>
+          <Link className="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1" href="/trip/new">
+            <span className="material-symbols-outlined">add</span>
+            <span className="font-headline text-[8px] uppercase">New</span>
+          </Link>
+        </nav>
+      </div>
+
+      {/* Edit Trip Modal - uses reusable TripForm */}
+      {isEditModalOpen && trip && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-background min-h-screen md:min-h-auto md:rounded-2xl w-full max-w-4xl my-8">
+            <TripForm
+              initialValues={{
+                emoji: trip.emoji,
+                title: trip.title,
+                description: trip.description,
+                startDate: trip.startDate,
+                endDate: trip.endDate,
+                wallpaper: trip.wallpaper
+              }}
+              onSubmit={handleEditSubmit}
+              onCancel={() => setIsEditModalOpen(false)}
+              isSubmitting={isEditSubmitting}
+              submitButtonText="Save Changes"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

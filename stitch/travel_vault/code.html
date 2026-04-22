@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trippi Document Vault</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Manrope:wght@300;400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#ff61f8",
+                        "on-secondary-container": "#efffbc",
+                        "outline": "#757575",
+                        "tertiary-container": "#fe00fe",
+                        "surface-container-highest": "#262626",
+                        "on-surface": "#ffffff",
+                        "error-dim": "#d7383b",
+                        "inverse-surface": "#f9f9f9",
+                        "secondary-container": "#506600",
+                        "surface": "#0e0e0e",
+                        "on-tertiary-container": "#230023",
+                        "on-tertiary-fixed-variant": "#6a006a",
+                        "on-secondary-fixed-variant": "#4e6300",
+                        "on-secondary-fixed": "#354500",
+                        "on-background": "#ffffff",
+                        "inverse-on-surface": "#555555",
+                        "surface-tint": "#8ff5ff",
+                        "on-surface-variant": "#ababab",
+                        "secondary": "#c3f400",
+                        "surface-container": "#191919",
+                        "secondary-fixed": "#c3f400",
+                        "surface-bright": "#2c2c2c",
+                        "on-secondary": "#455900",
+                        "surface-dim": "#0e0e0e",
+                        "primary-fixed-dim": "#00deec",
+                        "on-tertiary": "#400040",
+                        "error-container": "#9f0519",
+                        "background": "#0e0e0e",
+                        "secondary-fixed-dim": "#b7e500",
+                        "on-primary": "#005d63",
+                        "on-error-container": "#ffa8a3",
+                        "inverse-primary": "#006a71",
+                        "tertiary": "#ff51fa",
+                        "primary-container": "#00eefc",
+                        "outline-variant": "#484848",
+                        "on-tertiary-fixed": "#320032",
+                        "surface-container-lowest": "#000000",
+                        "tertiary-dim": "#ff51fa",
+                        "surface-variant": "#262626",
+                        "secondary-dim": "#b7e500",
+                        "primary-fixed": "#00eefc",
+                        "primary": "#8ff5ff",
+                        "on-primary-fixed": "#003f43",
+                        "surface-container-low": "#131313",
+                        "on-primary-fixed-variant": "#005e64",
+                        "primary-dim": "#00deec",
+                        "surface-container-high": "#1f1f1f",
+                        "tertiary-fixed": "#ff81f5",
+                        "on-primary-container": "#005359",
+                        "on-error": "#490006",
+                        "error": "#ff716c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Manrope"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .vault-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        .pseudo-morphic-inset {
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5), inset 0 -1px 0 0 rgba(255, 255, 255, 0.05);
+        }
+        .brushed-chrome {
+            background: linear-gradient(145deg, #262626 0%, #131313 100%);
+            border-top: 1px solid rgba(143, 245, 255, 0.2);
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-neutral-900/40 backdrop-blur-xl flex justify-between items-center px-6 py-4 w-full shadow-[inset_0_1px_0_0_rgba(143,245,255,0.1)]">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-bold tracking-tighter text-cyan-400 font-['Space_Grotesk']">Trippi</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-8">
+<a class="text-neutral-400 font-['Space_Grotesk'] tracking-tight hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded" href="#">Dashboard</a>
+<a class="text-neutral-400 font-['Space_Grotesk'] tracking-tight hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded" href="#">Itinerary</a>
+<a class="text-cyan-400 font-bold font-['Space_Grotesk'] tracking-tight" href="#">Documents</a>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-on-surface-variant hover:bg-neutral-800/50 rounded-full transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-neutral-800/50 rounded-full transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="travel_explore">travel_explore</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Desktop Only) -->
+<aside class="hidden md:flex h-screen w-64 fixed left-0 top-0 border-r border-neutral-800/30 bg-[#0e0e0e] flex-col p-4 z-40 pt-24 shadow-2xl transition-all duration-300 ease-in-out">
+<div class="mb-8 px-2">
+<h2 class="text-cyan-400 font-bold font-['Manrope'] text-sm uppercase tracking-widest">Trippi Elite</h2>
+<p class="text-neutral-500 text-xs font-['Inter']">Global Explorer</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">map</span>
+<span>Itinerary</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span>Bookings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-[#c3f400] text-black rounded-lg font-bold transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+<span>Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Expenses</span>
+</a>
+</nav>
+<div class="mt-auto space-y-2 pt-4 border-t border-neutral-800/30">
+<button class="w-full bg-[#c3f400] text-black font-bold py-3 rounded-lg mb-4 hover:brightness-110 transition-all uppercase text-xs tracking-widest">
+                New Trip
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all font-['Manrope'] text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined">help</span>
+<span>Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 pt-24 pb-32 px-6 md:px-12 min-h-screen">
+<!-- Hero Header -->
+<div class="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<span class="inline-block px-3 py-1 bg-surface-container-highest text-primary text-[10px] font-label uppercase tracking-[0.2em] rounded-full mb-4 border border-primary/20">Secure Encryption Active</span>
+<h1 class="text-5xl md:text-7xl font-headline font-bold tracking-tighter text-on-surface leading-none">Document Vault</h1>
+<p class="text-on-surface-variant mt-4 max-w-xl font-body text-lg">Centralized biometric storage for your global mission. Securely managed, globally accessible.</p>
+</div>
+<div class="flex gap-4">
+<div class="h-16 w-16 rounded-xl brushed-chrome flex items-center justify-center pseudo-morphic-inset">
+<span class="material-symbols-outlined text-secondary text-3xl" style="font-variation-settings: 'FILL' 1;">shield_lock</span>
+</div>
+</div>
+</div>
+<!-- Vault Content Grid -->
+<section class="vault-grid mb-12">
+<!-- Flight Tickets Folder -->
+<div class="group relative bg-surface-container-low rounded-2xl p-1 pseudo-morphic-inset border border-white/5 overflow-hidden transition-all hover:scale-[1.02] duration-300">
+<div class="brushed-chrome p-6 rounded-xl h-full flex flex-col">
+<div class="flex justify-between items-start mb-8">
+<div class="p-3 bg-surface-container-highest rounded-xl shadow-lg border border-white/5">
+<span class="material-symbols-outlined text-primary text-3xl">flight_takeoff</span>
+</div>
+<span class="text-secondary font-label text-[10px] tracking-widest uppercase">3 items</span>
+</div>
+<h3 class="text-2xl font-headline font-bold text-on-surface mb-2">Flight Tickets</h3>
+<p class="text-on-surface-variant font-body text-sm mb-6">Confirmed boarding passes and e-tickets for active legs.</p>
+<div class="mt-auto space-y-3">
+<div class="glass-card p-3 rounded-lg flex items-center gap-4 border border-white/10 hover:bg-white/5 transition-colors cursor-pointer">
+<div class="w-10 h-10 bg-surface-container-highest rounded flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="close-up of a blue and white airline boarding pass with barcodes and seat numbers in soft cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4jP4Vy0hOwjw_iUrs69zuUI-1jl8ddzmRdyzMYVYYHF4VQrukmFXH-d2KGyo87rHsrKaceNP5YZQJKLrcFZ-j1UpxEjTOYDX1mXA38qMnYW0vo_rIfQWVICtTWCRMGa2aKhAI5PHQl3Au93DJEDKlRoK_DyFCULEACExUU2uoMLWnvUoFbP_n6xDXLrTHo7hdDaK7KzK5kIGOpWmhMODvt8kI5fK_4PdrvxM1XWSkC2zvObxeF1Bh7tVWTcPJJwsDcAHMAecjPprc"/>
+</div>
+<div class="flex-1">
+<p class="text-xs font-bold text-on-surface">BA-7729 Heathrow.pdf</p>
+<p class="text-[10px] text-on-surface-variant">Last viewed 2h ago</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">visibility</span>
+</div>
+<div class="glass-card p-3 rounded-lg flex items-center gap-4 border border-white/10 hover:bg-white/5 transition-colors cursor-pointer">
+<div class="w-10 h-10 bg-surface-container-highest rounded flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="abstract tech background with glowing data points and lines representing digital security" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrk1zXqCJPKwWkfsKotf9va4Hjddzkcy0dthc8tN9BD7yYHXWhlWnSvRq9g0-CqwaK-vlMUrViiAtCqkng1VPlzEkPTy97iWI5Q8ERJkT3k2i223xanNMGE5oNUwwfJDE4UHP5GC2emfUJapVV_adYyopGlrwN0LbBtemfcluvDmlIAhPwJoXN3aK1VO8d8qG3drYaeMqc-LMsO5OuHQOL4iISh0XX3bCceLhybWUkomiAfoi-gG33qEPFRKFnW7YP4G9fW4NgdJZa"/>
+</div>
+<div class="flex-1">
+<p class="text-xs font-bold text-on-surface">QR-Connect-Doha.png</p>
+<p class="text-[10px] text-on-surface-variant">Added Oct 12</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">visibility</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Hotel Bookings Folder -->
+<div class="group relative bg-surface-container-low rounded-2xl p-1 pseudo-morphic-inset border border-white/5 overflow-hidden transition-all hover:scale-[1.02] duration-300">
+<div class="brushed-chrome p-6 rounded-xl h-full flex flex-col">
+<div class="flex justify-between items-start mb-8">
+<div class="p-3 bg-surface-container-highest rounded-xl shadow-lg border border-white/5">
+<span class="material-symbols-outlined text-secondary text-3xl">apartment</span>
+</div>
+<span class="text-secondary font-label text-[10px] tracking-widest uppercase">5 items</span>
+</div>
+<h3 class="text-2xl font-headline font-bold text-on-surface mb-2">Hotel Bookings</h3>
+<p class="text-on-surface-variant font-body text-sm mb-6">Reservation vouchers and payment receipts for accommodation.</p>
+<div class="mt-auto space-y-3">
+<div class="glass-card p-3 rounded-lg flex items-center gap-4 border border-white/10 hover:bg-white/5 transition-colors cursor-pointer">
+<div class="w-10 h-10 bg-surface-container-highest rounded flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="blurred elegant hotel lobby with warm lighting and luxury marble floors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQidCgWZvrgMPlNICzt--87ZkHDIqx1OK4s3kVMeqgVUuOPJqcJviJiuE1XQ28CrIkN_rLiexa52Byrh-Iluvi7uO602lyB_nLUM5CN2aiD7vpvxqofxTUfmv6D5A-zhpcR7FIkqFojF1j8UEJHrvleyRFtPC_sKaPPlyQa5HFFPMACsR3vdz-GEr6JRj-fDoDsBau-QKFW1gd9o6HKKdUP3g2aMIY8I1CKeURe8ztAYBnqEMwTb1Tq5F_j73UK6aAjppnjoPHFHpC"/>
+</div>
+<div class="flex-1">
+<p class="text-xs font-bold text-on-surface">The-Ritz-Voucher.pdf</p>
+<p class="text-[10px] text-on-surface-variant">Confirmed</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">download</span>
+</div>
+<div class="glass-card p-3 rounded-lg flex items-center gap-4 border border-white/10 hover:bg-white/5 transition-colors cursor-pointer">
+<div class="w-10 h-10 bg-surface-container-highest rounded flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-50" data-alt="minimal luxury resort bedroom with white linens and tropical views in soft morning light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcvDrWMLNKYyfA9GjtQwQLOk75X2KxDhVfB50DR5TsYZMZ6yzwJs7CY9obbykMXOuXJHQSdMJLPxvnmeVcf3mJgin1m-4V3XZ73_AkQKDEUs83_qOfku2B8rIZ0vTubiI4muyCiISa_Z4rpW7JPbzZAVZx0B34_qfAlx7PUDyAg1KhJGhLw-bXonSiLA5oCvvzUk394xc4Za-O1522eEmJlbI4jrxp8h5T-lBrXKgp3faJLN6lS1jF83ReZe825TuS5KXpFa0SfjTy"/>
+</div>
+<div class="flex-1">
+<p class="text-xs font-bold text-on-surface">Bali-Resort-Receipt.pdf</p>
+<p class="text-[10px] text-on-surface-variant">Tax Invoice</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">download</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Personal IDs Folder -->
+<div class="group relative bg-surface-container-low rounded-2xl p-1 pseudo-morphic-inset border border-white/5 overflow-hidden transition-all hover:scale-[1.02] duration-300">
+<div class="brushed-chrome p-6 rounded-xl h-full flex flex-col">
+<div class="flex justify-between items-start mb-8">
+<div class="p-3 bg-surface-container-highest rounded-xl shadow-lg border border-white/5">
+<span class="material-symbols-outlined text-tertiary text-3xl">badge</span>
+</div>
+<span class="text-secondary font-label text-[10px] tracking-widest uppercase">Locked</span>
+</div>
+<h3 class="text-2xl font-headline font-bold text-on-surface mb-2">Personal IDs</h3>
+<p class="text-on-surface-variant font-body text-sm mb-6">High-security scan of passports, visas, and identification.</p>
+<div class="flex-1 flex flex-col items-center justify-center bg-black/40 rounded-xl border border-dashed border-neutral-700 py-8 px-4">
+<span class="material-symbols-outlined text-neutral-600 text-4xl mb-2">fingerprint</span>
+<p class="text-neutral-500 font-label text-[10px] uppercase tracking-widest text-center">Biometric auth required<br/>to view contents</p>
+<button class="mt-4 px-4 py-2 border border-primary/30 text-primary rounded-full font-label text-[10px] uppercase tracking-widest hover:bg-primary/10 transition-colors">Authorize</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Asymmetric Info Section -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+<div class="lg:col-span-7 bg-surface-container rounded-3xl p-8 flex flex-col justify-between overflow-hidden relative">
+<div class="relative z-10">
+<h2 class="text-3xl font-headline font-bold text-on-surface mb-4">Zero-Knowledge Security</h2>
+<p class="text-on-surface-variant max-w-md mb-8">Trippi uses end-to-end encryption. Even our servers can't see your documents. Your privacy is not a feature; it's our fundamental architecture.</p>
+<div class="flex gap-4">
+<div class="px-6 py-4 brushed-chrome rounded-2xl pseudo-morphic-inset flex-1">
+<h4 class="text-secondary font-bold mb-1">AES-256</h4>
+<p class="text-xs text-on-surface-variant">Military-grade document encryption</p>
+</div>
+<div class="px-6 py-4 brushed-chrome rounded-2xl pseudo-morphic-inset flex-1">
+<h4 class="text-primary font-bold mb-1">FaceID 2.0</h4>
+<p class="text-xs text-on-surface-variant">Next-gen biometric verification</p>
+</div>
+</div>
+</div>
+<div class="absolute right-[-10%] top-0 h-full w-1/2 opacity-20 pointer-events-none">
+<img class="h-full object-cover" data-alt="close-up of complex server hardware with glowing blue lights and intricate circuit boards" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAmdUS47ODOlDQMDrthRQvTTLtbFEkJnI_zc7zuzM7i9uwsP47140VfNa9Z9N5_dHD9dv12MuJfF8KSwer9HKymUjI7vnYC_1nBLRDL2mwwXqgTofP-8Ova0UN7Pa8sXzMigjEof3nvF6rf1myvKDB6GfOHdq2uy5QU8-Ie9iqU96UvUS7osER2VNFiqdsRfXaXYIAxaywUu8mI9C7iPhKkYE_SiACQhuD97EgTOC0iMSnFuk67ktHQ2fmWqe1zoXp_n3zq2U1fUEG"/>
+</div>
+</div>
+<div class="lg:col-span-5 bg-tertiary-container/10 border border-tertiary/20 rounded-3xl p-8 flex flex-col items-center justify-center text-center">
+<div class="w-20 h-20 bg-tertiary/20 rounded-full flex items-center justify-center mb-6">
+<span class="material-symbols-outlined text-tertiary text-4xl" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+</div>
+<h3 class="text-2xl font-headline font-bold text-tertiary mb-2">Drop New Documents</h3>
+<p class="text-on-surface-variant text-sm mb-6">Drag and drop files here to automatically categorize and encrypt.</p>
+<div class="w-full h-24 border-2 border-dashed border-tertiary/30 rounded-2xl flex items-center justify-center text-tertiary/50 font-label text-xs uppercase tracking-[0.3em]">
+                    Release File
+                </div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md rounded-full border border-white/10 bg-neutral-950/80 backdrop-blur-2xl flex justify-around p-2 z-50 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+<a class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1 hover:text-white transition-transform scale-105" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase">Itinerary</span>
+</a>
+<a class="bg-cyan-400 text-black rounded-full px-6 py-2 flex items-center gap-2 transition-transform scale-105" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder_shared</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-bold">Docs</span>
+</a>
+<a class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1 hover:text-white transition-transform scale-105" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase">Expenses</span>
+</a>
+</nav>
+</body></html>

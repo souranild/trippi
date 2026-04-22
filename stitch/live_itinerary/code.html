@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trippi - Tokyo Collaborative Itinerary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Manrope:wght@300;400;500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .neo-button-clay {
+            box-shadow: inset 0 1px 0 0 rgba(143, 245, 255, 0.3), 0 4px 12px rgba(0,0,0,0.4);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0e0e0e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #262626;
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#ff61f8",
+                        "on-secondary-container": "#efffbc",
+                        "outline": "#757575",
+                        "tertiary-container": "#fe00fe",
+                        "surface-container-highest": "#262626",
+                        "on-surface": "#ffffff",
+                        "error-dim": "#d7383b",
+                        "inverse-surface": "#f9f9f9",
+                        "secondary-container": "#506600",
+                        "surface": "#0e0e0e",
+                        "on-tertiary-container": "#230023",
+                        "on-tertiary-fixed-variant": "#6a006a",
+                        "on-secondary-fixed-variant": "#4e6300",
+                        "on-secondary-fixed": "#354500",
+                        "on-background": "#ffffff",
+                        "inverse-on-surface": "#555555",
+                        "surface-tint": "#8ff5ff",
+                        "on-surface-variant": "#ababab",
+                        "secondary": "#c3f400",
+                        "surface-container": "#191919",
+                        "secondary-fixed": "#c3f400",
+                        "surface-bright": "#2c2c2c",
+                        "on-secondary": "#455900",
+                        "surface-dim": "#0e0e0e",
+                        "primary-fixed-dim": "#00deec",
+                        "on-tertiary": "#400040",
+                        "error-container": "#9f0519",
+                        "background": "#0e0e0e",
+                        "secondary-fixed-dim": "#b7e500",
+                        "on-primary": "#005d63",
+                        "on-error-container": "#ffa8a3",
+                        "inverse-primary": "#006a71",
+                        "tertiary": "#ff51fa",
+                        "primary-container": "#00eefc",
+                        "outline-variant": "#484848",
+                        "on-tertiary-fixed": "#320032",
+                        "surface-container-lowest": "#000000",
+                        "tertiary-dim": "#ff51fa",
+                        "surface-variant": "#262626",
+                        "secondary-dim": "#b7e500",
+                        "primary-fixed": "#00eefc",
+                        "primary": "#8ff5ff",
+                        "on-primary-fixed": "#003f43",
+                        "surface-container-low": "#131313",
+                        "on-primary-fixed-variant": "#005e64",
+                        "primary-dim": "#00deec",
+                        "surface-container-high": "#1f1f1f",
+                        "tertiary-fixed": "#ff81f5",
+                        "on-primary-container": "#005359",
+                        "on-error": "#490006",
+                        "error": "#ff716c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Manrope"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-neutral-900/40 backdrop-blur-xl flex justify-between items-center px-6 py-4 w-full shadow-[inset_0_1px_0_0_rgba(143,245,255,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold tracking-tighter text-cyan-400 font-headline">Trippi</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-cyan-400 font-bold font-headline tracking-tight hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Itinerary</a>
+<a class="text-neutral-400 font-headline tracking-tight hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Explore</a>
+<a class="text-neutral-400 font-headline tracking-tight hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Community</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="travel_explore">travel_explore</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant/30 overflow-hidden">
+<img alt="User" data-alt="Portrait of a modern traveler with stylish sunglasses in an urban setting with soft cinematic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAa6i_AUECoWNIv26nEyi5kH0dzJqDI8c6VpuRVrovaNuLK-NJHBWqD_Wp11P0XwkW9GIbibAnPFjAwTrJZLF4S76WOXgmpUiOL7lymjjObQG0tyGcoltzDGBC6o2LpvCMOSAIgFqxX1PsGcAwkrKezQMpEicupngwfvjAWx6DhD4MihE7zPh35ZQYtK__jkLrUlNGbo9sgctorncYLph4yOh4TTq59rF4-nJoxAMQPOifYYaOZl5oWB7RkBJW6YTajhWIWTKwmRgbk"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar (Hidden on small, visible on large) -->
+<aside class="hidden lg:flex flex-col h-screen w-64 fixed left-0 top-0 border-r border-neutral-800/30 bg-[#0e0e0e] p-4 z-40 pt-24">
+<div class="mb-8 px-4">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 rounded bg-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-black text-sm" data-icon="grid_view">grid_view</span>
+</div>
+<span class="text-cyan-400 font-bold font-headline uppercase tracking-widest text-xs">Trippi Elite</span>
+</div>
+<p class="text-neutral-500 font-label text-[10px] uppercase tracking-widest">Global Explorer</p>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300 ease-in-out font-body text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 p-3 bg-secondary text-black rounded-lg font-bold transition-all duration-300 ease-in-out font-body text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+                Itinerary
+            </a>
+<a class="flex items-center gap-3 p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300 ease-in-out font-body text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="confirmation_number">confirmation_number</span>
+                Bookings
+            </a>
+<a class="flex items-center gap-3 p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300 ease-in-out font-body text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+                Documents
+            </a>
+<a class="flex items-center gap-3 p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300 ease-in-out font-body text-sm uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                Expenses
+            </a>
+</nav>
+<div class="mt-auto space-y-2 pt-4 border-t border-neutral-800/30">
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary-fixed py-3 rounded-lg font-bold font-headline tracking-tighter hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                New Trip
+            </button>
+<div class="flex flex-col gap-1 mt-4">
+<a class="flex items-center gap-3 p-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="settings">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 p-2 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg text-xs uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-lg" data-icon="help">help</span>
+                    Support
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="lg:pl-64 pt-20 pb-24 min-h-screen">
+<div class="flex flex-col md:flex-row h-full">
+<!-- Left Panel: Itinerary Timeline -->
+<div class="w-full md:w-[60%] p-6 lg:p-10 space-y-8 max-h-[calc(100vh-5rem)] overflow-y-auto">
+<header class="space-y-4">
+<div class="flex items-center gap-2 text-secondary font-label text-xs tracking-[0.2em] uppercase">
+<span class="material-symbols-outlined text-sm" data-icon="calendar_today">calendar_today</span>
+                        Day 03 — Nov 14, 2024
+                    </div>
+<h1 class="text-5xl lg:text-7xl font-bold font-headline tracking-tighter text-on-surface">Neon Tokyo Dreams.</h1>
+<div class="flex items-center gap-4">
+<div class="flex -space-x-2">
+<img alt="Avatar" class="w-8 h-8 rounded-full border-2 border-background" data-alt="Close-up of a smiling young woman with bright eyes and natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1dmg9Yx7j69xsOXg55nUUCF6LRBVfJbxkoVDdIIoIi70o2Vo7qhM4e-jvwU3G5b9OxBqhUwVzW0QHudXn-Pq30Q7gtlhpUJs8uAWSbv7SbrHK7-0eSkQ_CUJqrlfXJfe4un8mgiPm6xOs0gUEaYnakpWnXW6AlNkvyfo4_PjL-5a6a-oXPW8gRgqxcaq_omJH7ZQ-Q4kxCuaAO3RR62k__dmjwPD6Mpvz06e8roGoF4loykB5ZQ3nvFSL53EO1CscRRsS6m4SRsVO"/>
+<img alt="Avatar" class="w-8 h-8 rounded-full border-2 border-background" data-alt="Portrait of a young man with a friendly expression in a soft studio light setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrpvpjF9AdbPyG4Bi3wxR5hiZ1TLuJBQ1KxRR80LJr6dya3l9yaBNb-N-a4_q0751zDEofkCkNmB5Ei1QO_DKPCPOCVnhBQZy8y-zW3WsfG9TTN8SX1scY7T1HoxpUG7F0WreNaXbweriRcDV-IVpHlOd7Iff7KMJ2RS-m8DKFC7hNUtNaAqQKWJ58_-FJn-H3yHbEmAw7b6MFv9PMCUSj5JdTjicUWt1ArXOurf1ZyA1sBLAXuhX7zySGwNFsqvHFMvyG_9R_V2mr"/>
+<div class="w-8 h-8 rounded-full border-2 border-background bg-surface-container-highest flex items-center justify-center text-[10px] font-bold">+3</div>
+</div>
+<span class="text-on-surface-variant text-sm font-medium">Collaborating with the Tokyo Squad</span>
+</div>
+</header>
+<!-- Timeline -->
+<div class="space-y-12 relative before:absolute before:left-6 before:top-4 before:bottom-4 before:w-[2px] before:bg-gradient-to-b before:from-primary before:via-secondary before:to-tertiary before:opacity-20">
+<!-- Activity Card: Breakfast -->
+<div class="relative pl-16 group">
+<div class="absolute left-4 top-1 w-4 h-4 rounded-full bg-primary ring-4 ring-background z-10"></div>
+<div class="bg-surface-container-low rounded-xl p-6 transition-all hover:bg-surface-container-high neo-button-clay border-l-4 border-primary">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="text-[10px] font-label uppercase tracking-widest text-primary mb-1 block">08:30 AM — Dining</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Tsukiji Outer Market</h3>
+</div>
+<span class="material-symbols-outlined text-primary" data-icon="restaurant">restaurant</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-4 leading-relaxed">Early morning sushi breakfast and exploring the iconic stalls for premium street food.</p>
+<div class="flex items-center gap-2">
+<span class="px-2 py-1 bg-surface-container-highest rounded text-[10px] text-on-surface-variant">4.8 Rating</span>
+<span class="px-2 py-1 bg-surface-container-highest rounded text-[10px] text-on-surface-variant">$$</span>
+</div>
+</div>
+</div>
+<!-- Activity Card: Transport -->
+<div class="relative pl-16 group">
+<div class="absolute left-4 top-1 w-4 h-4 rounded-full bg-neutral-600 ring-4 ring-background z-10"></div>
+<div class="flex items-center gap-4 p-4 bg-surface-container-lowest/50 rounded-xl border border-outline-variant/10">
+<span class="material-symbols-outlined text-neutral-400" data-icon="directions_subway">directions_subway</span>
+<div class="flex-1">
+<p class="text-xs font-medium">Transfer via Oedo Line</p>
+<p class="text-[10px] text-on-surface-variant uppercase">Tsukiji-shijo → Akihabara (18 mins)</p>
+</div>
+</div>
+</div>
+<!-- Activity Card: Group Vote Feature (Interactive) -->
+<div class="relative pl-16 group">
+<div class="absolute left-4 top-1 w-4 h-4 rounded-full bg-tertiary ring-4 ring-background z-10"></div>
+<div class="bg-surface-container rounded-xl p-6 border border-tertiary/20 shadow-[0_0_40px_rgba(255,81,250,0.1)]">
+<div class="flex justify-between items-start mb-4">
+<div>
+<span class="px-2 py-0.5 bg-tertiary text-on-tertiary text-[9px] font-bold uppercase tracking-widest rounded-full mb-2 inline-block">Group Vote Required</span>
+<h3 class="text-xl font-bold font-headline tracking-tight">Afternoon Tech Tour</h3>
+</div>
+<span class="material-symbols-outlined text-tertiary" data-icon="groups">groups</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-6">Which experience should we prioritize in Akihabara?</p>
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between p-4 bg-surface-container-highest rounded-lg border border-outline-variant/30 hover:border-tertiary transition-all active:scale-[0.98]">
+<div class="flex items-center gap-3 text-left">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="videogame_asset">videogame_asset</span>
+<span class="text-sm font-semibold">Retro Gaming Arcade Safari</span>
+</div>
+<div class="flex -space-x-1">
+<div class="w-5 h-5 rounded-full bg-primary border border-background"></div>
+<div class="w-5 h-5 rounded-full bg-secondary border border-background"></div>
+</div>
+</button>
+<button class="w-full flex items-center justify-between p-4 bg-surface-container-highest rounded-lg border border-tertiary/60 bg-tertiary/5 transition-all active:scale-[0.98]">
+<div class="flex items-center gap-3 text-left">
+<span class="material-symbols-outlined text-tertiary" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span class="text-sm font-semibold">DIY Electronics Workshop</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex -space-x-1">
+<div class="w-5 h-5 rounded-full bg-tertiary-fixed-dim border border-background"></div>
+</div>
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</button>
+</div>
+</div>
+</div>
+<!-- Activity Card: Sightseeing -->
+<div class="relative pl-16 group">
+<div class="absolute left-4 top-1 w-4 h-4 rounded-full bg-secondary ring-4 ring-background z-10"></div>
+<div class="bg-surface-container-low rounded-xl overflow-hidden neo-button-clay">
+<div class="h-48 relative overflow-hidden">
+<img alt="Shibuya Crossing" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Vibrant long exposure photo of Shibuya Crossing at night with colorful neon signs and motion-blurred crowds" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxUX9OCrIzIcyLjiM8GFiR5SvVJRXHI_q_O6kb20_Jlu_KPYZe8dgKVcReyClZ6rE-cmFuh5YwDED5JTcnWIraKt_Y5gcvoa24oVt-yuu2i7cSpJc56jymumoLkbLw9HUMrQ6ptiuDqNJH5mYZ8iDI6o-GwuiT-pkQkxL55e8McJhebgysVdyDSdeMDixa3Lu2YKggnigbexZeBHkBDjXsr9hLZAXCxdkiDSxAkRaOiAbrY5YLZN3e9aWI_fynjZ-qqnOQyO16aveW"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+<div class="absolute bottom-4 left-6">
+<span class="text-[10px] font-label uppercase tracking-widest text-secondary mb-1 block">07:00 PM — Sightseeing</span>
+<h3 class="text-2xl font-bold font-headline tracking-tight text-white">Shibuya Sky at Dusk</h3>
+</div>
+</div>
+<div class="p-6">
+<p class="text-on-surface-variant text-sm mb-4">Golden hour views from 229 meters above ground. The ultimate panoramic perspective of Tokyo.</p>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="confirmation_number">confirmation_number</span>
+<span class="text-xs text-on-surface-variant">Tickets: T-9284-BK</span>
+</div>
+<button class="px-4 py-2 bg-secondary text-black text-xs font-bold rounded-lg uppercase tracking-widest hover:opacity-90">View Pass</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Panel: Map (Split View) -->
+<div class="hidden md:block w-[40%] sticky top-20 h-[calc(100vh-5rem)] p-4">
+<div class="w-full h-full rounded-2xl bg-surface-container overflow-hidden border border-outline-variant/20 relative shadow-2xl">
+<!-- Map Mockup -->
+<div class="absolute inset-0 bg-[#0e0e0e]">
+<img alt="Map View" class="w-full h-full object-cover opacity-40 grayscale" data-alt="Stylized dark mode map of Tokyo with cyan and pink glowing pathways and minimalistic topography" data-location="Tokyo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANJbGhSTy59KON1F7uGKUu7xdFgs3mkyVwzCUQOzSaRSTxy2ysT6hl3Ze5ctSdE0_cpBtP6lLy3knnNl0TFaijxq1qwpuE7btaaKgHfXn0Rw0D7jj-_4HOfpkIc1ZXZezzz3pXXqTh2kyPMglbSX4Uo7zCb10EmpSVk4ZCH0U66V43XRf3b7eU5ahkpYHJKP-hSothfTCFbAI69ybsET0Oncq_ViWrQKoYpOapTVRji25_wO5cphvdt_8qqYN8QM0CcscqOZfQEL9n"/>
+</div>
+<!-- Map Interface Elements -->
+<div class="absolute top-6 right-6 flex flex-col gap-2">
+<button class="w-10 h-10 glass-panel rounded-full flex items-center justify-center text-white border border-white/10">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+<button class="w-10 h-10 glass-panel rounded-full flex items-center justify-center text-white border border-white/10">
+<span class="material-symbols-outlined" data-icon="remove">remove</span>
+</button>
+</div>
+<div class="absolute bottom-6 left-6 right-6 p-4 glass-panel rounded-xl border border-white/10 shadow-2xl">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="near_me">near_me</span>
+</div>
+<div class="flex-1">
+<h4 class="text-xs font-bold uppercase tracking-widest text-primary">Current Destination</h4>
+<p class="text-sm font-semibold">Tsukiji Outer Market</p>
+</div>
+<button class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors">Route</button>
+</div>
+</div>
+<!-- Map Pins -->
+<div class="absolute top-1/4 left-1/3">
+<div class="relative">
+<div class="absolute -top-10 -left-12 glass-panel px-3 py-1.5 rounded-full border border-primary/40 whitespace-nowrap">
+<span class="text-[10px] font-bold">Akihabara Tech District</span>
+</div>
+<div class="w-4 h-4 bg-primary rounded-full animate-pulse shadow-[0_0_15px_rgba(143,245,255,0.8)]"></div>
+</div>
+</div>
+<div class="absolute bottom-1/3 right-1/4">
+<div class="relative">
+<div class="w-4 h-4 bg-tertiary rounded-full shadow-[0_0_15px_rgba(255,81,250,0.8)]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Visible on mobile) -->
+<footer class="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md rounded-full border border-white/10 bg-neutral-950/80 backdrop-blur-2xl px-2 py-2 flex justify-between items-center z-50 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+<button class="bg-cyan-400 text-black rounded-full px-6 py-2 flex items-center gap-2 scale-105 transition-transform">
+<span class="material-symbols-outlined text-lg" data-icon="calendar_today">calendar_today</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-bold">Itinerary</span>
+</button>
+<button class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="folder_shared">folder_shared</span>
+<span class="font-['Space_Grotesk'] text-[8px] uppercase">Docs</span>
+</button>
+<button class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="receipt_long">receipt_long</span>
+<span class="font-['Space_Grotesk'] text-[8px] uppercase">Expenses</span>
+</button>
+</footer>
+</body></html>

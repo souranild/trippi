@@ -1,0 +1,346 @@
+<html class="dark"><head>
+<meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Manrope:wght@300;400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#ff61f8",
+                        "on-secondary-container": "#efffbc",
+                        "outline": "#757575",
+                        "tertiary-container": "#fe00fe",
+                        "surface-container-highest": "#262626",
+                        "on-surface": "#ffffff",
+                        "error-dim": "#d7383b",
+                        "inverse-surface": "#f9f9f9",
+                        "secondary-container": "#506600",
+                        "surface": "#0e0e0e",
+                        "on-tertiary-container": "#230023",
+                        "on-tertiary-fixed-variant": "#6a006a",
+                        "on-secondary-fixed-variant": "#4e6300",
+                        "on-secondary-fixed": "#354500",
+                        "on-background": "#ffffff",
+                        "inverse-on-surface": "#555555",
+                        "surface-tint": "#8ff5ff",
+                        "on-surface-variant": "#ababab",
+                        "secondary": "#c3f400",
+                        "surface-container": "#191919",
+                        "secondary-fixed": "#c3f400",
+                        "surface-bright": "#2c2c2c",
+                        "on-secondary": "#455900",
+                        "surface-dim": "#0e0e0e",
+                        "primary-fixed-dim": "#00deec",
+                        "on-tertiary": "#400040",
+                        "error-container": "#9f0519",
+                        "background": "#0e0e0e",
+                        "secondary-fixed-dim": "#b7e500",
+                        "on-primary": "#005d63",
+                        "on-error-container": "#ffa8a3",
+                        "inverse-primary": "#006a71",
+                        "tertiary": "#ff51fa",
+                        "primary-container": "#00eefc",
+                        "outline-variant": "#484848",
+                        "on-tertiary-fixed": "#320032",
+                        "surface-container-lowest": "#000000",
+                        "tertiary-dim": "#ff51fa",
+                        "surface-variant": "#262626",
+                        "secondary-dim": "#b7e500",
+                        "primary-fixed": "#00eefc",
+                        "primary": "#8ff5ff",
+                        "on-primary-fixed": "#003f43",
+                        "surface-container-low": "#131313",
+                        "on-primary-fixed-variant": "#005e64",
+                        "primary-dim": "#00deec",
+                        "surface-container-high": "#1f1f1f",
+                        "tertiary-fixed": "#ff81f5",
+                        "on-primary-container": "#005359",
+                        "on-error": "#490006",
+                        "error": "#ff716c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Manrope"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .neon-glow-primary {
+            box-shadow: inset 0 0 12px rgba(143, 245, 255, 0.15), 0 0 20px rgba(143, 245, 255, 0.05);
+        }
+        .neon-glow-secondary {
+            box-shadow: inset 0 0 12px rgba(195, 244, 0, 0.15), 0 0 20px rgba(195, 244, 0, 0.05);
+        }
+        .kinetic-text {
+            letter-spacing: -0.05em;
+            line-height: 0.9;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary selection:text-on-primary-fixed">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-neutral-900/40 backdrop-blur-xl flex justify-between items-center px-6 py-4 shadow-[inset_0_1px_0_0_rgba(143,245,255,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold tracking-tighter text-cyan-400 font-headline">Trippi</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-cyan-400 font-bold font-headline tracking-tight" href="#">Dashboard</a>
+<a class="text-neutral-400 hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Explore</a>
+<a class="text-neutral-400 hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Community</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-neutral-800/50 rounded-full px-4 py-2 flex items-center gap-2 border border-white/5">
+<span class="material-symbols-outlined text-cyan-400 text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder:text-neutral-500" placeholder="Search experiences..." type="text"/>
+</div>
+<button class="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined">travel_explore</span>
+</button>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 border-r border-neutral-800/30 bg-[#0e0e0e] flex flex-col p-4 z-40 hidden md:flex">
+<div class="mt-20 mb-8 px-2">
+<div class="flex items-center gap-3 mb-6">
+<img alt="User profile" class="w-10 h-10 rounded-full border-2 border-secondary object-cover" data-alt="high-end professional headshot of a traveler in front of a blurred urban skyline at dusk, neon highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDH1Qj9kfZJl8Tp0_Y5XplATuMPkmsPe_NCv6OmKeVnYqgvT451VKpa7Nzh3UYxuzuNyEYYGZIZbLMjMFxZ0AJWxQBBEvNmp2EX3yhQOeRMcR649oEXgQ4giJgoGzmdXdT7vfVntna3yHN7BI8iMxIsW48aMS53gR9lEySOIy-HYDiRu-guBWO7lWwmFh9eVk6kbPP3dZMBLGsUheQ6QQr0Vu51gbKTtwUXQScREDFlvt3gl18U17NoY-kih9i2NEm_xenlXHjk-qk2"/>
+<div>
+<p class="text-[#c3f400] font-bold font-headline text-xs uppercase tracking-widest">Trippi Elite</p>
+<p class="text-neutral-500 text-[10px] uppercase font-label">Global Explorer</p>
+</div>
+</div>
+<button class="w-full bg-[#c3f400] text-black rounded-lg font-bold py-3 flex items-center justify-center gap-2 mb-8 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+<span class="font-headline tracking-tight uppercase text-xs">New Trip</span>
+</button>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="bg-[#c3f400] text-black rounded-lg font-bold flex items-center gap-3 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-headline text-xs uppercase tracking-widest">Dashboard</span>
+</a>
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-headline text-xs uppercase tracking-widest">Itinerary</span>
+</a>
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span class="font-headline text-xs uppercase tracking-widest">Bookings</span>
+</a>
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-headline text-xs uppercase tracking-widest">Documents</span>
+</a>
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all duration-300" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-headline text-xs uppercase tracking-widest">Expenses</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-2 border-t border-neutral-800/50 pt-4">
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-headline text-xs uppercase tracking-widest">Settings</span>
+</a>
+<a class="text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg flex items-center gap-3 px-4 py-3 transition-all" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-headline text-xs uppercase tracking-widest">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 pt-24 pb-32 px-6 md:px-10 min-h-screen">
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto">
+<!-- Header/Title Block -->
+<div class="md:col-span-8 flex flex-col justify-end min-h-[160px] pb-4">
+<p class="text-primary font-headline uppercase tracking-[0.3em] text-[10px] mb-2">Welcome Back, Alex</p>
+<h1 class="text-5xl md:text-7xl font-bold font-headline kinetic-text text-white">
+                    TOKYO <span class="text-outline-variant">DRIVE</span>
+</h1>
+</div>
+<!-- Weather Card -->
+<div class="md:col-span-4 glass-card neon-glow-primary rounded-full p-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-4xl" data-weight="fill">cloud_queue</span>
+<div>
+<p class="text-on-surface font-headline text-2xl font-bold">24°C</p>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest font-label">Shibuya, Tokyo</p>
+</div>
+</div>
+<div class="text-right">
+<p class="text-primary text-[10px] uppercase tracking-tighter font-bold">Scattered Clouds</p>
+<p class="text-neutral-500 text-[10px]">H: 26° L: 19°</p>
+</div>
+</div>
+<!-- Active Trip Card with Countdown -->
+<div class="md:col-span-7 bg-surface-container-low rounded-xl overflow-hidden relative group">
+<div class="absolute inset-0 z-0 overflow-hidden">
+<img alt="Active Trip" class="w-full h-full object-cover opacity-40 group-hover:scale-105 transition-transform duration-700" data-alt="cinematic shot of shibuya crossing at night with neon lights reflecting on wet pavement, cinematic lighting, 8k resolution" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCA70zxRroH9XA5ZZ6d83vFLfv-QJDWzxxZe6BHhH1iPYi0mPc3F0kTkVx8GdW9XiOTL4fJjvbrKU5NFSFOQwukbLY479YYsssoXdxEMaNHJEJU_rE3GHg4mGbDcEbBWKgutwfjTgmNyBWYwPTTDs_0jdnWvs9r-WN5cieM6CwbnacIKhcgjxXuDbHOtIMkIE0pA-jgHnpAo1WCYcKtlTLu1hk-9Z9c7DKnDDp2N6QfXhguPatObU8ux7wBfBMvtITxsH7GXnXs1YaG"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent"></div>
+</div>
+<div class="relative z-10 p-8 h-full flex flex-col justify-between min-h-[400px]">
+<div>
+<div class="flex items-center gap-2 mb-4">
+<span class="bg-primary/20 text-primary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-primary/20">Active Trip</span>
+</div>
+<h2 class="text-4xl font-bold font-headline text-white mb-2">Neon Nights &amp; Temples</h2>
+<p class="text-on-surface-variant max-w-sm text-sm">Experience the duality of Tokyo's futuristic skyline and ancient heritage.</p>
+</div>
+<div class="grid grid-cols-4 gap-4">
+<div class="bg-black/60 backdrop-blur-md rounded-xl p-4 border border-white/5 text-center">
+<p class="text-2xl font-bold font-headline text-primary">02</p>
+<p class="text-[9px] uppercase tracking-widest text-neutral-500 font-label">Days</p>
+</div>
+<div class="bg-black/60 backdrop-blur-md rounded-xl p-4 border border-white/5 text-center">
+<p class="text-2xl font-bold font-headline text-primary">14</p>
+<p class="text-[9px] uppercase tracking-widest text-neutral-500 font-label">Hours</p>
+</div>
+<div class="bg-black/60 backdrop-blur-md rounded-xl p-4 border border-white/5 text-center">
+<p class="text-2xl font-bold font-headline text-primary">55</p>
+<p class="text-[9px] uppercase tracking-widest text-neutral-500 font-label">Mins</p>
+</div>
+<div class="bg-black/60 backdrop-blur-md rounded-xl p-4 border border-white/5 text-center">
+<p class="text-2xl font-bold font-headline text-primary">08</p>
+<p class="text-[9px] uppercase tracking-widest text-neutral-500 font-label">Secs</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Next Up Activity Feed -->
+<div class="md:col-span-5 bg-surface-container rounded-xl p-6 flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline font-bold text-white text-xl">Next Up</h3>
+<button class="text-primary text-[10px] font-bold uppercase tracking-widest hover:underline">View All</button>
+</div>
+<div class="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+<!-- Activity 1 -->
+<div class="flex gap-4 p-4 rounded-xl bg-surface-container-highest/50 border border-white/5 hover:border-primary/30 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary">restaurant</span>
+</div>
+<div>
+<p class="text-white font-bold text-sm">Sushi Omakase at Sukiyabashi Jiro</p>
+<p class="text-neutral-500 text-xs">Today, 19:30 • Ginza</p>
+</div>
+</div>
+<!-- Activity 2 -->
+<div class="flex gap-4 p-4 rounded-xl bg-surface-container-highest/50 border border-white/5 hover:border-primary/30 transition-colors">
+<div class="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary">directions_car</span>
+</div>
+<div>
+<p class="text-white font-bold text-sm">Private Tour: Mount Fuji</p>
+<p class="text-neutral-500 text-xs">Tomorrow, 08:00 • Hotel Pickup</p>
+</div>
+</div>
+<!-- Activity 3 -->
+<div class="flex gap-4 p-4 rounded-xl bg-surface-container-highest/50 border border-white/5 hover:border-primary/30 transition-colors opacity-60">
+<div class="w-12 h-12 rounded-xl bg-tertiary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-tertiary">spa</span>
+</div>
+<div>
+<p class="text-white font-bold text-sm">Onsen Relaxation Session</p>
+<p class="text-neutral-500 text-xs">June 14, 16:00 • Hakone</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Actions Panel -->
+<div class="md:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Vault -->
+<div class="glass-card rounded-xl p-6 border border-white/5 group hover:bg-surface-container-highest transition-all">
+<div class="flex justify-between items-start mb-8">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">lock_open</span>
+</div>
+<span class="material-symbols-outlined text-neutral-700 group-hover:text-primary transition-colors">arrow_outward</span>
+</div>
+<h4 class="text-white font-bold font-headline text-xl mb-1">Document Vault</h4>
+<p class="text-neutral-500 text-sm">Passports, Visas, and Health Certs.</p>
+</div>
+<!-- Expenses -->
+<div class="glass-card rounded-xl p-6 border border-white/5 group hover:bg-surface-container-highest transition-all">
+<div class="flex justify-between items-start mb-8">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">account_balance_wallet</span>
+</div>
+<span class="material-symbols-outlined text-neutral-700 group-hover:text-secondary transition-colors">arrow_outward</span>
+</div>
+<h4 class="text-white font-bold font-headline text-xl mb-1">$1,240.50 Expensed</h4>
+<p class="text-neutral-500 text-sm">Current trip spending tracking.</p>
+</div>
+<!-- Chat -->
+<div class="glass-card rounded-xl p-6 border border-white/5 group hover:bg-surface-container-highest transition-all">
+<div class="flex justify-between items-start mb-8">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-tertiary">chat_bubble</span>
+</div>
+<div class="flex -space-x-2">
+<img alt="Chat User" class="w-8 h-8 rounded-full border-2 border-surface shadow-lg" data-alt="avatar of a concierge professional, soft lighting, minimalist style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCvjAN2DlqVkVWLvxIE5i_Jxws9GVHxpmHKiEg7X2X-yGxFclmQKQMXgbcEzg8pnfuuRTdLbLsMbL4XJgCWou36bGw-C069RGW7UDB_MrKesakriA6oDCWRra5q6uOsM24eqzLrwae7ctr32n2YMo9gJ7TQ4qydKPN2ONrRT5i1GvN4RUM6Eo4PYxvyLfY4Ik7dPF2zh7G32SZ9Q_Gl10lmaGmc5_27MfrIpE0bXsL27bilLY4sH2cV_HJZuUAS2pUEtP6Jq7O6BvP"/>
+<img alt="Chat User" class="w-8 h-8 rounded-full border-2 border-surface shadow-lg" data-alt="avatar of a travel companion, friendly smile, outdoor lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVBpCOP4vAm09HcyXUR5ughdrhkuBFkeynDgTAasxGMMfLxb8S8eKdMpHUnDE7o11UaNocBzFf11Pmdd4ZkhYaaqlNE-6QJywsTrLp62SDOuM0nFQ1ANVRgdwEkRHVvzteq3V81Q2qXg7JKZrpvIBqBQgpfRvTQQ7jX_vxrBNAdk--MLpSd175MqkqhvPVUSv2ndRCkMVvU6_R2cR79RR5923GKroi4qLcmGeRYJskzNIy_DQL0A8lMF3U0xLamo2ceYamyDQR_7ki"/>
+</div>
+</div>
+<h4 class="text-white font-bold font-headline text-xl mb-1">Concierge Chat</h4>
+<p class="text-neutral-500 text-sm">2 new messages from your guide.</p>
+</div>
+</div>
+<!-- Itinerary Mini Map (Bento wide) -->
+<div class="md:col-span-12 bg-surface-container-low rounded-xl p-8 relative overflow-hidden min-h-[300px]">
+<div class="absolute inset-0 z-0 opacity-40 grayscale hover:grayscale-0 transition-all duration-1000">
+<img alt="Map View" class="w-full h-full object-cover" data-alt="stylized vector map of tokyo streets with neon pathways and glowing landmarks, dark mode aesthetic" data-location="Tokyo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCycx6fGktXlh_lpT9cumLB8cTNepU_ZGB8gzHEC2HhjDmuXEqTXDsW3rCX3niuasn9A6YwKVb1A76-0wPQbw1kBlrXIteP2mUE2VDNx0TS9eWG4iq0twmn7mRUmNGruN0CbxcNgNkerd_e5ZRrEciYRMlCLLz2t7sb9hh9wapHgIfM0V7-d6FQ1-Yvx2kM8vYtr3AeUctcI_itKdHkdXCTw4Epi9f5XqbxcaZc980lFAHiJJKOnzWw8yEKWyKXhO-HpawR0NyzgE8E"/>
+</div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="mb-auto">
+<h3 class="text-2xl font-bold font-headline text-white mb-2">Live Itinerary Map</h3>
+<p class="text-on-surface-variant text-sm">Tracking 8 pins across Greater Tokyo area.</p>
+</div>
+<div class="flex gap-4 mt-8">
+<button class="bg-white text-black px-6 py-2 rounded-full font-bold text-xs uppercase font-headline active:scale-95 transition-all">Expand View</button>
+<button class="bg-surface-container-highest/80 backdrop-blur text-white px-6 py-2 rounded-full font-bold text-xs uppercase font-headline border border-white/10 active:scale-95 transition-all">Download Offline</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<div class="md:hidden fixed bottom-8 w-full flex justify-center z-50">
+<nav class="bg-neutral-950/80 backdrop-blur-2xl w-[90%] max-w-md rounded-full border border-white/10 flex justify-between items-center p-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+<a class="bg-cyan-400 text-black rounded-full px-6 py-2 flex items-center gap-2 scale-105 transition-transform" href="#">
+<span class="material-symbols-outlined text-[20px]">calendar_today</span>
+<span class="font-headline text-[10px] uppercase font-bold">Itinerary</span>
+</a>
+<a class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1" href="#">
+<span class="material-symbols-outlined">folder_shared</span>
+<span class="font-headline text-[8px] uppercase">Docs</span>
+</a>
+<a class="text-neutral-400 px-4 py-2 flex flex-col items-center gap-1" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-headline text-[8px] uppercase">Expenses</span>
+</a>
+</nav>
+</div>
+</body></html>

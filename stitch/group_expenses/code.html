@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Manrope:wght@300;400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#ff61f8",
+                        "on-secondary-container": "#efffbc",
+                        "outline": "#757575",
+                        "tertiary-container": "#fe00fe",
+                        "surface-container-highest": "#262626",
+                        "on-surface": "#ffffff",
+                        "error-dim": "#d7383b",
+                        "inverse-surface": "#f9f9f9",
+                        "secondary-container": "#506600",
+                        "surface": "#0e0e0e",
+                        "on-tertiary-container": "#230023",
+                        "on-tertiary-fixed-variant": "#6a006a",
+                        "on-secondary-fixed-variant": "#4e6300",
+                        "on-secondary-fixed": "#354500",
+                        "on-background": "#ffffff",
+                        "inverse-on-surface": "#555555",
+                        "surface-tint": "#8ff5ff",
+                        "on-surface-variant": "#ababab",
+                        "secondary": "#c3f400",
+                        "surface-container": "#191919",
+                        "secondary-fixed": "#c3f400",
+                        "surface-bright": "#2c2c2c",
+                        "on-secondary": "#455900",
+                        "surface-dim": "#0e0e0e",
+                        "primary-fixed-dim": "#00deec",
+                        "on-tertiary": "#400040",
+                        "error-container": "#9f0519",
+                        "background": "#0e0e0e",
+                        "secondary-fixed-dim": "#b7e500",
+                        "on-primary": "#005d63",
+                        "on-error-container": "#ffa8a3",
+                        "inverse-primary": "#006a71",
+                        "tertiary": "#ff51fa",
+                        "primary-container": "#00eefc",
+                        "outline-variant": "#484848",
+                        "on-tertiary-fixed": "#320032",
+                        "surface-container-lowest": "#000000",
+                        "tertiary-dim": "#ff51fa",
+                        "surface-variant": "#262626",
+                        "secondary-dim": "#b7e500",
+                        "primary-fixed": "#00eefc",
+                        "primary": "#8ff5ff",
+                        "on-primary-fixed": "#003f43",
+                        "surface-container-low": "#131313",
+                        "on-primary-fixed-variant": "#005e64",
+                        "primary-dim": "#00deec",
+                        "surface-container-high": "#1f1f1f",
+                        "tertiary-fixed": "#ff81f5",
+                        "on-primary-container": "#005359",
+                        "on-error": "#490006",
+                        "error": "#ff716c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Manrope"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(38, 38, 38, 0.4);
+            backdrop-filter: blur(20px);
+        }
+        .text-glow-primary {
+            text-shadow: 0 0 12px rgba(143, 245, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-neutral-900/40 backdrop-blur-xl flex justify-between items-center px-6 py-4 w-full shadow-[inset_0_1px_0_0_rgba(143,245,255,0.1)]">
+<div class="flex items-center gap-8">
+<span class="text-2xl font-bold tracking-tighter text-cyan-400 font-['Space_Grotesk']">Trippi</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-neutral-400 font-['Space_Grotesk'] uppercase text-xs tracking-widest hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Itinerary</a>
+<a class="text-neutral-400 font-['Space_Grotesk'] uppercase text-xs tracking-widest hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Docs</a>
+<a class="text-cyan-400 font-bold font-['Space_Grotesk'] uppercase text-xs tracking-widest hover:bg-neutral-800/50 transition-colors px-3 py-1 rounded-lg" href="#">Expenses</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined text-neutral-400">notifications</span>
+</button>
+<button class="p-2 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
+<span class="material-symbols-outlined text-neutral-400">travel_explore</span>
+</button>
+</div>
+</header>
+<!-- SideNavBar (Web Only) -->
+<aside class="hidden lg:flex h-screen w-64 fixed left-0 top-0 border-r border-neutral-800/30 bg-[#0e0e0e] flex-col p-4 z-40">
+<div class="mb-10 pt-20 px-2">
+<div class="flex items-center gap-3 mb-6">
+<img alt="User profile" class="w-10 h-10 rounded-full border border-primary/20" data-alt="Portrait of a stylish young traveler with urban city lighting and soft focus background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqFiDNOiZ_piFtUl8bZb9DsEqwWDXsOlGQTyGxLjOpYdeed4WcIvYEG5J8tzD2Ixumg2_snoUdea4tI_mZ1LEZuzm9Kvdq5kYQtyE_ZMpniAz8qXGNTzKL7LasjeDDl6j_CoAktQg47rgi5of7g_OTq9uqAeXImU1hftFBxuZnV5aKL19MKVqwn7aJcMt_gstKTFCyAXNXhZnorVdOt5T8RzpQKsGiWC7a_-zIGoGzNkLlBzSN52DZs_Ed0Z_fbHFGBuvEgg_RqXHj"/>
+<div>
+<p class="text-cyan-400 font-bold font-headline text-sm tracking-tight">Trippi Elite</p>
+<p class="text-neutral-500 text-[10px] uppercase tracking-widest font-label">Global Explorer</p>
+</div>
+</div>
+<button class="w-full bg-[#c3f400] text-black rounded-lg py-3 font-bold uppercase text-xs tracking-widest hover:brightness-110 transition-all shadow-[0_0_20px_rgba(195,244,0,0.2)]">
+                New Trip
+            </button>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Itinerary</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Bookings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-[#c3f400] text-black rounded-lg font-bold transition-all duration-300" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Expenses</span>
+</a>
+</nav>
+<div class="pt-4 border-t border-neutral-800/30 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-lg transition-all duration-300" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-['Manrope'] text-sm uppercase tracking-widest">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="lg:pl-64 pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto">
+<header class="mb-12">
+<h1 class="text-5xl md:text-7xl font-headline font-bold tracking-tighter mb-2 text-glow-primary">Group Ledger</h1>
+<p class="text-on-surface-variant font-body text-lg">Tokyo Expedition • 4 Members</p>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<!-- Total Trip Spend Card -->
+<div class="md:col-span-2 bg-surface-container-low p-8 rounded-full border border-outline-variant/10 relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-primary/10 transition-all"></div>
+<div class="relative z-10 flex flex-col h-full justify-between">
+<div>
+<span class="text-xs font-label uppercase tracking-[0.2em] text-on-surface-variant mb-4 block">Total Trip Spend</span>
+<h2 class="text-6xl md:text-8xl font-headline font-bold text-white tracking-tighter">$12,450<span class="text-primary text-4xl">.00</span></h2>
+</div>
+<div class="flex gap-4 mt-8">
+<div class="bg-surface-container rounded-full px-6 py-3 flex items-center gap-2 border border-outline-variant/10">
+<span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_10px_#c3f400]"></span>
+<span class="text-sm font-body font-medium">Flights: $4,200</span>
+</div>
+<div class="bg-surface-container rounded-full px-6 py-3 flex items-center gap-2 border border-outline-variant/10">
+<span class="w-2 h-2 rounded-full bg-tertiary shadow-[0_0_10px_#ff51fa]"></span>
+<span class="text-sm font-body font-medium">Hotel: $6,100</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Your Balance Card -->
+<div class="bg-surface-container p-8 rounded-full border border-outline-variant/10 flex flex-col justify-between items-center text-center">
+<span class="text-xs font-label uppercase tracking-[0.2em] text-on-surface-variant">Your Balance</span>
+<div class="my-6">
+<p class="text-secondary text-5xl font-headline font-bold tracking-tight">+$420.50</p>
+<p class="text-xs font-label text-secondary mt-2 uppercase tracking-widest">You're Owed</p>
+</div>
+<button class="w-full bg-surface-container-highest text-white rounded-full py-4 text-sm font-bold uppercase tracking-widest hover:bg-neutral-800 transition-all border border-outline-variant/20">
+                    Settle Up
+                </button>
+</div>
+</div>
+<!-- Transactions Section -->
+<section>
+<div class="flex items-center justify-between mb-8 px-4">
+<h3 class="text-2xl font-headline font-bold tracking-tight">Recent Activity</h3>
+<button class="text-primary text-sm font-label uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all">
+                    View All <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="space-y-3">
+<!-- Transaction Item 1 -->
+<div class="bg-surface-container-low hover:bg-surface-container-high transition-all p-4 rounded-full flex items-center justify-between gap-4 group">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative">
+<img alt="Paid by Marcus" class="w-12 h-12 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Headshot of a man with minimalist lighting against a dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAIzwrEyBtuiajXDGAXD4pPFdflyoq_QBD0H0TtWiTEUTX2kFElQV7nbdEFTTrUU8dPISU93PGodCFZ7e5B5K7EloEhE8msFu95KIgAHJPt8QUybySg3p_uSyQXdNz9AMAZ89fvsQf10xbZ6AtG8gHyCLtTYN_4sR2RgxpLsJkB0I4QPOsqBXn-9tVWCRrCFq3jHGCMb5MNDTwUVlRii2_KM3wDs2IKtl9DMK3LkreuId2xms4w7AJzlTtATPsgSn061oaP28JgqJa"/>
+<div class="absolute -bottom-1 -right-1 bg-surface-container-lowest p-1 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-[10px] text-primary">restaurant</span>
+</div>
+</div>
+<div>
+<p class="font-headline font-bold text-lg tracking-tight">Shinjuku Gyoen Ramen</p>
+<p class="text-on-surface-variant text-xs font-body">Today, 2:45 PM • Paid by Marcus</p>
+</div>
+</div>
+<div class="hidden md:block px-4">
+<span class="bg-secondary/10 text-secondary text-[10px] font-label font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-secondary/20">Split Evenly</span>
+</div>
+<div class="text-right pr-4">
+<p class="font-headline font-bold text-xl">$84.00</p>
+<p class="text-tertiary text-[10px] font-label font-bold uppercase tracking-widest">-$21.00</p>
+</div>
+</div>
+<!-- Transaction Item 2 -->
+<div class="bg-surface-container-low hover:bg-surface-container-high transition-all p-4 rounded-full flex items-center justify-between gap-4 group">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative">
+<img alt="Paid by Sarah" class="w-12 h-12 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Close up of a smiling woman with cinematic soft lighting and elegant travel style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-XtQ5sHC3rHSmwbVQh_t3QaWYoERmcTfD4r8a19B6pVICOooCTt32utTaPX0IHqg081Mq3RT_iyBRm43FdbRgp0hdPjQPqU9IaFXaKOiG2F1noYLdKOgoG3fvuk0dAoT7_nhFOR9RwidE9CD_QA2CyPkw5kztJnQHmA_KDCeHHVOVacuXBc5Xd8wDRC011PArUUiDiBouDLnqxlCNt53VZHm9G3y4JQikYFYrphWJ93zjQUDAZ-6bvJ5gXZBOfu7UtnD0wFuELPVk"/>
+<div class="absolute -bottom-1 -right-1 bg-surface-container-lowest p-1 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-[10px] text-primary">train</span>
+</div>
+</div>
+<div>
+<p class="font-headline font-bold text-lg tracking-tight">JR Pass Renewal</p>
+<p class="text-on-surface-variant text-xs font-body">Yesterday • Paid by Sarah</p>
+</div>
+</div>
+<div class="hidden md:block px-4">
+<span class="bg-tertiary/10 text-tertiary text-[10px] font-label font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-tertiary/20">Custom Split</span>
+</div>
+<div class="text-right pr-4">
+<p class="font-headline font-bold text-xl">$450.00</p>
+<p class="text-secondary text-[10px] font-label font-bold uppercase tracking-widest">+$112.50</p>
+</div>
+</div>
+<!-- Transaction Item 3 -->
+<div class="bg-surface-container-low hover:bg-surface-container-high transition-all p-4 rounded-full flex items-center justify-between gap-4 group">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative">
+<img alt="Paid by You" class="w-12 h-12 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Urban portrait of a young man with cool toned blue hour lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3W03mfWVbdqZHZgRBmn2jp6w4RROxojKNgJgncEMeqpSxCZHbFuxjp8SBqNkOmvXjtfFlG4VP8HYeLtqm3yOk6Ucq3Q96M1hrf09qQj4JUFKg-wplwMKEPB5nTOWnNyYNLw-5ocEFZqnDLCEwlHPFzFRGjpdX_LEIdrF3a9lkLngjizZ-ffoca-Sct5Z5nXm-p5uYzTSZmvx6MANWIv7kSNNleAXBxPQ5YKhF4_BCQkuq3Gze2AtD0L9iKnK6iBacbdn4FdwCiO6e"/>
+<div class="absolute -bottom-1 -right-1 bg-surface-container-lowest p-1 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-[10px] text-primary">apartment</span>
+</div>
+</div>
+<div>
+<p class="font-headline font-bold text-lg tracking-tight">Park Hyatt Stay (Partial)</p>
+<p class="text-on-surface-variant text-xs font-body">Oct 24 • Paid by You</p>
+</div>
+</div>
+<div class="hidden md:block px-4">
+<span class="bg-secondary/10 text-secondary text-[10px] font-label font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-secondary/20">Split Evenly</span>
+</div>
+<div class="text-right pr-4">
+<p class="font-headline font-bold text-xl">$1,200.00</p>
+<p class="text-secondary text-[10px] font-label font-bold uppercase tracking-widest">+$900.00</p>
+</div>
+</div>
+<!-- Transaction Item 4 -->
+<div class="bg-surface-container-low hover:bg-surface-container-high transition-all p-4 rounded-full flex items-center justify-between gap-4 group opacity-60">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative">
+<img alt="Paid by Chen" class="w-12 h-12 rounded-full object-cover grayscale transition-all" data-alt="Minimalist fashion portrait with dramatic shadows and high-end aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBk19yx3lX7okzNOOaI6AjHnfQlJ4WY0wqtXs70mcub65aB5AW6jhQv_zMYU0NMmIl8BNRqcGG0Xi8g6YSSxknFFzheRuvfrTgj7jtrrlY4xPcEhBxVB-QlRFGovzfPGaRNB2swDTPhVRWxqKRMwxb5lDOwbqroFqm2NxMHnsNktZBmr-J1mHibE4e0YSaV4y1Kp0MA7AXBXOApLmIQz9YB58obqKHh0z6Ruln6Cd3G26GldCVoZG3ublH_FEd35GeYe5OowUcYGeYb"/>
+<div class="absolute -bottom-1 -right-1 bg-surface-container-lowest p-1 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-[10px] text-primary">shopping_bag</span>
+</div>
+</div>
+<div>
+<p class="font-headline font-bold text-lg tracking-tight">Duty Free Gifts</p>
+<p class="text-on-surface-variant text-xs font-body">Oct 22 • Paid by Chen</p>
+</div>
+</div>
+<div class="hidden md:block px-4">
+<span class="bg-neutral-800 text-neutral-500 text-[10px] font-label font-bold px-3 py-1 rounded-full uppercase tracking-widest border border-neutral-700">Settled</span>
+</div>
+<div class="text-right pr-4">
+<p class="font-headline font-bold text-xl">$120.00</p>
+<p class="text-neutral-500 text-[10px] font-label font-bold uppercase tracking-widest">$0.00</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md rounded-full bg-neutral-950/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 flex justify-between p-2">
+<a class="text-neutral-400 px-4 py-2 hover:text-white transition-transform scale-105" href="#">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase">Itinerary</span>
+</div>
+</a>
+<a class="text-neutral-400 px-4 py-2 hover:text-white transition-transform scale-105" href="#">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined">folder_shared</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase">Docs</span>
+</div>
+</a>
+<a class="bg-cyan-400 text-black rounded-full px-6 py-2 flex items-center gap-2 transition-transform scale-105" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-['Space_Grotesk'] text-[10px] uppercase font-bold">Expenses</span>
+</a>
+</nav>
+<!-- FAB -->
+<button class="fixed bottom-8 right-8 lg:right-12 w-14 h-14 bg-secondary rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(195,244,0,0.4)] active:scale-90 transition-all z-40">
+<span class="material-symbols-outlined text-black font-bold">add</span>
+</button>
+</body></html>
