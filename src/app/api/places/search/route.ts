@@ -12,11 +12,15 @@ const NOMINATIM_USER_AGENT = 'Trippi/1.0 (https://github.com/trippi-app; place s
 
 const FETCH_MS = 12_000
 
-async function fetchPhoton(q: string): Promise<{ ok: boolean; results: ReturnType<typeof mapPhotonResponse> }> {
+async function fetchPhoton(q: string, lat?: string, lon?: string): Promise<{ ok: boolean; results: ReturnType<typeof mapPhotonResponse> }> {
   try {
     const url = new URL('https://photon.komoot.io/api/')
     url.searchParams.set('q', q)
     url.searchParams.set('limit', '12')
+    if (lat && lon) {
+      url.searchParams.set('lat', lat)
+      url.searchParams.set('lon', lon)
+    }
 
     const data = (await fetchGeocoderJson(url.toString(), { Accept: 'application/json' }, FETCH_MS)) as PhotonSearchResponse
     return { ok: true, results: mapPhotonResponse(data) }
@@ -25,13 +29,17 @@ async function fetchPhoton(q: string): Promise<{ ok: boolean; results: ReturnTyp
   }
 }
 
-async function fetchNominatim(q: string): Promise<{ ok: boolean; results: ReturnType<typeof mapNominatimResults> }> {
+async function fetchNominatim(q: string, lat?: string, lon?: string): Promise<{ ok: boolean; results: ReturnType<typeof mapNominatimResults> }> {
   try {
     const url = new URL('https://nominatim.openstreetmap.org/search')
     url.searchParams.set('q', q)
     url.searchParams.set('format', 'json')
     url.searchParams.set('limit', '12')
     url.searchParams.set('addressdetails', '1')
+    if (lat && lon) {
+      url.searchParams.set('lat', lat)
+      url.searchParams.set('lon', lon)
+    }
 
     const data = (await fetchGeocoderJson(
       url.toString(),
@@ -49,16 +57,19 @@ async function fetchNominatim(q: string): Promise<{ ok: boolean; results: Return
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() ?? ''
+  const lat = request.nextUrl.searchParams.get('lat')
+  const lon = request.nextUrl.searchParams.get('lon')
+
   if (q.length < 2) {
     return NextResponse.json({ results: [] })
   }
 
-  const photon = await fetchPhoton(q)
+  const photon = await fetchPhoton(q, lat || undefined, lon || undefined)
   if (photon.results.length > 0) {
     return NextResponse.json({ results: photon.results })
   }
 
-  const nominatim = await fetchNominatim(q)
+  const nominatim = await fetchNominatim(q, lat || undefined, lon || undefined)
   if (nominatim.results.length > 0) {
     return NextResponse.json({ results: nominatim.results })
   }

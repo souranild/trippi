@@ -1,255 +1,124 @@
-import { Trip, DayItinerary, Attachment, Event, Transport, Place } from './storage'
+import { Trip, Place, Transport } from './storage'
+
+export type ItineraryItem = 
+  | { type: 'place'; data: Place; globalIndex: number }
+  | { type: 'transport'; data: Transport; fromPlaceIndex: number; transportIndex: number }
 
 /**
- * Initialize itinerary from trip dates
+ * Generates a flat, chronological list of all items in the trip.
+ * Interleaves places and transport legs logically.
  */
-export function initializeItinerary(trip: Trip): DayItinerary[] {
-  const startDate = new Date(trip.startDate)
-  const endDate = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
-  
-  const days: DayItinerary[] = []
-  const currentDate = new Date(startDate)
-  let dayNumber = 1
-  
-  while (currentDate <= endDate) {
-    days.push({
-      day: dayNumber,
-      date: currentDate.toISOString().split('T')[0],
-      attachments: []
-    })
-    
-    currentDate.setDate(currentDate.getDate() + 1)
-    dayNumber++
-  }
-  
-  return days
-}
+export function getGlobalItinerary(trip: Trip): ItineraryItem[] {
+  const queue: ItineraryItem[] = []
+  const places = trip.places || []
 
-/**
- * Migrate old event/transport/place structure to new attachment-based itinerary
- */
-export function migrateToAttachmentItinerary(trip: Trip): DayItinerary[] {
-  const itinerary = initializeItinerary(trip)
-  
-  // Migrate events from places to attachments
-  trip.places.forEach((place) => {
-    const dayNumber = place.day || 1
-    const dayItinerary = itinerary.find(d => d.day === dayNumber)
-    
-    if (dayItinerary) {
-      // Add place as attachment
-      dayItinerary.attachments.push({
-        id: place.id,
-        type: 'place',
-        title: place.name,
-        description: place.notes,
-        location: place.location,
-        placeLocation: place.location,
-        country: place.country,
-        lat: place.lat,
-        lng: place.lng,
-        startTime: place.arrival,
-        endTime: place.departure,
-        documents: [],
-        links: []
+  places.forEach((place, idx) => {
+    // 1. Check for transport legs starting from 'home' to this first place
+    if (idx === 0) {
+      const inboundLegs = (place.transport || [])
+        .filter(t => t.from === 'home' && t.to === place.id)
+        .sort(sortTransports)
+      
+      inboundLegs.forEach((leg) => {
+        queue.push({ 
+          type: 'transport', 
+          data: leg, 
+          fromPlaceIndex: -1, // representing 'home'
+          transportIndex: place.transport!.indexOf(leg)
+        })
       })
-      
-      // Add events
-      if (place.events && place.events.length > 0) {
-        place.events.forEach((event) => {
-          dayItinerary.attachments.push({
-            id: event.id,
-            type: 'event',
-            title: event.title,
-            description: event.description,
-            startTime: event.time,
-            location: event.location,
-            category: event.type as 'activity' | 'dining' | 'sightseeing' | 'other',
-            documents: event.documents || [],
-            links: [],
-            notes: ''
-          })
-        })
-      }
-      
-      // Add transport
-      if (place.transport && place.transport.length > 0) {
-        place.transport.forEach((transport) => {
-          dayItinerary.attachments.push({
-            id: transport.id,
-            type: 'transport',
-            title: `${transport.from} → ${transport.to}`,
-            transportMode: transport.type as Attachment['transportMode'],
-            from: transport.from,
-            to: transport.to,
-            departure: transport.departure,
-            arrival: transport.arrival,
-            duration: transport.duration,
-            provider: transport.provider,
-            documents: transport.documents || [],
-            links: [],
-            notes: ''
-          })
-        })
-      }
     }
-  })
-  
-  return itinerary
-}
 
-/**
- * Add attachment to a specific day
- */
-export function addAttachmentToDay(
-  itinerary: DayItinerary[],
-  dayNumber: number,
-  attachment: Attachment
-): DayItinerary[] {
-  return itinerary.map(day => {
-    if (day.day === dayNumber) {
-      return {
-        ...day,
-        attachments: [...day.attachments, attachment]
-      }
-    }
-    return day
-  })
-}
+    // 2. Add the place itself
+    queue.push({ type: 'place', data: place, globalIndex: idx })
 
-/**
- * Remove attachment from a day
- */
-export function removeAttachmentFromDay(
-  itinerary: DayItinerary[],
-  dayNumber: number,
-  attachmentId: string
-): DayItinerary[] {
-  return itinerary.map(day => {
-    if (day.day === dayNumber) {
-      return {
-        ...day,
-        attachments: day.attachments.filter(a => a.id !== attachmentId)
-      }
-    }
-    return day
-  })
-}
+    // 3. Add all outbound transport legs from this place to the next destination (or home)
+    const nextPlace = places[idx + 1]
+    const targetId = nextPlace ? nextPlace.id : 'home'
+    
+    const outboundLegs = (place.transport || [])
+      .filter(t => t.from === place.id && t.to === targetId)
+      .sort(sortTransports)
 
-/**
- * Move attachment to different day
- */
-export function moveAttachmentToDay(
-  itinerary: DayItinerary[],
-  fromDayNumber: number,
-  toDayNumber: number,
-  attachmentId: string
-): DayItinerary[] {
-  let attachment: Attachment | null = null
-  
-  // Find and remove from source day
-  const updated = itinerary.map(day => {
-    if (day.day === fromDayNumber) {
-      const foundAttachment = day.attachments.find(a => a.id === attachmentId)
-      if (foundAttachment) {
-        attachment = foundAttachment
-      }
-      return {
-        ...day,
-        attachments: day.attachments.filter(a => a.id !== attachmentId)
-      }
-    }
-    return day
-  })
-  
-  // Add to target day
-  if (attachment) {
-    return updated.map(day => {
-      if (day.day === toDayNumber) {
-        return {
-          ...day,
-          attachments: [...day.attachments, attachment!]
-        }
-      }
-      return day
+    outboundLegs.forEach((leg) => {
+      queue.push({ 
+        type: 'transport', 
+        data: leg, 
+        fromPlaceIndex: idx,
+        transportIndex: place.transport!.indexOf(leg)
+      })
     })
+  })
+
+  return queue
+}
+
+function sortTransports(a: Transport, b: Transport) {
+  const dayA = a.departureDay || 1
+  const dayB = b.departureDay || 1
+  if (dayA !== dayB) return dayA - dayB
+  return (a.departure || '').localeCompare(b.departure || '')
+}
+
+/**
+ * Returns the "bounds" for a specific item in the itinerary queue.
+ * Useful for time validation.
+ */
+export function getItemBounds(
+  queue: ItineraryItem[], 
+  currentIndex: number,
+  isInsertion: boolean = false
+): { 
+  minDay: number; 
+  minTime: string; 
+  maxDay: number; 
+  maxTime: string;
+} {
+  const prev = queue[currentIndex - 1]
+  const next = isInsertion ? queue[currentIndex] : queue[currentIndex + 1]
+
+  let minDay = 1
+  let minTime = '00:00'
+  let maxDay = 999
+  let maxTime = '23:59'
+
+  if (prev) {
+    if (prev.type === 'place') {
+      minDay = prev.data.endDay || prev.data.day || 1
+      minTime = prev.data.departure || ''
+    } else {
+      minDay = prev.data.arrivalDay || prev.data.departureDay || 1
+      minTime = prev.data.arrival || ''
+    }
   }
+
+  if (next) {
+    if (next.type === 'place') {
+      maxDay = next.data.day || 1
+      maxTime = next.data.arrival || ''
+    } else {
+      maxDay = next.data.departureDay || 1
+      maxTime = next.data.departure || ''
+    }
+  }
+
+  return { minDay, minTime, maxDay, maxTime }
+}
+
+/**
+ * Helper to check if a time is after another, accounting for 12h/24h strings
+ */
+export function isTimeAfter(time1: string, time2: string): boolean {
+  if (!time1 || !time2) return true
   
-  return updated
-}
-
-/**
- * Reorder attachments within a day
- */
-export function reorderAttachments(
-  itinerary: DayItinerary[],
-  dayNumber: number,
-  fromIndex: number,
-  toIndex: number
-): DayItinerary[] {
-  return itinerary.map(day => {
-    if (day.day === dayNumber) {
-      const attachments = [...day.attachments]
-      const [removed] = attachments.splice(fromIndex, 1)
-      attachments.splice(toIndex, 0, removed)
-      return {
-        ...day,
-        attachments
-      }
-    }
-    return day
-  })
-}
-
-/**
- * Update attachment
- */
-export function updateAttachment(
-  itinerary: DayItinerary[],
-  dayNumber: number,
-  attachmentId: string,
-  updates: Partial<Attachment>
-): DayItinerary[] {
-  return itinerary.map(day => {
-    if (day.day === dayNumber) {
-      return {
-        ...day,
-        attachments: day.attachments.map(a => {
-          if (a.id === attachmentId) {
-            return { ...a, ...updates }
-          }
-          return a
-        })
-      }
-    }
-    return day
-  })
-}
-
-/**
- * Get all attachments of a specific type
- */
-export function getAttachmentsByType(
-  itinerary: DayItinerary[],
-  type: Attachment['type']
-): Attachment[] {
-  return itinerary.flatMap(day => 
-    day.attachments.filter(a => a.type === type)
-  )
-}
-
-/**
- * Get attachment by ID across all days
- */
-export function findAttachment(
-  itinerary: DayItinerary[],
-  attachmentId: string
-): { attachment: Attachment; dayNumber: number } | null {
-  for (const day of itinerary) {
-    const attachment = day.attachments.find(a => a.id === attachmentId)
-    if (attachment) {
-      return { attachment, dayNumber: day.day }
-    }
+  const toMins = (t: string) => {
+    const clean = t.replace(/\s*(AM|PM)/i, '').trim()
+    const [h, m] = clean.split(':').map(Number)
+    let total = h * 60 + m
+    if (t.toLowerCase().includes('pm') && h < 12) total += 12 * 60
+    if (t.toLowerCase().includes('am') && h === 12) total -= 12 * 60
+    return total
   }
-  return null
+
+  return toMins(time1) >= toMins(time2)
 }

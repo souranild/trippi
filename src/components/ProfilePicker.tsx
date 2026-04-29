@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalContent, ModalFooter } from '@/components/ModalLayout'
 
 const avatars = [
   'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
@@ -20,54 +21,62 @@ interface ProfilePickerProps {
 }
 
 export default function ProfilePicker({ currentAvatar, onSelect, onClose }: ProfilePickerProps) {
+  const [selected, setSelected] = useState(currentAvatar)
+
   return (
-    <div className="modal-backdrop p-4 md:p-8">
-      <div className="modal-container max-w-md w-full">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-heading-3 text-white">Choose Avatar</h2>
+    <ModalBackdrop onClick={onClose}>
+      <ModalContainer size="sm" tint="rgba(34, 211, 238, 0.05)">
+        <ModalHeader 
+          title="Choose Avatar" 
+          onClose={onClose} 
+          showBackButton={true}
+          leading={
+            <div className="w-10 h-10 rounded-full bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-lg text-cyan-400">person</span>
+            </div>
+          }
+        />
+        <ModalContent>
+          <div className="grid grid-cols-4 gap-4">
+            {avatars.map((avatar, index) => (
+              <button
+                key={index}
+                onClick={() => setSelected(avatar)}
+                className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all p-0.5 ${
+                  selected === avatar
+                    ? 'border-cyan-400 scale-110 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+                    : 'border-white/10 hover:border-white/30'
+                }`}
+              >
+                <img
+                  src={avatar}
+                  alt={`Avatar ${index + 1}`}
+                  className="w-full h-full object-cover rounded-full"
+                />
+                {selected === avatar && (
+                  <div className="absolute inset-0 bg-cyan-400/10 rounded-full flex items-center justify-center">
+                     <span className="material-symbols-outlined text-cyan-400 text-sm">check</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </ModalContent>
+        <ModalFooter>
           <button
             onClick={onClose}
-            className="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          {avatars.map((avatar, index) => (
-            <button
-              key={index}
-              onClick={() => onSelect(avatar)}
-              className={`w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${
-                currentAvatar === avatar
-                  ? 'border-primary scale-110'
-                  : 'border-neutral-600 hover:border-primary/50'
-              }`}
-            >
-              <img
-                src={avatar}
-                alt={`Avatar ${index + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-lg"
+            className="flex-1 py-3 px-4 rounded-2xl border border-white/10 text-white font-bold text-xs hover:bg-white/5 transition-all"
           >
             Cancel
           </button>
           <button
-            onClick={() => onSelect(currentAvatar)}
-            className="flex-1 bg-primary text-black px-4 py-2 rounded-lg font-bold"
+            onClick={() => onSelect(selected)}
+            className="flex-[2] py-3 px-4 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all active:scale-95"
           >
-            Save
+            Save Profile
           </button>
-        </div>
-      </div>
-    </div>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
   )
 }

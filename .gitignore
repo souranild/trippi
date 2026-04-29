@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/blob-report/
 
 # next.js
 /.next/
@@ -22,7 +25,12 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+*.log
+*.tmp
+*.swp
+*.swo
 
 # debug
 npm-debug.log*

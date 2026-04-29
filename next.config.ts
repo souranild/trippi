@@ -14,11 +14,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: '/:path*',
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "frame-src 'self' https://maps.google.com https://www.google.com https://*.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.googleapis.com; connect-src 'self' https://maps.googleapis.com https://*.googleapis.com; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;",
+            value: "frame-src 'self' https://maps.google.com https://www.google.com https://*.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.googleapis.com; connect-src 'self' https://maps.googleapis.com https://*.googleapis.com https://en.wikipedia.org https://nominatim.openstreetmap.org https://overpass-api.de https://*.overpass-api.de https://overpass.kumi.systems; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;",
           },
           {
             key: 'Referrer-Policy',

@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { searchWallpapers, getRandomPlaceholder } from '@/lib/wallpaper-search'
+import { applySkinTone } from '@/lib/emoji-categories'
+import ParallaxBackground from './ParallaxBackground'
 
-const emojis = [
-  '✈️', '🏖️', '🏔️', '🏙️', '🌴', '🏰', '🗽', '🗼', '🎭', '🍜', '🏃', '🎨', '🎵', '🍷', '🏂', '🚀',
-  '🌍', '🏕️', '🏝️', '🌄', '🌅', '🏞️', '🏜️', '🏯', '🕌', '⛩️', '🏛️', '🎡', '🎢', '🎠', '🏟️', '🎪',
-  '🍕', '🍔', '🍟', '🌭', '🍿', '🍩', '🍪', '🎂', '🍰', '🧁', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼',
-  '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸', '🥅', '🏒', '🏑', '🏏', '⛳', '🏹',
-  '🎸', '🎹', '🥁', '🎷', '🎺', '🪕', '🎻', '🎤', '🎧', '🎼', '🎶', '🎙️', '🎚️', '🎛️', '🎯',
-  '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🚚', '🚛', '🚜', '🏍️', '🛵', '🚲',
-  '⛵', '🛶', '🚤', '🛳️', '⛴️', '🚢', '🛩️', '🛫', '🛬', '🚁', '🚟', '🚠', '🚡', '🛤️', '🛸'
+import { useTrips } from '@/context/TripContext'
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalContent, ModalFooter } from '@/components/ModalLayout'
+import EmojiPicker from './EmojiPicker'
+import DatePicker from './DatePicker'
+import { ConfirmationModal } from './ConfirmationModal'
+
+const defaultEmojis = [
+  '✈️', '🏖️', '🏔️', '🏙️', '🌴', '🏰', '🗽', '🗼', '🎭', '🍜', '🏃', '🎨', '🎵', '🍷', '🏂', '🚀'
 ]
 
 interface TripFormProps {
@@ -35,6 +37,9 @@ interface TripFormProps {
   submitButtonText?: string
   onEmojiPickerToggle?: (isOpen: boolean) => void
   onWallpaperPickerToggle?: (isOpen: boolean) => void
+  hideBackground?: boolean
+  onDelete?: () => void
+  onWallpaperChange?: (url: string) => void
 }
 
 export default function TripForm({
@@ -44,14 +49,20 @@ export default function TripForm({
   isSubmitting = false,
   submitButtonText = 'Create Trip',
   onEmojiPickerToggle,
-  onWallpaperPickerToggle
+  onWallpaperPickerToggle,
+  hideBackground = false,
+  onDelete,
+  onWallpaperChange
 }: TripFormProps) {
+  const { userProfile } = useTrips()
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [emoji, setEmoji] = useState(initialValues.emoji || '')
+  const [skinTone, setSkinTone] = useState(userProfile?.skinTone || 'medium')
 
   // Set random emoji on mount if none provided
   useEffect(() => {
     if (!initialValues.emoji) {
-      const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)]
+      const randomEmoji = defaultEmojis[Math.floor(Math.random() * defaultEmojis.length)]
       setEmoji(randomEmoji)
     }
   }, [initialValues.emoji])
@@ -60,7 +71,7 @@ export default function TripForm({
   const [startDate, setStartDate] = useState(initialValues.startDate || '')
   const [endDate, setEndDate] = useState(initialValues.endDate || '')
   const [wallpaper, setWallpaper] = useState(initialValues.wallpaper || '')
-  const [wallpaperOpacity, setWallpaperOpacity] = useState(0)
+  const [wallpaperOpacity, setWallpaperOpacity] = useState(1)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isWallpaperPickerOpen, setIsWallpaperPickerOpen] = useState(false)
   const [wallpaperSearchQuery, setWallpaperSearchQuery] = useState('')
@@ -68,18 +79,18 @@ export default function TripForm({
   const [isWallpaperSearching, setIsWallpaperSearching] = useState(false)
   const wallpaperInputRef = useRef<HTMLInputElement | null>(null)
 
+  const changeWallpaper = (url: string) => {
+    onWallpaperChange?.(url)
+    setWallpaper(url)
+  }
+
   // Set initial wallpaper on mount
   useEffect(() => {
-    if (!initialValues.wallpaper) {
+    if (!wallpaper) {
       const placeholder = getRandomPlaceholder()
-      setWallpaperOpacity(0)
       setWallpaper(placeholder)
-      const timer = setTimeout(() => setWallpaperOpacity(1), 50)
-      return () => clearTimeout(timer)
-    } else {
-      setWallpaperOpacity(1)
     }
-  }, [initialValues.wallpaper])
+  }, [])
 
   useEffect(() => {
     onEmojiPickerToggle?.(isEmojiPickerOpen)
@@ -92,16 +103,18 @@ export default function TripForm({
   const handleWallpaperSearch = async (query: string) => {
     if (!query.trim()) {
       setWallpaperSearchResults([])
-      return
+      return []
     }
 
     try {
       setIsWallpaperSearching(true)
       const urls = await searchWallpapers(query)
       setWallpaperSearchResults(urls)
+      return urls
     } catch (error) {
       console.error('Failed to search wallpapers:', error)
       setWallpaperSearchResults([])
+      return []
     } finally {
       setIsWallpaperSearching(false)
     }
@@ -123,6 +136,62 @@ export default function TripForm({
     }
   }, [isWallpaperPickerOpen])
 
+  const handleWikiSummary = async (query: string) => {
+    // Only auto-fill if description is empty or very short
+    if (!query.trim() || description.trim().length > 10) return
+    
+    // Clean query: remove common prefix "Trip to " or "My "
+    const cleanedQuery = query.trim().replace(/^(Trip to|My|Our|Journey to)\s+/i, '')
+
+    try {
+      // Use local proxy to avoid CORS and Failed to fetch errors
+      const response = await fetch(`/api/wiki?title=${encodeURIComponent(cleanedQuery)}`)
+      if (response.ok) {
+        const data = await response.json()
+        const pages = data.query?.pages
+        if (pages) {
+          const pageId = Object.keys(pages)[0]
+          if (pageId === '-1') return // Page not found
+          
+          const extract = pages[pageId]?.extract
+          if (extract) {
+            setDescription(extract.split('\n')[0].slice(0, 500)) // More generous slice
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch wiki summary:', error)
+    }
+  }
+
+  const handleTitleBlur = () => {
+    if (title.trim()) {
+      // 1. Kick off wiki search (background)
+      handleWikiSummary(title.trim())
+      
+      // 2. Kick off wallpaper search (background)
+      handleWallpaperSearch(title.trim()).then(urls => {
+        if (urls && urls.length > 0) {
+          changeWallpaper(urls[0])
+        }
+      })
+    }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setWallpaper(base64String)
+      onWallpaperChange?.(base64String)
+      setIsWallpaperPickerOpen(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !emoji || !startDate) return
@@ -143,66 +212,64 @@ export default function TripForm({
     <div className="space-y-6">
       {/* Emoji Picker Modal */}
       {isEmojiPickerOpen && (
-        <div className="modal-backdrop p-4 md:p-8 animate-in fade-in duration-300">
-          <div className="modal-container w-full max-w-2xl max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-4 p-6 border-b border-neutral-700 bg-white/5 backdrop-blur-xl">
-              <button
-                onClick={() => setIsEmojiPickerOpen(false)}
-                className="w-10 h-10 bg-neutral-900/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-800/60 hover:text-white transition-all duration-300 active:scale-95 shadow-lg"
-                aria-label="Back"
-              >
-                <span className="material-symbols-outlined text-sm">arrow_back</span>
-              </button>
-              <h2 className="text-2xl font-bold text-white font-headline">Choose Trip Emoji</h2>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="grid grid-cols-10 gap-3">
-                {emojis.map((e, index) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => {
-                      setEmoji(e)
-                      setIsEmojiPickerOpen(false)
-                    }}
-                    className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl transition-all hover:scale-110 hover:shadow-lg animate-in slide-in-from-bottom-2 duration-300 ${
-                      emoji === e
-                        ? 'bg-primary text-black shadow-lg scale-110'
-                        : 'bg-surface-container-highest text-white hover:bg-neutral-700'
-                    }`}
-                    style={{ animationDelay: `${index * 20}ms` }}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-6 border-t border-neutral-700 bg-surface-container-highest">
-              <button
-                onClick={() => setIsEmojiPickerOpen(false)}
-                className="w-full py-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+        <ModalBackdrop onClick={() => setIsEmojiPickerOpen(false)}>
+          <ModalContainer size="sm" className="rounded-[2rem]">
+            <ModalHeader 
+              title="Select Emoji" 
+              onClose={() => setIsEmojiPickerOpen(false)}
+              leading={
+                <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                  <span className="text-xl">😊</span>
+                </div>
+              }
+            />
+            <ModalContent maxHeight={false}>
+              <EmojiPicker 
+                onSelect={(selected) => {
+                  setEmoji(applySkinTone(selected, skinTone))
+                  setIsEmojiPickerOpen(false)
+                }}
+                onClose={() => setIsEmojiPickerOpen(false)}
+                selectedEmoji={emoji}
+                selectedSkinTone={skinTone}
+                onSkinToneChange={(tone) => {
+                  setSkinTone(tone)
+                  if (emoji) {
+                    setEmoji(prev => applySkinTone(prev, tone)) 
+                  }
+                }}
+              />
+            </ModalContent>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
 
       {/* Wallpaper Picker Modal */}
       {isWallpaperPickerOpen && (
-        <div className="modal-backdrop p-4 md:p-8 animate-in fade-in duration-300">
-          <div className="modal-container w-full max-w-4xl max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-500 flex flex-col">
-            <div className="flex items-center gap-4 p-6 border-b border-neutral-700 bg-white/5 backdrop-blur-xl flex-shrink-0">
-              <button
-                onClick={() => setIsWallpaperPickerOpen(false)}
-                className="w-10 h-10 bg-neutral-900/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-neutral-400 hover:bg-neutral-800/60 hover:text-white transition-all duration-300 active:scale-95 shadow-lg"
-                aria-label="Back"
-              >
-                <span className="material-symbols-outlined text-sm">arrow_back</span>
-              </button>
-              <h2 className="text-heading-2 text-white">Choose Trip Wallpaper</h2>
-            </div>
+        <ModalBackdrop onClick={() => setIsWallpaperPickerOpen(false)}>
+          <ModalContainer size="lg">
+            <ModalHeader 
+              title="Background Media" 
+              subtitle="Search photos or upload videos/photos"
+              onClose={() => setIsWallpaperPickerOpen(false)}
+              leading={
+                <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg text-primary">landscape</span>
+                </div>
+              }
+              actions={
+                <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl text-primary text-xs font-bold cursor-pointer hover:bg-primary/20 transition-all active:scale-95">
+                  <span className="material-symbols-outlined text-sm">upload_file</span>
+                  <span className="hidden sm:inline">Upload</span>
+                  <input 
+                    type="file" 
+                    accept="image/*,video/*" 
+                    className="hidden" 
+                    onChange={handleFileUpload}
+                  />
+                </label>
+              }
+            />
 
             <div className="p-6 border-b border-neutral-700 flex-shrink-0">
               <div className="relative">
@@ -216,8 +283,8 @@ export default function TripForm({
                       handleWallpaperSearch(wallpaperSearchQuery || 'travel')
                     }
                   }}
-                  placeholder="Search for wallpapers (e.g., mountains, beach, city)..."
-                  className="w-full rounded-xl border border-neutral-700 bg-surface-container-highest px-4 py-3 pr-12 text-white placeholder-neutral-400 focus:border-primary outline-none"
+                  placeholder="Search for wallpapers (Wikipedia, Unsplash)..."
+                  className="w-full rounded-xl border border-neutral-700 bg-white/5 px-4 py-3 pr-12 text-white placeholder-neutral-400 focus:border-primary outline-none"
                 />
                 <button
                   type="button"
@@ -226,15 +293,39 @@ export default function TripForm({
                   className="absolute right-3 top-3 text-neutral-400 hover:text-white disabled:opacity-50"
                 >
                   {isWallpaperSearching ? (
-                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                    <span className="material-symbols-outlined animate-spin text-sm">refresh</span>
                   ) : (
-                    <span className="material-symbols-outlined">search</span>
+                    <span className="material-symbols-outlined text-sm">search</span>
                   )}
                 </button>
               </div>
+
+              <div className="flex items-center gap-2">
+                <div className="h-px bg-neutral-800 flex-1" />
+                <span className="text-xs font-bold text-neutral-600">or paste a link</span>
+                <div className="h-px bg-neutral-800 flex-1" />
+              </div>
+
+              <div className="relative">
+                <input
+                  type="url"
+                  placeholder="Paste direct image URL here..."
+                  className="w-full rounded-xl border border-neutral-700 bg-white/5 px-4 py-3 text-white placeholder-neutral-400 focus:border-primary outline-none text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      if (val.startsWith('http')) {
+                        changeWallpaper(val);
+                        setIsWallpaperPickerOpen(false);
+                      }
+                    }
+                  }}
+                />
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <ModalContent>
+
               {wallpaperSearchResults.length === 0 && !isWallpaperSearching && (
                 <div className="text-center py-12">
                   <p className="text-neutral-500 text-sm">No wallpapers loaded yet. Try searching for something!</p>
@@ -246,7 +337,7 @@ export default function TripForm({
                     key={`${url}-${index}`}
                     type="button"
                     onClick={() => {
-                      setWallpaper(url)
+                      changeWallpaper(url)
                       setIsWallpaperPickerOpen(false)
                     }}
                     className={`relative aspect-video rounded-lg overflow-hidden transition-all hover:scale-105 hover:shadow-lg animate-in slide-in-from-bottom-2 duration-300 ${
@@ -267,73 +358,83 @@ export default function TripForm({
                   </button>
                 ))}
               </div>
-            </div>
+            </ModalContent>
 
-            <div className="p-6 border-t border-neutral-700 bg-surface-container-highest flex-shrink-0">
-              <div className="flex justify-between items-center">
-                <p className="text-neutral-400 text-sm">Choose a beautiful background for your trip</p>
+            <ModalFooter>
+              <div className="flex justify-between items-center w-full gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const styles = ['cover', 'contain', 'auto'] as const
+                    const idx = styles.indexOf(wallpaperStyle as any)
+                    setWallpaperStyle(styles[(idx + 1) % 3])
+                  }}
+                  className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-neutral-400 text-xs font-bold hover:text-white transition-all shadow-lg active:scale-90"
+                >
+                  Media Fit: {wallpaperStyle}
+                </button>
                 <button
                   onClick={() => setIsWallpaperPickerOpen(false)}
-                  className="px-4 py-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-lg"
+                  className="px-4 py-2 text-white bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-xs font-bold"
                 >
                   Done
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
 
       {/* Background */}
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-700"
-        style={{
-          backgroundImage: wallpaper ? `url(${wallpaper})` : `url(https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop)`,
-          opacity: wallpaperOpacity,
-        }}
-      />
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" />
+      {!hideBackground && (
+        <ParallaxBackground 
+          src={wallpaper || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&h=1080&fit=crop'} 
+          opacity={wallpaperOpacity} 
+          parallaxFactor={0.15}
+        />
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="relative z-10 mx-auto max-w-4xl">
         <div className="mb-8 rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-          <div className="grid grid-cols-[3.5rem_1fr_3.5rem] items-center gap-x-3 sm:grid-cols-[4rem_1fr_4rem] sm:gap-x-5">
-            <div className="flex h-16 w-14 items-center justify-center sm:w-16">
-              <button
-                type="button"
-                onClick={() => setIsEmojiPickerOpen(true)}
-                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-3xl transition-all hover:scale-105 sm:h-16 sm:w-16 sm:text-4xl ${
-                  emoji
-                    ? 'bg-white/20 hover:bg-white/30'
-                    : 'border-2 border-dashed border-white/30 bg-white/10 hover:bg-white/20'
-                }`}
-              >
-                {emoji || '😊'}
-              </button>
-            </div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Emoji */}
+            <button
+              type="button"
+              onClick={() => setIsEmojiPickerOpen(true)}
+              className={`shrink-0 flex h-14 w-14 items-center justify-center rounded-xl text-3xl transition-all hover:scale-105 active:scale-95 ${
+                emoji
+                  ? 'bg-white/20 hover:bg-white/30'
+                  : 'border-2 border-dashed border-white/30 bg-white/10 hover:bg-white/20'
+              }`}
+              title="Change emoji"
+            >
+              {emoji || '😊'}
+            </button>
 
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Trip name..."
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-sm text-white placeholder-white/50 focus:border-primary focus:outline-none transition-colors"
-              />
-              <div className="flex gap-2 text-xs text-white/60">
-                <span>Click to change emoji</span>
-              </div>
-            </div>
+            {/* Trip name */}
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
+              placeholder="Trip name..."
+              className="flex-1 min-w-0 rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-sm text-white placeholder-white/50 focus:border-primary focus:outline-none transition-colors font-bold text-lg"
+            />
 
-            <div className="flex h-16 w-14 items-center justify-center sm:w-16">
-              <button
-                type="button"
-                onClick={handleWallpaperPickerOpen}
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-white/30 bg-white/10 text-white transition-all hover:scale-105 hover:bg-white/20 sm:h-16 sm:w-16"
-              >
-                <span className="material-symbols-outlined text-2xl sm:text-3xl">wallpaper</span>
-              </button>
-            </div>
+            {/* Wallpaper */}
+            <button
+              type="button"
+              onClick={handleWallpaperPickerOpen}
+              title="Change wallpaper"
+              className="shrink-0 flex h-14 w-14 items-center justify-center rounded-xl border-2 border-dashed border-white/30 bg-white/10 text-white transition-all hover:scale-105 hover:bg-white/20 active:scale-95 overflow-hidden"
+            >
+              {wallpaper ? (
+                <img src={wallpaper} alt="wallpaper" className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-2xl">wallpaper</span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -355,41 +456,60 @@ export default function TripForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-neutral-300 mb-2">Start Date</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-sm text-white focus:border-primary focus:outline-none transition-colors"
+                  onChange={setStartDate}
+                  placeholder="When are you going?"
                 />
               </div>
               <div>
                 <label className="block text-sm text-neutral-300 mb-2">End Date (Optional)</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-sm text-white focus:border-primary focus:outline-none transition-colors"
+                <DatePicker
+                  value={endDate || ''}
+                  onChange={setEndDate}
+                  placeholder="When are you back?"
                 />
               </div>
             </div>
 
-            <div className="flex gap-4 pt-6">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="btn-secondary btn-md flex-1 text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!isFormValid || isSubmitting}
-                className="btn-primary btn-md flex-1 text-xs shadow-primary/20"
-              >
-                <span className="material-symbols-outlined text-sm">rocket_launch</span>
-                {isSubmitting ? 'Creating...' : submitButtonText}
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-6">
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                >
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                  Delete
+                </button>
+              )}
+
+              <div className="flex-1 flex gap-3">
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="flex-1 py-3 px-6 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all active:scale-95 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!isFormValid || isSubmitting}
+                  className="flex-[2] py-3 px-6 rounded-2xl bg-primary text-slate-950 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all disabled:opacity-50 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2 text-xs"
+                >
+                  <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                  {isSubmitting ? 'Creating...' : submitButtonText}
+                </button>
+              </div>
             </div>
+
+            <ConfirmationModal
+              isOpen={showDeleteConfirm}
+              title="Delete Trip?"
+              message={`Are you sure you want to delete "${title || 'this trip'}"? This action cannot be undone and all your plans will be lost.`}
+              onConfirm={onDelete!}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
           </div>
         </div>
       </form>

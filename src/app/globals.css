@@ -127,18 +127,26 @@
   text-shadow: 0 0 12px rgba(143, 245, 255, 0.4);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-body);
-  background:
-    radial-gradient(circle at 14% 18%, rgba(var(--glass-tint-rgb), 0.22), transparent 40%),
-    radial-gradient(circle at 84% 8%, rgba(var(--glass-tint-rgb), 0.12), transparent 34%),
-    var(--color-background);
+  background-color: #0a0a0b;
   color: var(--color-on-surface);
   selection: var(--color-primary);
   selection-text: var(--color-on-primary-fixed);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Map Marker Styles */
+.map-marker, .custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
 .map-marker {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -189,6 +197,15 @@ body {
   100% { transform: scale(1); opacity: 0.5; }
 }
 
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.01); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
 .world-map-svg {
   width: 100%;
   height: 100%;
@@ -211,26 +228,226 @@ body {
   line-height: 0.9;
 }
 
-/* Leaflet Tooltip Styles */
-.leaflet-tooltip.custom-tooltip {
-  background: rgba(0, 0, 0, 0.9) !important;
-  color: white !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-  font-family: var(--font-body) !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
-  padding: 8px 12px !important;
-  backdrop-filter: blur(10px) !important;
+.leaflet-tooltip.custom-tooltip-wrapper,
+.leaflet-tooltip.interactive-discovery-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
-.leaflet-tooltip.custom-tooltip::before {
-  border-top-color: rgba(0, 0, 0, 0.9) !important;
+.leaflet-tooltip.custom-tooltip-wrapper::before,
+.leaflet-tooltip.interactive-discovery-tooltip::before {
+  display: none !important;
 }
 
 /* Custom emoji marker styles */
 .custom-emoji-marker {
   background: transparent !important;
   border: none !important;
+}
+
+/* Fix for Leaflet z-index bleeding through modals */
+.leaflet-container {
+  z-index: 1 !important;
+}
+.leaflet-pane {
+  z-index: 10 !important;
+}
+.leaflet-top, .leaflet-bottom {
+  z-index: 20 !important;
+}
+.leaflet-map-pane {
+  z-index: 1 !important;
+}
+
+.modal-backdrop {
+  z-index: 5000 !important;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-container {
+  z-index: 1001 !important;
+}
+
+/* Premium Dark Zoom Controls */
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-bar a {
+  background-color: rgba(10, 10, 10, 0.8) !important;
+  color: #fff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  font-weight: bold !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: rgba(40, 40, 40, 0.9) !important;
+  color: var(--primary) !important;
+}
+
+.leaflet-bar a.leaflet-disabled {
+  background-color: rgba(5, 5, 5, 0.5) !important;
+  color: #444 !important;
+}
+
+/* Artistic Map Style Filters */
+.map-style-cyber .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) saturate(2) brightness(0.9) contrast(1.2) !important;
+}
+
+.map-style-mono .leaflet-tile-pane {
+  filter: grayscale(100%) contrast(150%) brightness(0.9) !important;
+}
+
+.map-style-midnight .leaflet-tile-pane {
+  filter: saturate(1.4) contrast(1.3) brightness(0.85) !important;
+}
+
+/* Print Styles for Professional PDF Export */
+@media print {
+  @page {
+    margin: 1cm;
+    size: auto;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background-color: #0a0a0b !important;
+    color: white !important;
+    font-size: 11pt;
+  }
+
+  .no-print,
+  button,
+  .modal-backdrop,
+  .btn-primary,
+  .btn-secondary,
+  nav,
+  header,
+  .quick-search-trigger {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .trip-container {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .itinerary-column {
+    width: 100% !important;
+    display: block !important;
+  }
+
+  .glass-card, .bg-neutral-900\/20 {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    color: white !important;
+    page-break-inside: avoid;
+    margin-bottom: 20px;
+  }
+
+  h1, h2, h3, h4 {
+    color: #8ff5ff !important;
+    text-shadow: none !important;
+  }
+
+  p, span, div {
+    color: #e2e8f0 !important;
+  }
+
+  .text-neutral-400, .text-neutral-500 {
+    color: #94a3b8 !important;
+  }
+
+  .text-primary, .text-cyan-400 {
+    color: #22d3ee !important;
+  }
+
+  .map-container {
+    height: 400px !important;
+    page-break-inside: avoid;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+
+  .itinerary-day {
+    page-break-inside: avoid;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+  }
+
+  .attachment-item {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .document-link {
+    text-decoration: underline !important;
+    color: #22d3ee !important;
+  }
+
+  a::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #94a3b8;
+  }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slide-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.animate-slide-in {
+  animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-out {
+  animation: slide-out-right 0.4s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Animated Map Polyline */
+.animated-polyline {
+  stroke-dasharray: 4, 12;
+  animation: dash-move 3s linear infinite;
+  stroke-linecap: round;
+}
+
+@keyframes dash-move {
+  from {
+    stroke-dashoffset: 32;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }

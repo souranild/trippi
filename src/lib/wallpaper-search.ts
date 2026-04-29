@@ -8,6 +8,22 @@ export interface WallpaperResult {
 }
 
 // Search wallpapers using the Next.js API route
+export async function searchWikipediaImages(query: string): Promise<string[]> {
+  try {
+    const cleanedQuery = query.trim().replace(/^(Trip to|My|Our|Journey to)\s+/i, '')
+    // Use local proxy to avoid CORS
+    const response = await fetch(`/api/wiki-images?query=${encodeURIComponent(cleanedQuery)}`)
+    if (response.ok) {
+      return await response.json()
+    }
+    return []
+  } catch (error) {
+    console.error('[Wiki API] Error:', error)
+    return []
+  }
+}
+
+// Search wallpapers using the Next.js API route
 export async function searchWallpapers(query: string): Promise<string[]> {
   console.log('[Wallpaper API] Searching for:', query)
 
@@ -17,15 +33,15 @@ export async function searchWallpapers(query: string): Promise<string[]> {
   }
 
   try {
-    const response = await fetch(`/api/wallpapers?query=${encodeURIComponent(query)}`)
+    const [wikiImages, unsplashImages] = await Promise.all([
+      searchWikipediaImages(query),
+      fetch(`/api/wallpapers?query=${encodeURIComponent(query)}`).then(r => r.ok ? r.json() : [])
+    ])
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`)
-    }
+    const combinedUrls = [...wikiImages, ...unsplashImages]
+    console.log(`[Wallpaper API] ✅ Found ${combinedUrls.length} combined images for query: "${query}"`)
+    return combinedUrls
 
-    const imageUrls: string[] = await response.json()
-    console.log(`[Wallpaper API] ✅ Found ${imageUrls.length} images for query: "${query}"`)
-    return imageUrls
 
   } catch (error) {
     console.error('[Wallpaper API] Error:', error)

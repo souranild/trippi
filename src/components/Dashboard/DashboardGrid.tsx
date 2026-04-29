@@ -60,7 +60,7 @@ export default function DashboardGrid({ trips, onDelete }: DashboardGridProps) {
             Current Adventure
           </h3>
           <div className="w-full">
-            <TripCard trip={currentTrip} onDelete={onDelete} className="w-full" />
+            <TripCard trip={currentTrip} onDelete={onDelete} className="w-full" isCurrent={true} />
           </div>
         </div>
       )}

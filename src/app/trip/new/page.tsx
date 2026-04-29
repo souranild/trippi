@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useTrips } from '@/context/TripContext'
 import TripForm from '@/components/TripForm'
+import AppHeader from '@/components/AppHeader'
 
 export default function NewTrip() {
   const router = useRouter()
@@ -34,31 +35,14 @@ export default function NewTrip() {
       places: [],
     }
 
-    addTrip(newTrip)
+    await addTrip(newTrip)
     router.push(`/trip/${newTrip.id}?addFirstPlace=true`)
   }
 
   return (
     <div className="min-h-screen bg-background text-on-surface font-body">
       {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex w-full items-center justify-between bg-neutral-900/40 px-6 py-4 shadow-[inset_0_1px_0_rgba(143,245,255,0.1)] backdrop-blur-xl">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-2xl font-bold tracking-tighter text-cyan-400 font-headline hover:text-cyan-300 transition-colors">
-            trippi
-          </Link>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150">
-            <span className="material-symbols-outlined">search</span>
-          </button>
-          <button
-            onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
-            className="p-2 text-neutral-400 hover:bg-neutral-800/50 transition-colors rounded-full active:scale-95 duration-150"
-          >
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-        </div>
-      </header>
+      <AppHeader onBack={() => window.history.back()} />
 
       {/* Account Menu Panel */}
       <div className={`fixed right-0 top-0 h-full w-80 z-50 transform transition-transform duration-300 ease-in-out bg-[linear-gradient(145deg,rgba(18,24,32,0.74),rgba(26,32,40,0.52))] border-l border-[rgba(var(--glass-tint-rgb),0.34)] backdrop-blur-2xl ${

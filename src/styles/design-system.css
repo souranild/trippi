@@ -206,9 +206,11 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 32px rgba(var(--glass-tint-rgb), 0.14);
 }
 /* Button Sizes */
+.btn-xs { padding: 0.375rem 0.75rem; font-size: 11px; }
 .btn-sm { padding: 0.5rem 1.rem; font-size: 12px; }
 .btn-md { padding: 0.75rem 1.5rem; font-size: 14px; }
 .btn-lg { padding: 1rem 2rem; font-size: 16px; }
+.btn-xl { padding: 1.25rem 2.5rem; font-size: 18px; }
 
 /* Glow effects */
 .glow-blue {
@@ -281,6 +283,38 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-secondary:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  transform: none;
+}
+
+.btn-tertiary {
+  background: rgba(255, 81, 250, 0.1);
+  color: #ff51fa;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  border: 1px solid rgba(255, 81, 250, 0.3);
+  cursor: pointer;
+  transition: all var(--duration-normal) cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.02em;
+  font-size: 14px;
+  text-transform: none;
+}
+
+.btn-tertiary:hover {
+  background: rgba(255, 81, 250, 0.2);
+  border-color: rgba(255, 81, 250, 0.6);
+  box-shadow: 0 0 15px rgba(255, 81, 250, 0.2);
+  transform: scale(1.02);
+}
+
+.btn-tertiary:active {
+  transform: scale(0.98);
+}
+
+.btn-tertiary:disabled {
   opacity: 0.5;
   pointer-events: none;
   transform: none;

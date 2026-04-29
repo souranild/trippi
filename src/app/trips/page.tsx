@@ -3,6 +3,8 @@
 import { useTrips } from '@/context/TripContext'
 import Link from 'next/link'
 import type { Trip, Place } from '@/lib/storage'
+import AppHeader from '@/components/AppHeader'
+import { formatDuration } from '@/lib/date-utils'
 
 function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: string) => void }) {
   const durationDays = trip.startDate
@@ -13,18 +15,7 @@ function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: stri
       ) + 1
     : 0
 
-  const startDate = new Date(trip.startDate)
-  const endDate = trip.endDate ? new Date(trip.endDate) : null
-  const formattedStartDate = startDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  })
-  const formattedEndDate = endDate ? endDate.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  }) : null
+  const formattedDuration = formatDuration(trip.startDate, trip.endDate)
 
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -51,7 +42,7 @@ function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: stri
       {trip.wallpaper && (
         <>
           <div
-            className="absolute inset-0 opacity-30 group-hover:opacity-50 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+            className="absolute inset-0 opacity-30 group-hover:opacity-50 group-hover:scale-105 transition-all duration-700 pointer-events-none rounded-xl sm:rounded-2xl"
             style={{
               backgroundImage: `url(${trip.wallpaper})`,
               backgroundSize: 'cover',
@@ -118,7 +109,7 @@ function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: stri
         <div className="mb-4">
           <div className="flex items-center gap-2 text-sm text-[#b0b0b0] mb-1">
             <span className="material-symbols-outlined text-base">calendar_month</span>
-            <span>{formattedStartDate}{formattedEndDate ? ` - ${formattedEndDate}` : ''}</span>
+            <span>{formattedDuration}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-[#b0b0b0]">
             <span className="material-symbols-outlined text-base">schedule</span>
@@ -181,33 +172,6 @@ function AdventuresGrid({ trips, onDelete }: { trips: Trip[], onDelete: (id: str
   )
 }
 
-function TripsHeader() {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex justify-between bg-neutral-900/40 pl-20 pr-6 py-4 shadow-[inset_0_1px_0_rgba(143,245,255,0.1)] backdrop-blur-xl">
-      <div className="flex items-center gap-4">
-        <Link
-          href="/"
-          className="text-xl sm:text-2xl font-bold text-[#8ff5ff] font-['Space Grotesk'] tracking-tight hover:text-[#c3f400] transition-colors duration-300"
-        >
-          trippi
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-2 sm:gap-4">
-        <button className="p-2 text-[#b0b0b0] hover:text-[#8ff5ff] hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-95">
-          <span className="material-symbols-outlined text-base">search</span>
-        </button>
-        <Link href="/trip/new" className="btn-primary text-xs sm:text-sm flex items-center gap-1 sm:gap-2 group py-2 px-3 sm:px-4">
-          <span className="material-symbols-outlined text-base group-hover:rotate-12 transition-transform duration-300">
-            add
-          </span>
-          <span className="hidden sm:inline">New Trip</span>
-          <span className="inline sm:hidden">New</span>
-        </Link>
-      </div>
-    </header>
-  )
-}
 
 export default function TripsPage() {
   const { trips, deleteTrip } = useTrips()
@@ -221,7 +185,19 @@ export default function TripsPage() {
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white">
-      <TripsHeader />
+      <AppHeader
+        extraRight={
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-neutral-400 hover:text-[#8ff5ff] hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-95">
+              <span className="material-symbols-outlined text-base">search</span>
+            </button>
+            <Link href="/trip/new" className="btn-primary text-xs flex items-center gap-1 group py-2 px-3">
+              <span className="material-symbols-outlined text-base group-hover:rotate-12 transition-transform duration-300">add</span>
+              <span className="hidden sm:inline">New Trip</span>
+            </Link>
+          </div>
+        }
+      />
 
       <main className="w-full px-4 sm:px-6 pt-20 pb-8 sm:py-12">
         <div className="max-w-7xl mx-auto">

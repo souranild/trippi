@@ -1,193 +1,217 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { EMOJI_CATEGORIES, SKIN_TONES, applySkinTone, type SkinTone } from '@/lib/emoji-categories'
+import { useState, useEffect, useMemo } from 'react'
+import { EMOJI_CATEGORIES, SKIN_TONES, applySkinTone, supportsSkinTone, type SkinTone } from '@/lib/emoji-categories'
+import { generateFunnyName } from '@/lib/funny-names'
+import EmojiAvatar from '@/components/EmojiAvatar'
+import EmojiPicker from '@/components/EmojiPicker'
+import { useTrips } from '@/context/TripContext'
 
 interface UserProfile {
   name: string
   skinTone: string
+  avatar: string
 }
 
 interface OnboardingScreenProps {
   onComplete: (profile: UserProfile) => void
+  initialProfile?: UserProfile | null
+  onCancel?: () => void
 }
 
-export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
-  const [step, setStep] = useState<'welcome' | 'name' | 'skin-tone' | 'complete'>('welcome')
-  const [name, setName] = useState('')
-  const [selectedSkinTone, setSelectedSkinTone] = useState('medium')
-  const [previewEmoji, setPreviewEmoji] = useState('👋')
+export default function OnboardingScreen({ onComplete, initialProfile, onCancel }: OnboardingScreenProps) {
+  const { trips } = useTrips()
+  const [step, setStep] = useState<'welcome' | 'profile' | 'complete'>(initialProfile ? 'profile' : 'welcome')
+  const [showEditor, setShowEditor] = useState(!initialProfile) // Start with stats if already has a profile
+  const [name, setName] = useState(initialProfile?.name || '')
+  const [selectedSkinTone, setSelectedSkinTone] = useState(initialProfile?.skinTone || 'medium')
+  const [selectedAvatar, setSelectedAvatar] = useState(initialProfile?.avatar || '✈️')
+  const isEditing = !!initialProfile
 
-  const handleNameSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (name.trim()) {
-      setStep('skin-tone')
+  const stats = useMemo(() => {
+    const allPlaces = trips.flatMap(t => t.places || [])
+    const uniqueCountries = new Set(allPlaces.map(p => p.country).filter(Boolean)).size
+    return {
+      trips: trips.length,
+      countries: uniqueCountries,
+      places: allPlaces.length
     }
+  }, [trips])
+
+  const generateName = () => {
+    setName(generateFunnyName())
   }
 
-  const handleSkinToneSelect = (code: string) => {
-    setSelectedSkinTone(code)
-  }
+  // Generate a random name on first mount if empty
+  useEffect(() => {
+    if (!name && !isEditing) {
+      generateName()
+    }
+  }, [])
 
   const handleComplete = () => {
     const profile: UserProfile = {
-      name: name.trim(),
+      name: name.trim() || 'Anonymous Explorer',
       skinTone: selectedSkinTone,
+      avatar: selectedAvatar
     }
     
     // Save to localStorage
     localStorage.setItem('userProfile', JSON.stringify(profile))
-    
     onComplete(profile)
   }
 
-  useEffect(() => {
-    // Update preview emoji when skin tone changes
-    const baseEmoji = '👋'
-    setPreviewEmoji(applySkinTone(baseEmoji, selectedSkinTone))
-  }, [selectedSkinTone])
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
+    <div className="fixed inset-0 z-[4000] bg-slate-950 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-cyan-500/20 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative max-w-4xl w-full">
         {/* Welcome Step */}
         {step === 'welcome' && (
-          <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-8">
-              <h1 className="text-5xl font-bold text-cyan-400 font-headline mb-2">
-                Welcome to Trippi
+          <div className="text-center animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="mb-12">
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-2xl shadow-cyan-500/20 mb-6 active:scale-95 transition-transform duration-300">
+                <span className="material-symbols-outlined text-5xl text-slate-950">flight_takeoff</span>
+              </div>
+              <h1 className="text-5xl sm:text-7xl font-bold text-white font-headline mb-4 tracking-tight leading-tight">
+                Adventure awaits <br /> on <span className="text-cyan-400">Trippi</span>
               </h1>
-              <p className="text-xl text-neutral-300">
-                Let&apos;s set up your profile for the ultimate travel planning experience
+              <p className="text-xl text-neutral-400 max-w-xl mx-auto leading-relaxed">
+                Your personal gateway to the world's most incredible journeys. Let's start by creating your identity.
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 border border-white/20 shadow-2xl">
-              <div className="text-6xl mb-6">✈️</div>
-              <h2 className="text-3xl font-bold text-white mb-4">Ready for adventure?</h2>
-              <p className="text-neutral-300 mb-8">
-                First, let&apos;s get to know you!<br />
-                We&apos;ll ask for your name and help you customize your experience.
-              </p>
-              <button
-                onClick={() => setStep('name')}
-                className="w-full bg-gradient-to-r from-cyan-400 to-cyan-300 text-black font-bold py-4 px-6 rounded-xl hover:shadow-lg hover:shadow-cyan-400/50 transition-all duration-300 text-lg"
-              >
-                Let&apos;s Begin
-              </button>
-            </div>
+            <button
+              onClick={() => setStep('profile')}
+              className="group relative inline-flex items-center justify-center px-12 py-5 font-bold text-slate-950 transition-all duration-300 bg-cyan-400 rounded-2xl hover:bg-cyan-300 hover:shadow-[0_0_40px_rgba(34,211,238,0.4)] active:scale-95 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+              <span className="relative text-lg">Start Exploring</span>
+            </button>
           </div>
         )}
 
-        {/* Name Step */}
-        {step === 'name' && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white font-headline mb-2">
-                What&apos;s your name?
-              </h2>
-              <p className="text-neutral-400">
-                We&apos;ll use this to personalize your travel stories
-              </p>
-            </div>
+        {/* Profile Creation Step */}
+        {step === 'profile' && (
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="bg-slate-900/60 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden max-w-2xl mx-auto">
+              {!showEditor ? (
+                /* Stats View */
+                <div className="p-8 sm:p-12 space-y-10">
+                  <div className="flex flex-col items-center text-center space-y-6">
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-primary/20 rounded-full blur-[40px] group-hover:bg-primary/30 transition-all duration-500" />
+                      <EmojiAvatar 
+                        emoji={selectedAvatar} 
+                        skinTone={selectedSkinTone} 
+                        size="xl" 
+                        className="relative ring-4 ring-white/10 shadow-2xl"
+                      />
+                    </div>
+                    <div>
+                      <h2 className="text-4xl font-bold text-white tracking-tight">{name}</h2>
+                      <p className="text-primary font-bold uppercase tracking-[0.3em] text-[10px] mt-2">World Traveler</p>
+                    </div>
+                  </div>
 
-            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 border border-white/20 shadow-2xl">
-              <form onSubmit={handleNameSubmit} className="space-y-6">
-                <div>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name"
-                    autoFocus
-                    className="w-full rounded-xl border-2 border-white/20 bg-white/10 px-6 py-4 text-white placeholder-white/50 text-lg focus:border-cyan-400 focus:outline-none transition-colors"
-                  />
-                </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center group hover:bg-white/10 transition-all cursor-default">
+                      <p className="text-heading-3 font-bold text-white mb-1 group-hover:scale-110 transition-transform">{stats.trips}</p>
+                      <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Trips</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center group hover:bg-white/10 transition-all cursor-default">
+                      <p className="text-heading-3 font-bold text-white mb-1 group-hover:scale-110 transition-transform">{stats.countries}</p>
+                      <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Countries</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center group hover:bg-white/10 transition-all cursor-default">
+                      <p className="text-heading-3 font-bold text-white mb-1 group-hover:scale-110 transition-transform">{stats.places}</p>
+                      <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Places</p>
+                    </div>
+                  </div>
 
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep('welcome')}
-                    className="flex-1 rounded-xl border-2 border-white/20 text-white py-3 hover:bg-white/10 transition-colors font-bold"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!name.trim()}
-                    className="flex-1 bg-gradient-to-r from-cyan-400 to-cyan-300 text-black font-bold py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-cyan-400/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Skin Tone Step */}
-        {step === 'skin-tone' && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="text-center mb-8">
-              <h2 className="text-4xl font-bold text-white font-headline mb-2">
-                Choose your preferred emoji style
-              </h2>
-              <p className="text-neutral-400">
-                Select a skin tone for your emoji representations
-              </p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 border border-white/20 shadow-2xl">
-              <div className="mb-12">
-                <p className="text-neutral-300 text-sm mb-4">Preview:</p>
-                <div className="flex justify-center gap-4">
-                  <div className="text-6xl">{previewEmoji}</div>
-                  <div className="flex flex-col justify-center">
-                    <p className="text-white font-bold text-lg">Waving Hand</p>
-                    <p className="text-neutral-400">
-                      {SKIN_TONES.find(st => st.code === selectedSkinTone)?.name} tone
-                    </p>
+                  <div className="flex gap-4 pt-4">
+                    <button
+                      onClick={() => setShowEditor(true)}
+                      className="flex-1 py-4 px-6 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">edit</span>
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={onCancel}
+                      className="flex-1 py-4 px-6 rounded-2xl bg-primary text-slate-950 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <span className="material-symbols-outlined text-sm">check</span>
+                      Done
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-4 mb-8">
-                <p className="text-white font-bold text-center">Skin Tone Options:</p>
-                <div className="grid grid-cols-5 gap-3">
-                  {SKIN_TONES.map((tone) => (
-                    <button
-                      key={tone.code}
-                      onClick={() => handleSkinToneSelect(tone.code)}
-                      className={`p-4 rounded-xl transition-all duration-200 border-2 ${
-                        selectedSkinTone === tone.code
-                          ? 'border-cyan-400 bg-cyan-400/20 shadow-lg shadow-cyan-400/50'
-                          : 'border-white/20 bg-white/5 hover:bg-white/10'
-                      }`}
-                      title={tone.name}
-                    >
-                      <div className="text-4xl text-center">
-                        {applySkinTone('👋', tone.code)}
+              ) : (
+                /* Edit Profile View */
+                <div className="grid grid-cols-1 md:grid-cols-12">
+                  <div className="md:col-span-4 p-8 sm:p-10 bg-white/5 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-white/10">
+                    <div className="relative group mb-6">
+                      <div className="absolute inset-0 bg-cyan-500/20 rounded-full blur-2xl group-hover:bg-cyan-500/30 transition-all duration-500" />
+                      <EmojiAvatar 
+                        emoji={selectedAvatar} 
+                        skinTone={selectedSkinTone} 
+                        size="xl" 
+                        className="relative ring-4 ring-white/10"
+                      />
+                    </div>
+                    
+                    <div className="w-full space-y-4">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Your traveler name"
+                          className="w-full bg-slate-800/10 border-b-2 border-primary focus:border-cyan-400 p-2 text-center text-2xl font-bold text-white focus:outline-none transition-all placeholder:text-neutral-600"
+                          maxLength={25}
+                        />
                       </div>
-                      <p className="text-xs text-neutral-400 mt-2">{tone.name}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      
+                      <button
+                        onClick={generateName}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-cyan-400 transition-all text-xs font-bold uppercase tracking-widest"
+                      >
+                        <span className="material-symbols-outlined text-sm">refresh</span>
+                        Surprise Me
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setStep('name')}
-                  className="flex-1 rounded-xl border-2 border-white/20 text-white py-3 hover:bg-white/10 transition-colors font-bold"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleComplete}
-                  className="flex-1 bg-gradient-to-r from-cyan-400 to-cyan-300 text-black font-bold py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-cyan-400/50 transition-all duration-300"
-                >
-                  Complete Setup
-                </button>
-              </div>
+                  <div className="md:col-span-8 flex flex-col h-[500px] sm:h-[600px]">
+                    <EmojiPicker 
+                      onSelect={setSelectedAvatar}
+                      onClose={() => {}} 
+                      selectedEmoji={selectedAvatar}
+                      selectedSkinTone={selectedSkinTone}
+                      onSkinToneChange={setSelectedSkinTone}
+                    />
+
+                    <div className="p-6 sm:p-8 bg-slate-900 border-t border-white/5 flex gap-4">
+                      <button
+                        onClick={isEditing ? () => setShowEditor(false) : onCancel}
+                        className="flex-1 py-4 px-6 rounded-2xl border-2 border-white/10 text-white font-bold hover:bg-white/5 transition-all active:scale-95"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleComplete}
+                        className="flex-[2] py-4 px-6 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all active:scale-95"
+                      >
+                        {isEditing ? 'Save Changes' : 'All Set, Let\'s Go!'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

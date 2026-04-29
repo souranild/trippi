@@ -7,6 +7,10 @@ export interface PlaceSearchHit {
   country: string
   type: string
   coordinates: { lat: number; lng: number }
+  emoji?: string
+  image?: string
+  description?: string
+  tags?: any
 }
 
 interface PhotonGeometry {
@@ -179,4 +183,20 @@ export function mapNominatimResults(hits: NominatimHit[]): PlaceSearchHit[] {
     })
   }
   return out
+}
+
+export async function searchPlaces(query: string, lat?: number, lng?: number, signal?: AbortSignal): Promise<PlaceSearchHit[]> {
+  try {
+    let url = `/api/places/search?q=${encodeURIComponent(query)}`
+    if (lat !== undefined && lng !== undefined) {
+      url += `&lat=${lat}&lon=${lng}`
+    }
+    const res = await fetch(url, { signal })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.results || []
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw err
+    return []
+  }
 }

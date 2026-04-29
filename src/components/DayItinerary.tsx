@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { DayItinerary, Attachment } from '@/lib/storage'
+import { formatDateShort } from '@/lib/date-utils'
+import { ConfirmationModal } from './ConfirmationModal'
 
 interface DayItineraryProps {
   itinerary: DayItinerary[]
@@ -10,14 +12,15 @@ interface DayItineraryProps {
   onDeleteAttachment?: (attachmentId: string, dayNumber: number) => void
 }
 
-function getAttachmentIcon(type: Attachment['type']): string {
-  switch (type) {
-    case 'event': return '📅'
-    case 'transport': return '✈️'
-    case 'place': return '📍'
-    case 'accommodation': return '🏨'
-    case 'note': return '📝'
-    default: return '📌'
+function getAttachmentIcon(attachment: Attachment): string {
+  if (attachment.icon) return attachment.icon
+  switch (attachment.type) {
+    case 'event': return 'event'
+    case 'transport': return 'flight'
+    case 'place': return 'location_on'
+    case 'accommodation': return 'hotel'
+    case 'note': return 'sticky_note_2'
+    default: return 'push_pin'
   }
 }
 
@@ -37,6 +40,12 @@ export default function DayIteraryView({
   const [expandedDays, setExpandedDays] = useState<Set<number>>(
     new Set([itinerary[0]?.day])
   )
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    attachmentId: string;
+    dayNumber: number;
+    title: string;
+  } | null>(null)
 
   const toggleDay = (dayNumber: number) => {
     const newExpanded = new Set(expandedDays)
@@ -48,9 +57,8 @@ export default function DayIteraryView({
     setExpandedDays(newExpanded)
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString + 'T00:00:00')
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const formattedDate = (dateString: string) => {
+    return formatDateShort(dateString)
   }
 
   return (
@@ -68,7 +76,7 @@ export default function DayIteraryView({
               </div>
               <div className="text-left">
                 <div className="font-bold text-white">Day {day.day}</div>
-                <div className="text-xs sm:text-sm text-neutral-400">{formatDate(day.date)}</div>
+                <div className="text-xs sm:text-sm text-neutral-400">{formattedDate(day.date)}</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -103,8 +111,8 @@ export default function DayIteraryView({
                       onClick={() => onEditAttachment?.(attachment, day.day)}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-lg sm:text-xl flex-shrink-0">
-                          {getAttachmentIcon(attachment.type)}
+                        <span className="material-symbols-outlined text-lg sm:text-xl flex-shrink-0 text-primary">
+                          {getAttachmentIcon(attachment)}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-white text-sm sm:text-base line-clamp-2">
@@ -113,6 +121,14 @@ export default function DayIteraryView({
                           {attachment.description && (
                             <div className="text-xs sm:text-sm text-neutral-400 line-clamp-2 mt-1">
                               {attachment.description}
+                            </div>
+                          )}
+                          {(attachment.location || (attachment as any).address || (attachment as any).placeLocation) && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="material-symbols-outlined text-[12px] text-neutral-500">{attachment.icon || 'location_on'}</span>
+                              <div className="text-xs text-neutral-500 truncate">
+                                {attachment.location || (attachment as any).address || (attachment as any).placeLocation}
+                              </div>
                             </div>
                           )}
                           {attachment.startTime && (
@@ -125,7 +141,12 @@ export default function DayIteraryView({
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            onDeleteAttachment?.(attachment.id, day.day)
+                            setDeleteConfirm({
+                              isOpen: true,
+                              attachmentId: attachment.id,
+                              dayNumber: day.day,
+                              title: getAttachmentTitle(attachment)
+                            })
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-500/20 rounded text-red-400"
                         >
@@ -162,6 +183,18 @@ export default function DayIteraryView({
           )}
         </div>
       ))}
+
+      <ConfirmationModal
+        isOpen={!!deleteConfirm}
+        title="Remove from Itinerary?"
+        message={`Are you sure you want to remove "${deleteConfirm?.title}" from Day ${deleteConfirm?.dayNumber}?`}
+        onConfirm={() => {
+          if (deleteConfirm) {
+            onDeleteAttachment?.(deleteConfirm.attachmentId, deleteConfirm.dayNumber)
+          }
+        }}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   )
 }

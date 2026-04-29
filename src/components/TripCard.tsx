@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { Trip } from '@/lib/storage'
+import { formatDuration } from '@/lib/date-utils'
 
 export default function TripCard({ trip }: { trip: Trip }) {
   return (
@@ -15,7 +16,7 @@ export default function TripCard({ trip }: { trip: Trip }) {
             {trip.emoji && <span className="mr-2">{trip.emoji}</span>}
             {trip.title}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{trip.startDate}{trip.endDate && ` - ${trip.endDate}`}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{formatDuration(trip.startDate, trip.endDate)}</p>
           {trip.description && <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{trip.description}</p>}
         </div>
       </div>

@@ -12,11 +12,13 @@ export const TRANSPORT_MODES: {
   { type: 'car', label: 'Car', icon: 'directions_car', color: 'text-red-400' },
   { type: 'bike', label: 'Bike', icon: 'pedal_bike', color: 'text-orange-400' },
   { type: 'walk', label: 'Walk', icon: 'directions_walk', color: 'text-violet-400' },
+  { type: 'ship', label: 'Ship', icon: 'directions_boat', color: 'text-cyan-400' },
+  { type: 'portal', label: 'Portal', icon: 'all_inclusive', color: 'text-fuchsia-400' },
 ]
 
 export function normalizeTransportMode(t: string): TransportMode {
   if (t === 'train' || t === 'railway') return 'rail'
-  if (t === 'flight' || t === 'rail' || t === 'bus' || t === 'car' || t === 'bike' || t === 'walk') {
+  if (t === 'flight' || t === 'rail' || t === 'bus' || t === 'car' || t === 'bike' || t === 'walk' || t === 'ship' || t === 'portal') {
     return t
   }
   return 'car'

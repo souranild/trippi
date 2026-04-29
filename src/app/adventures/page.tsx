@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useTrips } from '@/context/TripContext'
 import type { Trip } from '@/lib/storage'
 import TripCard from '@/components/Dashboard/TripCard'
+import AppHeader from '@/components/AppHeader'
+import { formatDuration } from '@/lib/date-utils'
 
 type ViewType = 'list' | 'gallery'
 type SortType = 'newest' | 'oldest' | 'alphabetical' | 'duration'
@@ -100,29 +102,19 @@ export default function AdventuresPage() {
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center bg-neutral-900/40 px-4 sm:px-6 lg:px-8 py-4 shadow-[inset_0_1px_0_rgba(143,245,255,0.1)] backdrop-blur-xl">
-        {/* Hamburger space placeholder */}
-        <div className="w-10 sm:w-12" />
-        
-        {/* Title - centered */}
-        <h1 className="flex-1 text-center text-xl sm:text-2xl font-bold text-[#8ff5ff] font-['Space Grotesk'] tracking-tight">
-          Adventures
-        </h1>
-
-        {/* Right side controls */}
-        <div className="flex items-center gap-2 sm:gap-4 w-10 sm:w-12 justify-end">
-          <button className="p-2 text-[#b0b0b0] hover:text-[#8ff5ff] hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-95">
-            <span className="material-symbols-outlined text-base">search</span>
-          </button>
-          <Link href="/trip/new" className="btn-primary text-xs sm:text-sm flex items-center gap-1 sm:gap-2 group py-2 px-3 sm:px-4">
-            <span className="material-symbols-outlined text-base group-hover:rotate-12 transition-transform duration-300">
-              add
-            </span>
-            <span className="hidden sm:inline">New Trip</span>
-            <span className="inline sm:hidden">New</span>
-          </Link>
-        </div>
-      </header>
+      <AppHeader
+        extraRight={
+          <div className="flex items-center gap-2">
+            <button className="p-2 text-neutral-400 hover:text-[#8ff5ff] hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-95">
+              <span className="material-symbols-outlined text-base">search</span>
+            </button>
+            <Link href="/trip/new" className="btn-primary text-xs flex items-center gap-1 group py-2 px-3">
+              <span className="material-symbols-outlined text-base group-hover:rotate-12 transition-transform duration-300">add</span>
+              <span className="hidden sm:inline">New Trip</span>
+            </Link>
+          </div>
+        }
+      />
 
       {/* Floating Back Button */}
       <Link
@@ -314,21 +306,7 @@ export default function AdventuresPage() {
                           {trip.title}
                         </h3>
                         <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-                          {new Date(trip.startDate).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                          {trip.endDate && (
-                            <>
-                              {' '}-{' '}
-                              {new Date(trip.endDate).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </>
-                          )}
+                          {formatDuration(trip.startDate, trip.endDate)}
                         </p>
                         <div className="flex flex-wrap gap-2 mt-2">
                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${

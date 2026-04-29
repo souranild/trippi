@@ -2,6 +2,19 @@
 
 import React from 'react'
 import TimePicker from '@/components/TimePicker'
+import { 
+  FormContainer, 
+  FormContent, 
+  FormSection, 
+  FormLabel, 
+  FormInput, 
+  FormTextarea, 
+  FormSelect,
+  FormFooter, 
+  FormGrid,
+  FormListItem 
+} from '@/components/FormLayout'
+import { Button, ButtonGroup } from '@/components/Button'
 import type { Place, Event, Document, Link as PlaceLink } from '@/lib/storage'
 
 interface PlaceFormProps {
@@ -24,7 +37,7 @@ export default function PlaceForm({
   allDaysCount,
   disableSave = false
 }: PlaceFormProps) {
-  const updateMetadata = (field: keyof Place, value: string | number | boolean) => {
+  const updateMetadata = (field: keyof Place, value: any) => {
     onChange({ ...place, [field]: value })
   }
 
@@ -70,75 +83,106 @@ export default function PlaceForm({
   }
 
   return (
-    <div className="flex flex-col h-full max-h-[85vh]">
-      <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 scrollbar-hide">
+    <FormContainer>
+      <FormContent>
         {/* Basic Info */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <FormSection>
+          <FormGrid columns={2}>
+            <FormSelect
+              label="Start Day"
+              labelVariant="primary"
+              value={place.day || 1}
+              onChange={(e) => {
+                const newDay = parseInt(e.target.value);
+                const updates: Partial<Place> = { day: newDay };
+                if (place.endDay && place.endDay < newDay) {
+                  updates.endDay = newDay;
+                }
+                onChange({ ...place, ...updates });
+              }}
+              options={Array.from({ length: allDaysCount }).map((_, i) => ({
+                value: i + 1,
+                label: `Day ${i + 1}`
+              }))}
+            />
+            <FormSelect
+              label="End Day"
+              labelVariant="primary"
+              value={place.endDay || place.day || 1}
+              onChange={(e) => updateMetadata('endDay', parseInt(e.target.value))}
+              options={Array.from({ length: allDaysCount }).map((_, i) => ({
+                value: i + 1,
+                label: `Day ${i + 1}`,
+                disabled: (i + 1) < (place.day || 1)
+              }))}
+            />
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Day</label>
-              <select
-                value={place.day || 1}
-                onChange={(e) => updateMetadata('day', parseInt(e.target.value))}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors appearance-none"
-              >
-                {Array.from({ length: Math.max(place.day || 1, allDaysCount + 1) }).map((_, i) => (
-                  <option key={i + 1} value={i + 1} className="bg-neutral-900 leading-normal">Day {i + 1}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Location</label>
+              <FormLabel variant="primary">Location</FormLabel>
               <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white truncate">
                 {place.name}
               </div>
             </div>
-          </div>
+          </FormGrid>
 
-          <div className="flex gap-4">
-            <div className="flex-1 space-y-2">
-              <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Arrival</label>
+          <FormGrid columns={2}>
+            <div className="space-y-2">
+              <FormLabel variant="secondary">Arrival</FormLabel>
               <TimePicker
                 value={place.arrival || ''}
                 onChange={(val) => updateMetadata('arrival', val)}
                 placeholder="--:--"
               />
             </div>
-            <div className="flex-1 space-y-2">
-              <label className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Departure</label>
+            <div className="space-y-2">
+              <FormLabel variant="secondary">Departure</FormLabel>
               <TimePicker
                 value={place.departure || ''}
                 onChange={(val) => updateMetadata('departure', val)}
                 placeholder="--:--"
               />
             </div>
-          </div>
-        </div>
+          </FormGrid>
+        </FormSection>
 
         {/* Notes */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold text-tertiary uppercase tracking-[0.2em]">Notes</label>
-          <textarea
-            value={place.notes || ''}
-            onChange={(e) => updateMetadata('notes', e.target.value)}
-            placeholder="Add some notes about this place..."
-            className="w-full h-24 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-tertiary transition-colors resize-none text-sm"
-          />
-        </div>
+        <FormTextarea
+          label={`Notes for Day ${place.day || 1}`}
+          labelVariant="tertiary"
+          value={place.notes?.find(n => n.day === (place.day || 1))?.text || ''}
+          onChange={(e) => {
+            const day = place.day || 1
+            const text = e.target.value
+            const newNotes = [...(place.notes || [])]
+            const index = newNotes.findIndex(n => n.day === day)
+            if (index >= 0) {
+              newNotes[index] = { day, text }
+            } else {
+              newNotes.push({ day, text })
+            }
+            updateMetadata('notes', newNotes)
+          }}
+          placeholder="Add some notes about this place..."
+        />
 
         {/* Documents and Links */}
-        <div className="grid grid-cols-2 gap-4">
+        <FormGrid columns={2}>
           {/* Documents */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Documents</label>
-              <button onClick={addDocument} className="text-[10px] font-bold text-secondary uppercase tracking-tighter hover:underline flex items-center gap-1">
+              <FormLabel variant="default">Documents</FormLabel>
+              <button 
+                onClick={addDocument} 
+                className="text-xs font-bold text-blue-400 hover:underline flex items-center gap-1"
+              >
                 <span className="material-symbols-outlined text-xs">attach_file</span> Add
               </button>
             </div>
             <div className="space-y-2">
               {(place.documents || []).map((doc, idx) => (
-                <div key={doc.id} className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center gap-2 group">
+                <FormListItem
+                  key={doc.id}
+                  onDelete={() => removeDocument(doc.id)}
+                >
                   <input
                     value={doc.name}
                     onChange={(e) => {
@@ -146,12 +190,9 @@ export default function PlaceForm({
                       newDocs[idx] = { ...doc, name: e.target.value }
                       updateMetadata('documents', newDocs)
                     }}
-                    className="flex-1 bg-transparent border-none text-[10px] text-white focus:outline-none"
+                    className="flex-1 bg-transparent border-none text-[10px] text-white focus:outline-none w-full"
                   />
-                  <button onClick={() => removeDocument(doc.id)} className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all">
-                    <span className="material-symbols-outlined text-[14px]">close</span>
-                  </button>
-                </div>
+                </FormListItem>
               ))}
             </div>
           </div>
@@ -159,14 +200,20 @@ export default function PlaceForm({
           {/* Links */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Links</label>
-              <button onClick={addLink} className="text-[10px] font-bold text-tertiary uppercase tracking-tighter hover:underline flex items-center gap-1">
+              <FormLabel variant="default">Links</FormLabel>
+              <button 
+                onClick={addLink} 
+                className="text-xs font-bold text-cyan-400 hover:underline flex items-center gap-1"
+              >
                 <span className="material-symbols-outlined text-xs">link</span> Add
               </button>
             </div>
             <div className="space-y-2">
               {(place.links || []).map((link, idx) => (
-                <div key={link.id} className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center gap-2 group">
+                <FormListItem
+                  key={link.id}
+                  onDelete={() => removeLink(link.id)}
+                >
                   <input
                     value={link.title}
                     placeholder="Title"
@@ -175,31 +222,35 @@ export default function PlaceForm({
                       newLinks[idx] = { ...link, title: e.target.value }
                       updateMetadata('links', newLinks)
                     }}
-                    className="flex-1 bg-transparent border-none text-[10px] text-white focus:outline-none"
+                    className="flex-1 bg-transparent border-none text-[10px] text-white focus:outline-none w-full"
                   />
-                  <button onClick={() => removeLink(link.id)} className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all">
-                    <span className="material-symbols-outlined text-[14px]">close</span>
-                  </button>
-                </div>
+                </FormListItem>
               ))}
             </div>
           </div>
-        </div>
+        </FormGrid>
 
         {/* Dynamic Lists */}
         <div className="space-y-4">
           {/* Events */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Activities & Events</label>
-              <button onClick={addEvent} className="text-[10px] font-bold text-primary uppercase tracking-tighter hover:underline flex items-center gap-1">
+              <FormLabel variant="default">Activities & Events</FormLabel>
+              <button 
+                onClick={addEvent} 
+                className="text-xs font-bold text-red-400 hover:underline flex items-center gap-1"
+              >
                 <span className="material-symbols-outlined text-xs">add</span> Add
               </button>
+
             </div>
             <div className="space-y-2">
               {(place.events || []).map((event, idx) => (
-                <div key={event.id} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center gap-3 group">
-                  <div className="flex-1 space-y-2">
+                <FormListItem
+                  key={event.id}
+                  onDelete={() => removeEvent(event.id)}
+                >
+                  <div className="flex-1 space-y-2 w-full">
                     <input
                       value={event.title}
                       onChange={(e) => {
@@ -222,31 +273,34 @@ export default function PlaceForm({
                       />
                     </div>
                   </div>
-                  <button onClick={() => removeEvent(event.id)} className="opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-red-400 transition-all">
-                    <span className="material-symbols-outlined text-sm">delete</span>
-                  </button>
-                </div>
+                </FormListItem>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </FormContent>
 
-      <div className="p-4 md:p-6 space-y-3 bg-white/5 backdrop-blur-xl shrink-0 border-t border-white/5">
-        <button
+      <FormFooter>
+        <Button
+          variant="primary"
+          size="md"
+          fullWidth
           onClick={onSave}
           disabled={disableSave || !place || !place.name}
-          className="btn-primary btn-md w-full text-caption py-3.5 shadow-primary/10"
+          className="text-caption py-3.5 shadow-primary/10"
         >
           {saveLabel}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          fullWidth
           onClick={onCancel}
-          className="btn-secondary btn-md w-full text-caption py-3"
+          className="text-caption py-3"
         >
           Cancel
-        </button>
-      </div>
-    </div>
+        </Button>
+      </FormFooter>
+    </FormContainer>
   )
 }

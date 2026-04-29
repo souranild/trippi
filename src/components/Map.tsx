@@ -12,15 +12,9 @@ const DynamicMap = dynamic(() => import('./MapClient'), {
   )
 })
 
-interface Place {
-  id: string
-  name: string
-  location: string
-  lat?: number
-  lng?: number
-  day?: number
-  emoji?: string
-}
+import type { Place as StoragePlace, Transport } from '@/lib/storage'
+
+interface Place extends StoragePlace {}
 
 interface MapProps {
   places: Place[]
@@ -29,10 +23,18 @@ interface MapProps {
   focusedPlaceId?: string | null
   showDayNumbers?: boolean
   previewCoords?: { lat: number, lng: number } | null
-  onClick?: (coords: { lat: number, lng: number }) => void
+  onMapClick?: (coords: { lat: number, lng: number }) => void
+  onMarkerClick?: (place: Place) => void
+  searchResults?: any[]
+  selectedSearchResultId?: string | null
+  onSearchResultClick?: (hit: any) => void
+  onViewportChange?: (center: { lat: number, lng: number }, zoom: number) => void
+  mapStyle?: string
+  onStyleChange?: (style: string) => void
+  showControls?: boolean
 }
 
-export default function TripMap({ places, emoji = '📍', className, focusedPlaceId, showDayNumbers = true, previewCoords, onClick }: MapProps) {
+export default function TripMap({ places, emoji = '📍', className, focusedPlaceId, showDayNumbers = true, previewCoords, onMapClick, onMarkerClick, searchResults, selectedSearchResultId, onSearchResultClick, onViewportChange, mapStyle, onStyleChange, showControls = false }: MapProps) {
   return (
     <DynamicMap
       places={places}
@@ -41,7 +43,15 @@ export default function TripMap({ places, emoji = '📍', className, focusedPlac
       focusedPlaceId={focusedPlaceId}
       showDayNumbers={showDayNumbers}
       previewCoords={previewCoords}
-      onClick={onClick}
+      onMapClick={onMapClick}
+      onMarkerClick={onMarkerClick}
+      searchResults={searchResults}
+      selectedSearchResultId={selectedSearchResultId}
+      onSearchResultClick={onSearchResultClick}
+      onViewportChange={onViewportChange}
+      mapStyle={mapStyle}
+      onStyleChange={onStyleChange}
+      showControls={showControls}
     />
   )
 }
