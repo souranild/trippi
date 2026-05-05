@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { DateTimeSelector } from '@/components/DateTimeSelector'
-import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, BaseDetailModal } from '@/components/ModalLayout'
+import RichTextEditor from './RichTextEditor'
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalContent, ModalFooter, BaseDetailModal } from '@/components/ModalLayout'
 import LocationPickerModal from '@/components/LocationPickerModal'
 import MediaViewer from '@/components/MediaViewer'
 import type { Event as TripEvent, Document, Link, Accommodation } from '@/lib/storage'
@@ -13,6 +14,7 @@ import { ConfirmationModal } from './ConfirmationModal'
 import { FormInput, FormSelect, FormTextarea, FormGrid, FormLabel } from '@/components/FormLayout'
 import Map from '@/components/Map'
 import { MediaGrid } from '@/components/MediaGrid'
+import { toggleHtmlCheckbox } from '@/lib/rich-text-utils'
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 function getMediaType(url: string | { src: { medium: string, large: string } }): 'image' | 'video' {
@@ -43,6 +45,7 @@ export interface AttachmentDetailData {
 interface Props {
   data: AttachmentDetailData
   isEditMode?: boolean
+  placeId?: string
   placeName?: string
   placeCoords?: { lat: number; lng: number }
   placeStartDay?: number
@@ -55,6 +58,7 @@ interface Props {
   onClose: () => void
   onSave?: (updated: AttachmentDetailData) => void
   onDelete?: () => void
+  timeFormat?: '12h' | '24h'
 }
 
 // ─── Config per type ──────────────────────────────────────────────────────────
@@ -72,23 +76,25 @@ const CFG = {
 export default function AttachmentDetailModal({
   data,
   isEditMode: initialEditMode = false,
+  placeId,
   placeName,
   placeCoords,
   placeStartDay = 1,
   placeEndDay = 1,
   tripStartDate = '',
   tripEndDate = '',
-  totalDays = 1,
+  totalDays,
   mapStyle,
   allPlaces = [],
   onClose,
   onSave,
-  onDelete
+  onDelete,
+  timeFormat = '12h'
 }: Props) {
   // --- 1. State ---
   const [isEditMode, setIsEditMode] = useState(initialEditMode)
   const [draft, setDraft] = useState<AttachmentDetailData>(() => JSON.parse(JSON.stringify(data)))
-  const [mediaViewer, setMediaViewer] = useState<{ items: string[], index: number } | null>(null)
+  const [mediaViewer, setMediaViewer] = useState<{ items: any[], index: number } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false)
   const [isSearchingModalOpen, setIsSearchingModalOpen] = useState(false)
@@ -97,20 +103,79 @@ export default function AttachmentDetailModal({
   const [isSearching, setIsSearching] = useState(false)
 
   // --- 2. Derived State ---
-  const dayOptions = useMemo(() => Array.from(
-    { length: totalDays || (placeEndDay - placeStartDay + 1) },
-    (_, i) => {
-      const d = totalDays ? i + 1 : placeStartDay + i
+  const dayOptions = useMemo(() => {
+    const hasTripDayRange = typeof totalDays === 'number' && totalDays > 0
+    const length = hasTripDayRange ? totalDays : (placeEndDay - placeStartDay + 1)
+    return Array.from(
+      { length },
+      (_, i) => {
+      const d = hasTripDayRange ? i + 1 : placeStartDay + i
       return { value: d, label: getDayWithDate(tripStartDate, d) }
-    }
-  ), [totalDays, placeStartDay, placeEndDay, tripStartDate])
+      }
+    )
+  }, [totalDays, placeStartDay, placeEndDay, tripStartDate])
 
   const cfg = CFG[data.type]
   const title = isEditMode ? `Edit ${cfg.label}` : `${cfg.label} Details`
   const subtitle = placeName ? `For ${placeName}` : undefined
 
+  const normalizeDayValue = (day?: number): number | undefined => {
+    if (day == null) return undefined
+    const n = Number(day)
+    if (!Number.isFinite(n)) return undefined
+
+    const span = Math.max(1, placeEndDay - placeStartDay + 1)
+    // Legacy data may store attachment days relative to place start (1..span).
+    if (n < placeStartDay && n >= 1 && n <= span) {
+      return placeStartDay + n - 1
+    }
+    return n
+  }
+
   // --- 3. Handlers ---
+  const isValid = () => {
+    if (draft.type === 'document') {
+      return (draft.document?.name?.trim().length || 0) > 0 && 
+             ((draft.document?.url?.trim().length || 0) > 0 || draft.document?.file != null)
+    }
+    if (draft.type === 'event') return (draft.event?.title?.trim().length || 0) > 0
+    if (draft.type === 'link') return (draft.link?.url?.trim().length || 0) > 0
+    if (draft.type === 'accommodation') return (draft.accommodation?.name?.trim().length || 0) > 0
+    if (draft.type === 'note') return (draft.note?.trim().length || 0) > 0
+    return true
+  }
+
   const handleSave = () => {
+    if (draft.type === 'event' && draft.event) {
+      const normalizedStart = normalizeDayValue(draft.event.day) ?? placeStartDay
+      const normalizedEnd = normalizeDayValue(draft.event.endDay) ?? normalizedStart
+      onSave?.({
+        ...draft,
+        event: {
+          ...draft.event,
+          day: normalizedStart,
+          endDay: normalizedEnd,
+        },
+      })
+      onClose()
+      return
+    }
+
+    if (draft.type === 'accommodation' && draft.accommodation) {
+      const normalizedStart = normalizeDayValue(draft.accommodation.checkInDay) ?? placeStartDay
+      const normalizedEnd = normalizeDayValue(draft.accommodation.checkOutDay) ?? normalizedStart
+      onSave?.({
+        ...draft,
+        accommodation: {
+          ...draft.accommodation,
+          checkInDay: normalizedStart,
+          checkOutDay: normalizedEnd,
+        },
+      })
+      onClose()
+      return
+    }
+
     onSave?.(draft)
     onClose()
   }
@@ -125,6 +190,79 @@ export default function AttachmentDetailModal({
     finally { setIsSearching(false) }
   }
 
+  const handleUploadPhoto = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.onchange = (e: any) => {
+      const files = Array.from(e.target.files) as File[]
+      if (files.length === 0) return
+
+      let loadedCount = 0
+      const newUrls: string[] = []
+
+      files.forEach(file => {
+        const reader = new FileReader()
+        reader.onload = (re) => {
+          newUrls.push(re.target?.result as string)
+          loadedCount++
+          if (loadedCount === files.length) {
+            if (draft.type === 'accommodation' && draft.accommodation) {
+              const currentDay = draft.accommodation.checkInDay || 1
+              setDraft({ 
+                ...draft, 
+                accommodation: { 
+                  ...draft.accommodation, 
+                  photos: [...(draft.accommodation.photos || []), ...newUrls],
+                  photoDays: [...(draft.accommodation.photoDays || []), ...newUrls.map(() => currentDay)]
+                } 
+              })
+            } else if (draft.type === 'event' && draft.event) {
+              const currentDay = draft.event.day || 1
+              setDraft({ 
+                ...draft, 
+                event: { 
+                  ...draft.event, 
+                  photos: [...(draft.event.photos || []), ...newUrls],
+                  photoDays: [...(draft.event.photoDays || []), ...newUrls.map(() => currentDay)]
+                } 
+              })
+            }
+          }
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+    input.click()
+  }
+
+  const handlePhotoDayChange = (photoIdx: number, newDay: number) => {
+    if (draft.type === 'accommodation' && draft.accommodation) {
+      const photos = draft.accommodation.photos || []
+      const newPhotoDays = [...(draft.accommodation.photoDays || [])]
+      while (newPhotoDays.length < photos.length) {
+        newPhotoDays.push(draft.accommodation.checkInDay || 1)
+      }
+      newPhotoDays[photoIdx] = newDay
+      setDraft({
+        ...draft,
+        accommodation: { ...draft.accommodation, photoDays: newPhotoDays }
+      })
+    } else if (draft.type === 'event' && draft.event) {
+      const photos = draft.event.photos || []
+      const newPhotoDays = [...(draft.event.photoDays || [])]
+      while (newPhotoDays.length < photos.length) {
+        newPhotoDays.push(draft.event.day || 1)
+      }
+      newPhotoDays[photoIdx] = newDay
+      setDraft({
+        ...draft,
+        event: { ...draft.event, photoDays: newPhotoDays }
+      })
+    }
+  }
+
   // --- 4. Column Content ---
   const leftColumnContent = (
     <div className="space-y-5">
@@ -132,17 +270,39 @@ export default function AttachmentDetailModal({
       {draft.type === 'note' && (
         <div className="space-y-4">
           {isEditMode ? (
-            <FormTextarea
-              label="Note Content"
-              labelVariant="primary"
-              className="h-64"
-              value={draft.note || ''}
-              onChange={e => setDraft({ ...draft, note: e.target.value })}
-              autoFocus
-            />
+            <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+              <RichTextEditor
+                content={draft.note || ''}
+                onChange={val => setDraft({ ...draft, note: val })}
+                showToolbar={true}
+              />
+            </div>
           ) : (
             <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-              <p className="text-neutral-200 text-sm leading-relaxed whitespace-pre-wrap">{draft.note || 'No content'}</p>
+              {draft.note?.trim().startsWith('<') ? (
+                <div 
+                  className="prose-renderer text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: draft.note }}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
+                      e.stopPropagation();
+                      const container = e.currentTarget;
+                      const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+                      const index = checkboxes.indexOf(target as HTMLInputElement);
+                      
+                      if (index !== -1 && draft.note) {
+                        const updatedText = toggleHtmlCheckbox(draft.note, index);
+                        const updatedDraft = { ...draft, note: updatedText };
+                        setDraft(updatedDraft);
+                        if (onSave) onSave(updatedDraft);
+                      }
+                    }
+                  }}
+                />
+              ) : (
+                <p className="text-neutral-200 text-sm leading-relaxed whitespace-pre-wrap">{draft.note || 'No content'}</p>
+              )}
             </div>
           )}
         </div>
@@ -187,24 +347,31 @@ export default function AttachmentDetailModal({
             </FormLabel>
             <MediaGrid 
               photos={draft.event.photos || []} 
+              photoDays={draft.event.photoDays || []}
               editing={isEditMode} 
-              onMediaClick={(idx) => setMediaViewer({ items: draft.event!.photos!, index: idx })}
-              onRemove={(idx) => setDraft({ ...draft, event: { ...draft.event!, photos: draft.event!.photos!.filter((_, i) => i !== idx) } })}
+              onMediaClick={(idx) => setMediaViewer({ 
+                items: draft.event!.photos!.map((url, i) => ({ 
+                  url, 
+                  type: getMediaType(url),
+                  day: draft.event!.photoDays?.[i]
+                })), 
+                index: idx 
+              })}
+              onRemove={(idx) => setDraft({ 
+                ...draft, 
+                event: { 
+                  ...draft.event!, 
+                  photos: draft.event!.photos!.filter((_, i) => i !== idx),
+                  photoDays: (draft.event!.photoDays || []).filter((_, i) => i !== idx)
+                } 
+              })}
               onAdd={() => setIsSearchingModalOpen(true)}
+              onUpload={handleUploadPhoto}
+              onDayClick={handlePhotoDayChange}
+              maxDays={totalDays || 10}
               aspectRatio="square"
             />
           </div>
-
-          <DateTimeSelector
-            label="Schedule"
-            icon="schedule"
-            dayValue={draft.event.day || placeStartDay}
-            timeValue={draft.event.time || ''}
-            dayOptions={dayOptions}
-            onDayChange={d => setDraft({ ...draft, event: { ...draft.event!, day: d } })}
-            onTimeChange={t => setDraft({ ...draft, event: { ...draft.event!, time: t } })}
-            disabled={!isEditMode}
-          />
 
           <FormTextarea
             label="Description"
@@ -214,6 +381,36 @@ export default function AttachmentDetailModal({
             onChange={e => setDraft({ ...draft, event: { ...draft.event!, description: e.target.value } })}
             className="h-24"
           />
+
+          <div className="space-y-4 pt-2">
+            <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">schedule</span> Timing
+            </FormLabel>
+            <div className="space-y-4">
+              <DateTimeSelector
+                label="Start"
+                icon="login"
+                dayValue={normalizeDayValue(draft.event.day) || placeStartDay}
+                timeValue={draft.event.time || ''}
+                dayOptions={dayOptions}
+                onDayChange={d => setDraft({ ...draft, event: { ...draft.event!, day: d } })}
+                onTimeChange={t => setDraft({ ...draft, event: { ...draft.event!, time: t } })}
+                disabled={!isEditMode}
+                timeFormat={timeFormat}
+              />
+              <DateTimeSelector
+                label="End"
+                icon="logout"
+                dayValue={normalizeDayValue(draft.event.endDay) || normalizeDayValue(draft.event.day) || placeStartDay}
+                timeValue={draft.event.endTime || ''}
+                dayOptions={dayOptions}
+                onDayChange={d => setDraft({ ...draft, event: { ...draft.event!, endDay: d } })}
+                onTimeChange={t => setDraft({ ...draft, event: { ...draft.event!, endTime: t } })}
+                disabled={!isEditMode}
+                timeFormat={timeFormat}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -234,10 +431,67 @@ export default function AttachmentDetailModal({
             value={draft.document.url || ''}
             onChange={e => setDraft({ ...draft, document: { ...draft.document!, url: e.target.value } })}
           />
+          
+          <div className="space-y-2">
+            <FormLabel variant="primary">File Attachment</FormLabel>
+            {isEditMode ? (
+              <label className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-dashed border-white/20 cursor-pointer hover:bg-white/10 transition-all">
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onload = () => {
+                        setDraft(prev => ({ 
+                          ...prev, 
+                          document: { 
+                            ...prev.document!, 
+                            name: prev.document?.name === 'New Document' ? file.name : prev.document?.name || file.name,
+                            file: reader.result as string,
+                            mimeType: file.type 
+                          } 
+                        }))
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                  }}
+                />
+                <span className="material-symbols-outlined text-neutral-500">{draft.document.file ? 'check_circle' : 'upload_file'}</span>
+                <span className="text-sm text-neutral-400 truncate flex-1">
+                  {draft.document.file ? 'File attached' : 'Select a file...'}
+                </span>
+              </label>
+            ) : (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+                <span className="material-symbols-outlined text-neutral-500">{draft.document.file ? 'description' : 'block'}</span>
+                <span className="text-sm text-neutral-400 truncate flex-1">
+                  {draft.document.file ? 'File attached' : 'No file attached'}
+                </span>
+              </div>
+            )}
+            
+            {!isEditMode && draft.document.file && (
+              <button
+                onClick={() => {
+                  const link = document.createElement('a')
+                  link.href = draft.document!.file!
+                  link.download = draft.document!.name || 'document'
+                  link.click()
+                }}
+                className="inline-flex items-center gap-2 text-primary hover:underline text-xs mt-1"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                Download File
+              </button>
+            )}
+          </div>
+
           {!isEditMode && draft.document.url && (
             <a href={normalizeUrl(draft.document.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline text-xs">
               <span className="material-symbols-outlined text-sm">open_in_new</span>
-              Open Document
+              Open URL
             </a>
           )}
         </div>
@@ -247,24 +501,29 @@ export default function AttachmentDetailModal({
       {draft.type === 'link' && draft.link && (
         <div className="space-y-4">
           <FormInput
-            label="Label"
-            labelVariant="primary"
-            disabled={!isEditMode}
-            value={draft.link.title}
-            onChange={e => setDraft({ ...draft, link: { ...draft.link!, title: e.target.value } })}
-          />
-          <FormInput
             label="URL"
             labelVariant="primary"
             disabled={!isEditMode}
             value={draft.link.url}
             onChange={e => setDraft({ ...draft, link: { ...draft.link!, url: e.target.value } })}
+            placeholder="https://example.com"
           />
-          {!isEditMode && (
-            <a href={normalizeUrl(draft.link.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline text-xs">
-              <span className="material-symbols-outlined text-sm">open_in_new</span>
-              Visit Website
-            </a>
+          <FormInput
+            label="Label (Optional)"
+            labelVariant="primary"
+            disabled={!isEditMode}
+            value={draft.link.title}
+            onChange={e => setDraft({ ...draft, link: { ...draft.link!, title: e.target.value } })}
+            placeholder="My Custom Title"
+          />
+
+          {!isEditMode && draft.link.url && (
+            <div className="pt-2">
+              <a href={normalizeUrl(draft.link.url)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 hover:underline text-xs font-bold uppercase tracking-wider">
+                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                Visit Website
+              </a>
+            </div>
           )}
         </div>
       )}
@@ -286,12 +545,12 @@ export default function AttachmentDetailModal({
               disabled={!isEditMode}
               value={draft.accommodation.type}
               options={[
-                { value: 'Hotel', label: 'Hotel' },
-                { value: 'Airbnb', label: 'Airbnb' },
-                { value: 'Hostel', label: 'Hostel' },
-                { value: 'Other', label: 'Other' },
+                { value: 'hotel', label: 'Hotel' },
+                { value: 'airbnb', label: 'Airbnb' },
+                { value: 'hostel', label: 'Hostel' },
+                { value: 'other', label: 'Other' },
               ]}
-              onChange={e => setDraft({ ...draft, accommodation: { ...draft.accommodation!, type: e.target.value } })}
+              onChange={e => setDraft({ ...draft, accommodation: { ...draft.accommodation!, type: e.target.value as any } })}
             />
           </FormGrid>
           
@@ -323,10 +582,28 @@ export default function AttachmentDetailModal({
             </FormLabel>
             <MediaGrid 
               photos={draft.accommodation.photos || []} 
+              photoDays={draft.accommodation.photoDays || []}
               editing={isEditMode} 
-              onMediaClick={(idx) => setMediaViewer({ items: draft.accommodation!.photos!, index: idx })}
-              onRemove={(idx) => setDraft({ ...draft, accommodation: { ...draft.accommodation!, photos: draft.accommodation!.photos!.filter((_, i) => i !== idx) } })}
+              onMediaClick={(idx) => setMediaViewer({ 
+                items: draft.accommodation!.photos!.map((url, i) => ({ 
+                  url, 
+                  type: getMediaType(url),
+                  day: draft.accommodation!.photoDays?.[i]
+                })), 
+                index: idx 
+              })}
+              onRemove={(idx) => setDraft({ 
+                ...draft, 
+                accommodation: { 
+                  ...draft.accommodation!, 
+                  photos: draft.accommodation!.photos!.filter((_, i) => i !== idx),
+                  photoDays: (draft.accommodation!.photoDays || []).filter((_, i) => i !== idx)
+                } 
+              })}
               onAdd={() => setIsSearchingModalOpen(true)}
+              onUpload={handleUploadPhoto}
+              onDayClick={handlePhotoDayChange}
+              maxDays={totalDays || 10}
               aspectRatio="square"
             />
           </div>
@@ -348,22 +625,24 @@ export default function AttachmentDetailModal({
               <DateTimeSelector
                 label="Check-in"
                 icon="login"
-                dayValue={draft.accommodation.checkInDay || placeStartDay}
+                dayValue={normalizeDayValue(draft.accommodation.checkInDay) || placeStartDay}
                 timeValue={draft.accommodation.checkIn || ''}
                 dayOptions={dayOptions}
                 onDayChange={d => setDraft({ ...draft, accommodation: { ...draft.accommodation!, checkInDay: d } })}
                 onTimeChange={t => setDraft({ ...draft, accommodation: { ...draft.accommodation!, checkIn: t } })}
                 disabled={!isEditMode}
+                timeFormat={timeFormat}
               />
               <DateTimeSelector
                 label="Check-out"
                 icon="logout"
-                dayValue={draft.accommodation.checkOutDay || placeStartDay}
+                dayValue={normalizeDayValue(draft.accommodation.checkOutDay) || normalizeDayValue(draft.accommodation.checkInDay) || placeStartDay}
                 timeValue={draft.accommodation.checkOut || ''}
                 dayOptions={dayOptions}
                 onDayChange={d => setDraft({ ...draft, accommodation: { ...draft.accommodation!, checkOutDay: d } })}
                 onTimeChange={t => setDraft({ ...draft, accommodation: { ...draft.accommodation!, checkOut: t } })}
                 disabled={!isEditMode}
+                timeFormat={timeFormat}
               />
             </div>
           </div>
@@ -378,28 +657,78 @@ export default function AttachmentDetailModal({
         <Map
           className="w-full h-full"
           places={[
-            ...allPlaces.filter(p => (p.lat !== draft.accommodation?.lat || p.lng !== draft.accommodation?.lng) && (p.lat !== draft.event?.lat || p.lng !== draft.event?.lng)),
-            // Attachment Marker
-            {
-              id: 'preview',
+            ...allPlaces,
+            ...((draft.accommodation?.lat || draft.event?.lat) ? [{
+              id: 'attachment-preview',
               name: draft.type === 'accommodation' ? draft.accommodation?.name : draft.event?.title,
-              location: draft.type === 'accommodation' ? draft.accommodation?.address || '' : draft.event?.location || '',
+              location: draft.type === 'accommodation' ? draft.accommodation?.address : draft.event?.location,
               lat: draft.type === 'accommodation' ? draft.accommodation?.lat : draft.event?.lat,
               lng: draft.type === 'accommodation' ? draft.accommodation?.lng : draft.event?.lng,
-              emoji: cfg.emoji
-            }
-          ].filter(p => p.lat !== undefined && p.lng !== undefined) as any[]}
-          focusedPlaceId="preview"
-          showDayNumbers={false}
+              emoji: cfg.emoji,
+              photos: draft.type === 'accommodation' ? draft.accommodation?.photos : draft.event?.photos
+            }] : [])
+          ].filter(p => p.lat != null && p.lng != null)}
+          focusedPlaceId={(draft.accommodation?.lat || draft.event?.lat) ? 'attachment-preview' : placeId}
+          showDayNumbers={true}
           showControls={true}
           mapStyle={mapStyle}
+          onMarkerClick={(p) => {
+            if (p.id === 'attachment-preview') return;
+            if (p.id === placeId) return;
+          }}
+          onMapClick={(coords) => {
+            if (draft.type === 'accommodation') {
+              setDraft({ ...draft, accommodation: { ...draft.accommodation!, lat: coords.lat, lng: coords.lng } })
+            } else if (draft.type === 'event') {
+              setDraft({ ...draft, event: { ...draft.event!, lat: coords.lat, lng: coords.lng } })
+            }
+          }}
         />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 space-y-4 h-full">
-          <div className={`w-20 h-20 rounded-full ${cfg.color.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center`}>
-            <span className={`material-symbols-outlined text-4xl ${cfg.color} opacity-40`}>{cfg.icon}</span>
-          </div>
-          <p className="text-xs font-bold opacity-30">No Map Preview Available</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 space-y-4 h-full relative overflow-hidden">
+          {/* Subtle background glow for the preview panel */}
+          {draft.type === 'link' && draft.link?.url && draft.link.url.match(/^https?:\/\//) && (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-cyan-400/10 blur-[80px] rounded-full pointer-events-none" />
+            </>
+          )}
+          
+          {draft.document?.file && draft.document?.mimeType?.startsWith('image/') ? (
+            <img src={draft.document.file} className="w-full h-full object-cover" alt="Document Preview" />
+          ) : draft.type === 'link' && draft.link?.url && draft.link.url.match(/^https?:\/\//) ? (
+            <div className="flex flex-col items-center justify-center space-y-6 w-full max-w-[280px] px-8 animate-in fade-in zoom-in-95 duration-500 relative z-10">
+              {(() => {
+                const domain = draft.link!.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
+                const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=256`
+                return (
+                  <>
+                    <div className="w-32 h-32 rounded-[2.5rem] bg-white flex items-center justify-center overflow-hidden p-2 shadow-2xl shadow-cyan-900/50 relative group ring-1 ring-white/10 transition-transform duration-500 hover:scale-105">
+                      <img 
+                        src={favicon}
+                        className="w-full h-full object-contain relative z-10 rounded-[2rem]" 
+                        alt="" 
+                        onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="%2322d3ee" stroke-width="2" opacity="0.4"><circle cx="12" cy="12" r="10"/></svg>' }} 
+                      />
+                    </div>
+                    <div className="text-center w-full space-y-3">
+                      <div className="text-white text-lg font-bold truncate tracking-tight px-2 drop-shadow-md">{draft.link!.title || draft.link!.url}</div>
+                      <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-400/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-black uppercase tracking-[0.2em] truncate max-w-full shadow-inner backdrop-blur-md">
+                        {domain}
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          ) : (
+            <>
+              <div className={`w-20 h-20 rounded-full ${cfg.color.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center`}>
+                <span className={`material-symbols-outlined text-4xl ${cfg.color} opacity-40`}>{cfg.icon}</span>
+              </div>
+              <p className="text-xs font-bold opacity-30">No Preview Available</p>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -410,6 +739,7 @@ export default function AttachmentDetailModal({
       <BaseDetailModal
         isOpen={true}
         onClose={onClose}
+        isEditMode={isEditMode}
         title={title}
         subtitle={subtitle}
         icon={cfg.icon}
@@ -418,7 +748,7 @@ export default function AttachmentDetailModal({
         rightColumn={rightColumnContent}
         footer={
           <div className="flex items-center justify-between w-full">
-            {onDelete && (
+            {isEditMode && onDelete && (
               <Button
                 variant="modal-danger"
                 icon="delete"
@@ -431,12 +761,27 @@ export default function AttachmentDetailModal({
             <div className="flex items-center gap-3">
               {isEditMode ? (
                 <React.Fragment key="edit-mode-actions">
-                  <Button variant="modal-secondary" onClick={() => setIsEditMode(false)}>Cancel</Button>
-                  <Button variant="modal-primary" icon="save" onClick={handleSave}>Save Changes</Button>
+                  <button 
+                    onClick={() => setIsEditMode(false)}
+                    className="px-4 py-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <Button variant="modal-primary" icon="save" disabled={!isValid()} onClick={handleSave}>Save Changes</Button>
                 </React.Fragment>
               ) : (
                 <React.Fragment key="view-mode-actions">
-                  <Button variant="modal-secondary" icon="edit" onClick={() => setIsEditMode(true)}>Edit Details</Button>
+                  <button 
+                    onClick={(e) => {
+                      const el = e.currentTarget;
+                      el.classList.add('animate-[spin_0.3s_ease-out]');
+                      setTimeout(() => setIsEditMode(true), 150);
+                    }}
+                    className="group flex items-center justify-center w-10 h-10 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                    title="Edit Details"
+                  >
+                    <span className="material-symbols-outlined text-[20px] transition-transform duration-300 group-hover:rotate-12 group-active:-rotate-45">edit</span>
+                  </button>
                   <Button variant="modal-primary" onClick={onClose}>Close</Button>
                 </React.Fragment>
               )}
@@ -447,7 +792,7 @@ export default function AttachmentDetailModal({
 
       {mediaViewer && (
         <MediaViewer
-          items={mediaViewer.items.map(url => ({ url, type: getMediaType(url) }))}
+          items={mediaViewer.items}
           initialIndex={mediaViewer.index}
           onClose={() => setMediaViewer(null)}
         />
@@ -458,6 +803,8 @@ export default function AttachmentDetailModal({
           isOpen={true}
           onClose={() => setIsLocationPickerOpen(false)}
           mapStyle={mapStyle}
+          allPlaces={allPlaces}
+          focusedPlaceId={placeId}
           onSelect={(loc) => {
             if (draft.type === 'accommodation') {
               setDraft({ ...draft, accommodation: { ...draft.accommodation!, name: loc.name, address: loc.address, lat: loc.lat, lng: loc.lng } })
@@ -509,14 +856,21 @@ export default function AttachmentDetailModal({
                           isSelected ? 'border-primary ring-2 ring-primary/50' : 'border-white/10 hover:scale-105'
                         }`}
                         onClick={() => {
-                          let newPhotos = isSelected 
+                          const isRemoving = isSelected;
+                          const currentPhotoDays = draft.type === 'accommodation' ? (draft.accommodation?.photoDays || []) : (draft.event?.photoDays || [])
+                          
+                          let newPhotos = isRemoving 
                             ? currentPhotos.filter(p => p !== photo)
                             : [...currentPhotos, photo]
                           
+                          let newPhotoDays = isRemoving
+                            ? currentPhotoDays.filter((_, idx) => currentPhotos[idx] !== photo)
+                            : [...currentPhotoDays, (draft.type === 'accommodation' ? draft.accommodation?.checkInDay : draft.event?.day) || 1]
+                          
                           if (draft.type === 'accommodation') {
-                            setDraft({ ...draft, accommodation: { ...draft.accommodation!, photos: newPhotos } })
+                            setDraft({ ...draft, accommodation: { ...draft.accommodation!, photos: newPhotos, photoDays: newPhotoDays } })
                           } else if (draft.type === 'event') {
-                            setDraft({ ...draft, event: { ...draft.event!, photos: newPhotos } })
+                            setDraft({ ...draft, event: { ...draft.event!, photos: newPhotos, photoDays: newPhotoDays } })
                           }
                         }}
                       >

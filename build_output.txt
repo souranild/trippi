@@ -1,0 +1,29 @@
+
+> trippi@0.1.0 build
+> next build
+
+▲ Next.js 16.2.3 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/trip/[id]/page.tsx:2362:13
+Expected '</', got 'jsx text'
+  [90m2360 |[0m           )}
+  [90m2361 |[0m         </div>
+[31m[1m>[0m [90m2362 |[0m       </div>
+  [90m     |[0m             [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m2363 |[0m
+  [90m     |[0m [31m[1m^[0m
+[31m[1m>[0m [90m2364 |[0m       {[90m/* Floating Mobile Map Button */[0m}
+  [90m     |[0m [31m[1m^^^^^^[0m
+  [90m2365 |[0m         {showMap && isMobile && (
+  [90m2366 |[0m           <button
+  [90m2367 |[0m             onClick={() => setIsMobileMapOpen([36mtrue[0m)}
+
+Parsing ecmascript source code failed
+
+
+    at <unknown> (./src/app/trip/[id]/page.tsx:2362:13)

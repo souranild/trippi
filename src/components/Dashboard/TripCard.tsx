@@ -158,7 +158,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
           const isActuallyToday = currentDayPlaces.some(p => p.id === currentPlace.id);
           const isLive = activeByTime !== null;
           
-          const activeTransport = currentPlace?.transport?.find(t => {
+          const activeTransport = currentPlace?.transport?.find((t: any) => {
              const tDay = t.day || currentPlace.day || 1;
              return tDay === day;
           });
@@ -209,7 +209,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                     <div className="space-y-2 mt-3 pt-3 border-t border-white/5">
                       {(() => {
                         const noteText = Array.isArray(currentPlace.notes) 
-                          ? currentPlace.notes.find(n => n.day === day)?.text 
+                          ? currentPlace.notes.find((n: any) => n.day === day)?.text 
                           : (typeof currentPlace.notes === 'string' && currentPlace.notes && (day === (currentPlace.day || 1) || (currentPlace as any).copyNotesAcrossDays) ? currentPlace.notes : null)
                         return noteText && (
                           <p className="text-[10px] text-white/60 line-clamp-2 italic leading-relaxed pl-2 border-l-2 border-white/20">
@@ -219,11 +219,11 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                       })()}
                       
                       {/* Accommodations */}
-                      {currentPlace.accommodations?.filter(acc => {
+                      {currentPlace.accommodations?.filter((acc: any) => {
                         const start = acc.checkInDay || currentPlace.day || 1;
                         const end = acc.checkOutDay || currentPlace.endDay || currentPlace.day || 1;
                         return day >= start && day <= end;
-                      }).map((acc, idx) => (
+                      }).map((acc: any, idx: number) => (
                         <div key={idx} className="flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-1.5 px-2">
                           <span className="material-symbols-outlined text-[14px] text-yellow-400 shrink-0">bed</span>
                           <p className="text-[10px] text-yellow-100/90 font-bold truncate">{acc.name}</p>
@@ -231,11 +231,11 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                       ))}
 
                       {/* Events */}
-                      {currentPlace.events?.filter(event => {
+                      {currentPlace.events?.filter((event: any) => {
                         const start = event.day || currentPlace.day || 1;
                         const end = event.endDay || start;
                         return day >= start && day <= end;
-                      }).map((event, idx) => (
+                      }).map((event: any, idx: number) => (
                         <div key={idx} className="flex items-center gap-2 bg-red-400/10 border border-red-400/20 rounded-lg p-1.5 px-2">
                           <span className="material-symbols-outlined text-[14px] text-red-400 shrink-0">flag</span>
                           <p className="text-[10px] text-red-100/90 font-bold truncate">{event.title}</p>
@@ -244,11 +244,11 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
 
                       {currentPlace.links && currentPlace.links.length > 0 && (
                         <div className="flex flex-col gap-1.5">
-                          {currentPlace.links.filter(link => {
+                          {currentPlace.links.filter((link: any) => {
                             const lDay = link.day || currentPlace.day || 1;
                             const lEndDay = link.endDay || lDay;
                             return day >= lDay && day <= lEndDay;
-                          }).slice(0, 2).map((link, idx) => (
+                          }).slice(0, 2).map((link: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2 px-1">
                               <span className="material-symbols-outlined text-[14px] text-cyan-400/60 shrink-0">link</span>
                               <p className="text-[10px] text-cyan-100/60 truncate">{link.title || link.url}</p>
@@ -259,11 +259,11 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
 
                       {currentPlace.documents && currentPlace.documents.length > 0 && (
                         <div className="flex flex-col gap-1.5">
-                          {currentPlace.documents.filter(doc => {
+                          {currentPlace.documents.filter((doc: any) => {
                              const dDay = doc.day || currentPlace.day || 1;
                              const dEndDay = doc.endDay || dDay;
                              return day >= dDay && day <= dEndDay;
-                          }).slice(0, 2).map((doc, idx) => (
+                          }).slice(0, 2).map((doc: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2 px-1">
                               <span className="material-symbols-outlined text-[14px] text-blue-400/60 shrink-0">description</span>
                               <p className="text-[10px] text-blue-100/60 truncate">{doc.title || doc.file?.name}</p>

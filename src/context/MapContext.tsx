@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, ReactNode } from 'react'
-import { Place } from '@/types'
+import { Place } from '@/lib/storage'
 
 interface MapState {
   places: Place[]
@@ -29,7 +29,7 @@ interface MapContextType {
   isMapVisible: boolean
   setIsMapVisible: (visible: boolean) => void
   portalTarget: HTMLElement | null
-  setPortalTarget: (target: HTMLElement | null) => void
+  setPortalTarget: React.Dispatch<React.SetStateAction<HTMLElement | null>>
   isExpanded: boolean
   setIsExpanded: (expanded: boolean) => void
   discoveries: any[]

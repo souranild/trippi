@@ -32,6 +32,8 @@ interface LocationPickerModalProps {
   initialLat?: number
   initialLng?: number
   mapStyle?: string
+  allPlaces?: any[]
+  focusedPlaceId?: string | null
 }
 
 export default function LocationPickerModal({
@@ -43,7 +45,9 @@ export default function LocationPickerModal({
   initialAddress = '',
   initialLat,
   initialLng,
-  mapStyle
+  mapStyle,
+  allPlaces = [],
+  focusedPlaceId
 }: LocationPickerModalProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [googleUrl, setGoogleUrl] = useState('')
@@ -143,6 +147,22 @@ export default function LocationPickerModal({
     setSearchResults([])
     setSearchQuery('')
   }
+
+  const mapPlaces = [
+    ...allPlaces,
+    ...(lat != null && lng != null
+      ? [{
+          id: 'picker-preview',
+          name: placeName || 'Pinned location',
+          location: address || '',
+          lat,
+          lng,
+          emoji: '📍'
+        }]
+      : []),
+  ]
+
+  const effectiveFocusId = (lat != null && lng != null) ? 'picker-preview' : (focusedPlaceId || null)
 
   if (!isOpen) return null
 
@@ -254,7 +274,7 @@ export default function LocationPickerModal({
                   </div>
                 </div>
 
-                {lat && lng && (
+                {lat != null && lng != null && (
                   <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                     <div className="flex gap-4">
                       <div className="flex flex-col">
@@ -278,22 +298,39 @@ export default function LocationPickerModal({
           {/* Right Column - Map Preview */}
           <div className="hidden md:block flex-1 bg-neutral-900 relative">
             <TripMap
-              places={[]}
-              previewCoords={lat && lng ? { lat, lng } : null}
+              places={mapPlaces as any[]}
+              focusedPlaceId={effectiveFocusId}
+              previewCoords={null}
               className="h-full w-full"
-              showDayNumbers={false}
+              showDayNumbers={true}
               showControls={true}
               mapStyle={mapStyle}
+              onMapClick={(coords) => {
+                setLat(coords.lat)
+                setLng(coords.lng)
+                if (!placeName) setPlaceName('Pinned location')
+                if (!address) setAddress(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
+              }}
+              defaultDiscovery={true}
+              onAddDiscovery={(discovery) => {
+                setLat(discovery.coordinates.lat)
+                setLng(discovery.coordinates.lng)
+                setPlaceName(discovery.name)
+                setAddress(discovery.location || '')
+                setDescription(discovery.description || '')
+                setImages(discovery.images || (discovery.image ? [discovery.image] : []))
+                setType(discovery.type)
+              }}
             />
             
-            {!lat && (
+            {lat == null && lng == null && allPlaces.length === 0 && (
               <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center z-[50]">
                 <div className="text-center p-8 bg-neutral-900/80 border border-white/10 rounded-[2.5rem] backdrop-blur-xl max-w-xs shadow-2xl">
                   <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4">
                     <span className="material-symbols-outlined text-4xl text-neutral-600">map</span>
                   </div>
-                  <p className="text-sm font-bold text-white">Select a location to preview</p>
-                  <p className="text-xs text-neutral-500 mt-2 leading-relaxed">The map will center here once you search or pick a point</p>
+                  <p className="text-sm font-bold text-white">Search or click to pin a location</p>
+                  <p className="text-xs text-neutral-500 mt-2 leading-relaxed">You can use the same trip map context while picking</p>
                 </div>
               </div>
             )}
@@ -311,8 +348,8 @@ export default function LocationPickerModal({
           
           <Button
             variant="modal-primary"
-            disabled={!lat || !lng || !placeName}
-            onClick={() => lat && lng && onSelect({
+            disabled={lat == null || lng == null || !placeName}
+            onClick={() => lat != null && lng != null && onSelect({
               name: placeName,
               originalName: placeName,
               address: address,

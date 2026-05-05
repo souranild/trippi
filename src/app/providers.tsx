@@ -29,6 +29,8 @@ function ProvidersContent({ children }: { children: React.ReactNode }) {
       <WallpaperTintSync />
       <AnimatedParticleBackground trips={trips} />
       <NavigationLayout>{children}</NavigationLayout>
+      <PersistentMapHost />
+      <ExpandedMapModal />
     </>
   )
 }
@@ -38,8 +40,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <TripProvider>
       <MapProvider>
         <ProvidersContent>{children}</ProvidersContent>
-        <PersistentMapHost />
-        <ExpandedMapModal />
       </MapProvider>
     </TripProvider>
   )

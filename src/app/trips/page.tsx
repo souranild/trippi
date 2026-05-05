@@ -25,9 +25,11 @@ function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: stri
     }
   }
 
+  const startDate = trip.startDate ? new Date(trip.startDate) : null
+  const endDate = trip.endDate ? new Date(trip.endDate) : null
   const now = new Date()
-  const isUpcoming = startDate > now
-  const isActive = startDate <= now && (!endDate || now <= endDate)
+  const isUpcoming = startDate && startDate > now
+  const isActive = startDate && startDate <= now && (!endDate || now <= endDate)
   const isPast = endDate && now > endDate
 
   return (

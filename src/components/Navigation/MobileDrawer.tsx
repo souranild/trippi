@@ -30,7 +30,7 @@ export default function MobileDrawer({ trip, onShare, onSettings, onDelete, onEd
       {shouldShowHamburger && (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="fixed top-0 left-0 z-[60] h-16 w-16 flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition-all duration-300 active:scale-95"
+          className="fixed top-0 left-0 z-[60] h-16 w-16 flex items-center justify-center text-[#8ff5ff] hover:text-white transition-all duration-300 active:scale-95"
           aria-label="Toggle menu"
         >
           <span className={`material-symbols-outlined text-2xl transform transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`}>

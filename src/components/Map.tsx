@@ -29,12 +29,36 @@ interface MapProps {
   selectedSearchResultId?: string | null
   onSearchResultClick?: (hit: any) => void
   onViewportChange?: (center: { lat: number, lng: number }, zoom: number) => void
+  showControls?: boolean
+  onAddDiscovery?: (discovery: any) => void
+  defaultDiscovery?: boolean
+  isGlobal?: boolean
   mapStyle?: string
   onStyleChange?: (style: string) => void
-  showControls?: boolean
 }
 
-export default function TripMap({ places, emoji = '📍', className, focusedPlaceId, showDayNumbers = true, previewCoords, onMapClick, onMarkerClick, searchResults, selectedSearchResultId, onSearchResultClick, onViewportChange, mapStyle, onStyleChange, showControls = false }: MapProps) {
+export default function TripMap(props: MapProps) {
+  const { 
+    places, 
+    emoji = '📍', 
+    className, 
+    focusedPlaceId, 
+    showDayNumbers = true, 
+    previewCoords, 
+    onMapClick, 
+    onMarkerClick, 
+    searchResults, 
+    selectedSearchResultId, 
+    onSearchResultClick, 
+    onViewportChange, 
+    mapStyle, 
+    onStyleChange, 
+    showControls = false, 
+    onAddDiscovery, 
+    defaultDiscovery,
+    isGlobal
+  } = props;
+
   return (
     <DynamicMap
       places={places}
@@ -52,6 +76,9 @@ export default function TripMap({ places, emoji = '📍', className, focusedPlac
       mapStyle={mapStyle}
       onStyleChange={onStyleChange}
       showControls={showControls}
+      onAddDiscovery={onAddDiscovery}
+      defaultDiscovery={defaultDiscovery}
+      isGlobal={isGlobal}
     />
   )
 }

@@ -66,7 +66,7 @@ export function ConfirmationModal({
         />
         <ModalContent className="py-8">
           <div className="flex flex-col items-center text-center gap-4">
-            <div className={`w-16 h-16 rounded-3xl ${styles.iconColor.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center mb-2`}>
+            <div className={`w-16 h-16 rounded-[1.5rem] ${styles.iconColor.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center mb-2`}>
               <span className={`material-symbols-outlined text-4xl ${styles.iconColor}`}>{icon}</span>
             </div>
             <p className="text-neutral-300 text-base leading-relaxed">

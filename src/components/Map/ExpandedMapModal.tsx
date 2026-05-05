@@ -20,7 +20,8 @@ export default function ExpandedMapModal() {
   if (!isExpanded || !mapState) return null
 
   return (
-    <div className="fixed inset-0 z-[2000] flex flex-col bg-black no-print">
+    <div className="fixed inset-0 z-[2000] flex flex-col bg-black/40 backdrop-blur-3xl animate-in fade-in slide-in-from-bottom-10 duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] no-print">
+      <div className="absolute inset-0 z-[-1] bg-black/60" />
       {/* Header */}
       <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-neutral-900/50 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-3">

@@ -71,6 +71,7 @@ export default function TripForm({
   const [startDate, setStartDate] = useState(initialValues.startDate || '')
   const [endDate, setEndDate] = useState(initialValues.endDate || '')
   const [wallpaper, setWallpaper] = useState(initialValues.wallpaper || '')
+  const [wallpaperStyle, setWallpaperStyle] = useState<'cover' | 'contain' | 'auto'>('cover')
   const [wallpaperOpacity, setWallpaperOpacity] = useState(1)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isWallpaperPickerOpen, setIsWallpaperPickerOpen] = useState(false)

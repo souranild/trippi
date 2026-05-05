@@ -14,6 +14,7 @@ interface DateTimeSelectorProps {
   disabled?: boolean
   icon?: string
   labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
+  timeFormat?: '12h' | '24h'
 }
 
 export function DateTimeSelector({
@@ -25,7 +26,8 @@ export function DateTimeSelector({
   onTimeChange,
   disabled = false,
   icon,
-  labelVariant = 'primary'
+  labelVariant = 'primary',
+  timeFormat = '12h'
 }: DateTimeSelectorProps) {
   return (
     <div className="space-y-3">
@@ -56,6 +58,7 @@ export function DateTimeSelector({
               value={timeValue} 
               onChange={onTimeChange}
               className="w-full"
+              timeFormat={timeFormat}
             />
           )}
         </div>

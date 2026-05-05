@@ -22,7 +22,9 @@ export type AttachmentType = 'note' | 'event' | 'document' | 'link' | 'accommoda
 
 interface AttachmentModalProps {
   type: AttachmentType
+  placeId?: string
   placeName?: string
+  allPlaces?: any[]
   initialNote?: string
   startDay?: number
   endDay?: number
@@ -38,6 +40,7 @@ interface AttachmentModalProps {
 export interface AttachmentPayload {
   type: AttachmentType
   day?: number
+  eventEndDay?: number
   note?: string
   eventTitle?: string
   eventDescription?: string
@@ -58,6 +61,8 @@ export interface AttachmentPayload {
   accCheckOut?: string
   accCheckOutDay?: number
   accLink?: string
+  accLocation?: string
+  accDescription?: string
   lat?: number
   lng?: number
   icon?: string
@@ -100,7 +105,9 @@ const CONFIG: Record<AttachmentType, { title: string; subtitle: string; icon: st
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AttachmentModal({ 
   type, 
+  placeId,
   placeName, 
+  allPlaces = [],
   initialNote = '', 
   startDay = 1, 
   endDay = 1, 
@@ -202,7 +209,7 @@ export default function AttachmentModal({
 
   const isValid = () => {
     if (type === 'event') return eventTitle.trim().length > 0
-    if (type === 'document') return docName.trim().length > 0
+    if (type === 'document') return docName.trim().length > 0 && (docUrl.trim().length > 0 || docFile != null)
     if (type === 'link') return linkUrl.trim().length > 0
     if (type === 'accommodation') return accName.trim().length > 0
     if (type === 'note') return note.trim().length > 0
@@ -212,7 +219,7 @@ export default function AttachmentModal({
   return (
     <>
       <ModalBackdrop onClick={onClose}>
-        <ModalContainer size="lg">
+        <ModalContainer size="lg" className="max-h-[85vh] flex flex-col">
           <ModalHeader
             title={cfg.title}
             subtitle={placeName}
@@ -223,8 +230,8 @@ export default function AttachmentModal({
 
           <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left Column - Form */}
-            <div className="flex-1 md:flex-[0.5] overflow-y-auto custom-scrollbar p-6 bg-white/[0.02]">
-              <div className="space-y-6">
+            <div className="flex-1 md:flex-[0.5] overflow-y-auto custom-scrollbar p-4 bg-white/[0.02]">
+              <div className="space-y-4">
                 
                 {/* ── NOTE ── */}
                 {type === 'note' && (
@@ -249,24 +256,6 @@ export default function AttachmentModal({
                       autoFocus
                     />
                     
-                    <FormGrid columns={2}>
-                      <FormSelect
-                        label="Start Day"
-                        labelVariant="secondary"
-                        value={selectedDay}
-                        options={dayOptions}
-                        onChange={e => {
-                          const d = parseInt(e.target.value)
-                          setSelectedDay(d)
-                          if (eventEndDay < d) setEventEndDay(d)
-                        }}
-                      />
-                      <div className="space-y-1">
-                        <FormLabel variant="secondary">Start Time</FormLabel>
-                        <TimePicker value={eventTime} onChange={setEventTime} />
-                      </div>
-                    </FormGrid>
-
                     <FormInput
                       label="Location"
                       labelVariant="secondary"
@@ -275,14 +264,6 @@ export default function AttachmentModal({
                       onFocus={() => setIsLocationPickerOpen(true)}
                       className="cursor-pointer"
                       readOnly
-                    />
-
-                    <FormTextarea
-                      label="Description"
-                      labelVariant="secondary"
-                      value={eventDescription}
-                      onChange={e => setEventDescription(e.target.value)}
-                      className="h-24"
                     />
 
                     <div className="space-y-2">
@@ -301,6 +282,50 @@ export default function AttachmentModal({
                           <span className="text-xs font-bold mt-1">Add Media</span>
                         </button>
                       </div>
+                    </div>
+
+                    <FormTextarea
+                      label="Description"
+                      labelVariant="secondary"
+                      value={eventDescription}
+                      onChange={e => setEventDescription(e.target.value)}
+                      className="h-24"
+                    />
+
+                    <div className="space-y-4">
+                      <FormLabel variant="secondary">Timing</FormLabel>
+                      <FormGrid columns={2}>
+                        <FormGroup>
+                          <FormSelect
+                            label="Start Day"
+                            labelVariant="secondary"
+                            value={selectedDay}
+                            options={dayOptions}
+                            onChange={e => {
+                              const d = parseInt(e.target.value)
+                              setSelectedDay(d)
+                              if (eventEndDay < d) setEventEndDay(d)
+                            }}
+                          />
+                          <div className="space-y-1">
+                            <FormLabel variant="secondary">Start Time</FormLabel>
+                            <TimePicker value={eventTime} onChange={setEventTime} />
+                          </div>
+                        </FormGroup>
+                        <FormGroup>
+                          <FormSelect
+                            label="End Day"
+                            labelVariant="secondary"
+                            value={eventEndDay}
+                            options={dayOptions}
+                            onChange={e => setEventEndDay(parseInt(e.target.value))}
+                          />
+                          <div className="space-y-1">
+                            <FormLabel variant="secondary">End Time</FormLabel>
+                            <TimePicker value={eventEndTime} onChange={setEventEndTime} />
+                          </div>
+                        </FormGroup>
+                      </FormGrid>
                     </div>
                   </div>
                 )}
@@ -340,47 +365,6 @@ export default function AttachmentModal({
                       readOnly
                     />
 
-                    <FormGrid columns={2}>
-                      <FormGroup>
-                        <FormSelect
-                          label="Check-in Day"
-                          labelVariant="secondary"
-                          value={accCheckInDay}
-                          options={dayOptions}
-                          onChange={e => {
-                            const d = parseInt(e.target.value)
-                            setAccCheckInDay(d)
-                            if (accCheckOutDay < d) setAccCheckOutDay(d)
-                          }}
-                        />
-                        <div className="space-y-1">
-                          <FormLabel variant="secondary">Check-in Time</FormLabel>
-                          <TimePicker value={accCheckIn} onChange={setAccCheckIn} />
-                        </div>
-                      </FormGroup>
-                      <FormGroup>
-                        <FormSelect
-                          label="Check-out Day"
-                          labelVariant="secondary"
-                          value={accCheckOutDay}
-                          options={dayOptions}
-                          onChange={e => setAccCheckOutDay(parseInt(e.target.value))}
-                        />
-                        <div className="space-y-1">
-                          <FormLabel variant="secondary">Check-out Time</FormLabel>
-                          <TimePicker value={accCheckOut} onChange={setAccCheckOut} />
-                        </div>
-                      </FormGroup>
-                    </FormGrid>
-
-                    <FormTextarea
-                      label="Description"
-                      labelVariant="secondary"
-                      value={accDescription}
-                      onChange={e => setAccDescription(e.target.value)}
-                      className="h-24"
-                    />
-
                     <div className="space-y-2">
                       <FormLabel variant="secondary">Media ({accPhotos.length})</FormLabel>
                       <div className="grid grid-cols-3 gap-3">
@@ -397,6 +381,50 @@ export default function AttachmentModal({
                           <span className="text-xs font-bold mt-1">Add Media</span>
                         </button>
                       </div>
+                    </div>
+
+                    <FormTextarea
+                      label="Description"
+                      labelVariant="secondary"
+                      value={accDescription}
+                      onChange={e => setAccDescription(e.target.value)}
+                      className="h-24"
+                    />
+
+                    <div className="space-y-4">
+                      <FormLabel variant="secondary">Timing</FormLabel>
+                      <FormGrid columns={2}>
+                        <FormGroup>
+                          <FormSelect
+                            label="Check-in Day"
+                            labelVariant="secondary"
+                            value={accCheckInDay}
+                            options={dayOptions}
+                            onChange={e => {
+                              const d = parseInt(e.target.value)
+                              setAccCheckInDay(d)
+                              if (accCheckOutDay < d) setAccCheckOutDay(d)
+                            }}
+                          />
+                          <div className="space-y-1">
+                            <FormLabel variant="secondary">Check-in Time</FormLabel>
+                            <TimePicker value={accCheckIn} onChange={setAccCheckIn} />
+                          </div>
+                        </FormGroup>
+                        <FormGroup>
+                          <FormSelect
+                            label="Check-out Day"
+                            labelVariant="secondary"
+                            value={accCheckOutDay}
+                            options={dayOptions}
+                            onChange={e => setAccCheckOutDay(parseInt(e.target.value))}
+                          />
+                          <div className="space-y-1">
+                            <FormLabel variant="secondary">Check-out Time</FormLabel>
+                            <TimePicker value={accCheckOut} onChange={setAccCheckOut} />
+                          </div>
+                        </FormGroup>
+                      </FormGrid>
                     </div>
                   </div>
                 )}
@@ -470,16 +498,7 @@ export default function AttachmentModal({
                   <Map
                     className="w-full h-full"
                     places={[
-                      // Parent Place Marker
-                      ...(placeCoords ? [{
-                        id: 'parent',
-                        name: placeName || 'Place',
-                        location: '',
-                        lat: placeCoords.lat,
-                        lng: placeCoords.lng,
-                        emoji: '📍',
-                        isParent: true
-                      }] : []),
+                      ...allPlaces,
                       // Attachment Marker
                       {
                         id: 'preview',
@@ -490,17 +509,23 @@ export default function AttachmentModal({
                         emoji: type === 'accommodation' ? '🏨' : '🚩'
                       }
                     ].filter(p => p.lat !== undefined && p.lng !== undefined) as any[]}
-                    focusedPlaceId="preview"
-                    showDayNumbers={false}
+                    focusedPlaceId={(selectedCoords?.lat != null && selectedCoords?.lng != null) ? 'preview' : (placeId || null)}
+                    showDayNumbers={true}
                     showControls={true}
                     mapStyle={mapStyle}
                   />
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 space-y-4">
-                    <div className={`w-20 h-20 rounded-full ${cfg.color.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center`}>
-                      <span className={`material-symbols-outlined text-4xl ${cfg.color} opacity-40`}>{cfg.icon}</span>
-                    </div>
-                    <p className="text-xs font-bold opacity-30">No Map Preview Available</p>
+                  <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 space-y-4 h-full">
+                    {docFile && docMimeType?.startsWith('image/') ? (
+                      <img src={docFile} className="w-full h-full object-cover" alt="Preview" />
+                    ) : (
+                      <>
+                        <div className={`w-20 h-20 rounded-full ${cfg.color.replace('text-', 'bg-')}/10 border border-white/10 flex items-center justify-center`}>
+                          <span className={`material-symbols-outlined text-4xl ${cfg.color} opacity-40`}>{cfg.icon}</span>
+                        </div>
+                        <p className="text-xs font-bold opacity-30">No Preview Available</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -508,7 +533,7 @@ export default function AttachmentModal({
           </div>
 
           <ModalFooter>
-            <Button variant="modal-secondary" onClick={onClose}>Cancel</Button>
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
             <Button variant="modal-primary" icon={cfg.icon} disabled={!isValid()} onClick={handleSave}>Add {type}</Button>
           </ModalFooter>
         </ModalContainer>
@@ -519,6 +544,8 @@ export default function AttachmentModal({
           isOpen={true}
           onClose={() => setIsLocationPickerOpen(false)}
           mapStyle={mapStyle}
+          allPlaces={allPlaces}
+          focusedPlaceId={placeId}
           onSelect={(loc) => {
             if (type === 'accommodation') {
               setAccName(loc.name)

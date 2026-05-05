@@ -10,6 +10,7 @@ interface TimePickerProps {
   placeholder?: string
   minTime?: string
   maxTime?: string
+  timeFormat?: '12h' | '24h'
 }
 
 const HOURS = ['12', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
@@ -33,8 +34,8 @@ function parse(value: string): { hour: string; minute: string; period: 'AM' | 'P
   return { hour: '', minute: '', period: 'AM' }
 }
 
-function fmt(hour: string, minute: string, period: 'AM' | 'PM'): string {
-  return formatTime(`${hour}:${minute} ${period}`)
+function fmt(hour: string, minute: string, period: 'AM' | 'PM', format: '12h' | '24h'): string {
+  return formatTime(`${hour}:${minute} ${period}`, format)
 }
 
 export default function TimePicker({ 
@@ -43,7 +44,8 @@ export default function TimePicker({
   className = '', 
   placeholder = 'Select time',
   minTime,
-  maxTime
+  maxTime,
+  timeFormat = '12h'
 }: TimePickerProps) {
   const parsed = parse(value)
   const [isOpen, setIsOpen] = useState(false)
@@ -74,10 +76,10 @@ export default function TimePicker({
 
   const select = (h: string, m: string, p: 'AM' | 'PM') => {
     setHour(h); setMinute(m); setPeriod(p)
-    if (h && m) onChange(fmt(h, m, p))
+    if (h && m) onChange(fmt(h, m, p, timeFormat))
   }
 
-  const displayValue = (hour && minute) ? fmt(hour, minute, period) : ''
+  const displayValue = (hour && minute) ? fmt(hour, minute, period, timeFormat) : ''
 
   return (
     <div className={`relative ${className}`} ref={ref}>
@@ -102,7 +104,7 @@ export default function TimePicker({
                 type="button"
                 onClick={() => {
                   setPeriod(p)
-                  if (hour && minute) onChange(fmt(hour, minute, p))
+                  if (hour && minute) onChange(fmt(hour, minute, p, timeFormat))
                 }}
                 className={`flex-1 py-2 text-xs font-bold transition-colors ${
                   period === p ? 'bg-primary/20 text-primary' : 'text-neutral-400 hover:text-white hover:bg-white/5'

@@ -11,7 +11,7 @@ import TripCard from '@/components/Dashboard/TripCard'
 import ExploreSection from '@/components/ExploreSection'
 import AppHeader from '@/components/AppHeader'
 
-import MapSlot from '@/components/Map/MapSlot'
+import TripMap from '@/components/Map'
 
 
 function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[] }) {
@@ -21,10 +21,10 @@ function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[
   return (
     <section className="w-full flex flex-col space-y-4">
       {/* Map - Much Taller and Search Enabled */}
-      <div className="relative overflow-hidden rounded-[2rem] w-full aspect-[4/5] sm:aspect-[16/22] bg-surface-container-lowest border border-white/5 shadow-2xl">
+      <div className="relative overflow-hidden rounded-[2rem] w-full aspect-[4/5] md:aspect-[3/4] lg:aspect-[16/22] bg-surface-container-lowest border border-white/5 shadow-2xl">
         {/* Interactive Leaflet Map Layer */}
         <div className="absolute inset-0 z-10 cursor-move">
-          <MapSlot 
+          <TripMap 
             isGlobal={true} 
             places={places} 
             showDayNumbers={false} 
@@ -75,9 +75,9 @@ export default function Home() {
   const [isMobileMapClosing, setIsMobileMapClosing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Handle mobile detection
+  // Handle mobile detection (below md breakpoint)
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
@@ -154,9 +154,9 @@ export default function Home() {
         {trips.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-            {/* Left Column: Adventures (2/3 width on large screens) */}
-            <div className="lg:col-span-2 space-y-8 sm:space-y-12">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
+            {/* Left Column: Adventures (spans 2/3 on large, full on tablet) */}
+            <div className="md:col-span-1 lg:col-span-2 space-y-8 sm:space-y-12">
               {/* Current Adventure */}
               {currentTrip && (
                 <div className="animate-fade-in">
@@ -191,7 +191,7 @@ export default function Home() {
                     </div>
                     <span className="text-caption text-neutral-500">{upcomingTrips.length} {upcomingTrips.length === 1 ? 'trip' : 'trips'}</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
                     {upcomingTrips.slice(0, 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
                         <TripCard trip={trip} />
@@ -203,7 +203,7 @@ export default function Home() {
                   </div>
                   {upcomingTrips.length > 3 && (
                     <Link
-                      href="/adventures"
+                      href="/adventures?status=upcoming&sort=oldest"
                       className="mt-4 group px-4 py-2 text-sm font-medium text-secondary hover:text-[#c3f400] bg-white/5 hover:bg-white/10 rounded-lg border border-secondary/30 hover:border-secondary/60 transition-all duration-300 flex items-center justify-center gap-2 w-full"
                     >
                       <span>+{upcomingTrips.length - 3} more upcoming</span>
@@ -222,7 +222,7 @@ export default function Home() {
                         Past Adventures
                       </h2>
                       <Link
-                        href="/adventures"
+                        href="/adventures?status=past&sort=newest"
                         className="p-1.5 text-neutral-500 hover:text-[#c3f400] hover:bg-white/5 rounded-lg transition-all duration-300"
                         title="View all adventures"
                       >
@@ -231,7 +231,7 @@ export default function Home() {
                     </div>
                     <span className="text-caption text-neutral-500">{pastTrips.length} {pastTrips.length === 1 ? 'trip' : 'trips'}</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
                     {pastTrips.slice(0, 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
                         <TripCard trip={trip} />
@@ -243,7 +243,7 @@ export default function Home() {
                   </div>
                   {pastTrips.length > 3 && (
                     <Link
-                      href="/adventures"
+                      href="/adventures?status=past&sort=newest"
                       className="mt-4 group px-4 py-2 text-sm font-medium text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-300 flex items-center justify-center gap-2 w-full"
                     >
                       <span>+{pastTrips.length - 3} more past trips</span>
@@ -254,14 +254,12 @@ export default function Home() {
               )}
             </div>
 
-            {/* Right Column: Global Footprint (1/3 width on large screens, hidden on mobile) */}
-            {!isMobile && (
-              <div className="hidden lg:block">
-                <div className="sticky top-28">
-                  <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} />
-                </div>
+            {/* Right Column: Global Footprint (always shown on md+) */}
+            <div className="hidden md:block">
+              <div className="sticky top-28">
+                <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} />
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -321,7 +319,7 @@ export default function Home() {
 
         {/* Mobile Map Panel (Drawer) copied from trip detail logic */}
         {isMobileMapOpen && (
-          <div className="fixed inset-0 z-[2000] lg:hidden flex justify-end">
+          <div className="fixed inset-0 z-[2000] md:hidden flex justify-end">
             {/* Backdrop */}
             <div 
               className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-400 ${isMobileMapClosing ? 'opacity-0' : 'opacity-100'} animate-in fade-in duration-300`}
@@ -350,7 +348,7 @@ export default function Home() {
               </div>
 
               <div className="flex-1 relative bg-neutral-950 overflow-hidden">
-                <MapSlot 
+                <TripMap 
                   isGlobal={true} 
                   places={allPlacesWithEmojis} 
                   showDayNumbers={false} 

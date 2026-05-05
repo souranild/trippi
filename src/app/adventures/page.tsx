@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useTrips } from '@/context/TripContext'
 import type { Trip } from '@/lib/storage'
 import TripCard from '@/components/Dashboard/TripCard'
@@ -35,10 +36,26 @@ function getTripDuration(trip: Trip): number {
 
 export default function AdventuresPage() {
   const { trips, deleteTrip } = useTrips()
+  const searchParams = useSearchParams()
+  
   const [viewType, setViewType] = useState<ViewType>('gallery')
   const [sortType, setSortType] = useState<SortType>('newest')
   const [filters, setFilters] = useState<Filters>({ status: 'all' })
   const [showFilters, setShowFilters] = useState(true)
+
+  // Initialize from search params
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+    const sortParam = searchParams.get('sort')
+    
+    if (statusParam && (['all', 'active', 'upcoming', 'past'].includes(statusParam))) {
+      setFilters(f => ({ ...f, status: statusParam as any }))
+    }
+    
+    if (sortParam && (['newest', 'oldest', 'alphabetical', 'duration'].includes(sortParam))) {
+      setSortType(sortParam as any)
+    }
+  }, [searchParams])
 
   // Get unique years and countries for filter options
   const uniqueYears = useMemo(() => {

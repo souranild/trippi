@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Place, Note, normalizeUrl } from '@/lib/storage'
-import { getDayWithDate, getDayInfo } from '@/lib/date-utils'
+import { getDayWithDate, getDayInfo, formatTime } from '@/lib/date-utils'
 import dynamic from 'next/dynamic'
 import { DateTimeSelector } from '@/components/DateTimeSelector'
 import MediaViewer from '@/components/MediaViewer'
@@ -16,15 +16,26 @@ import {
 } from '@/components/ModalLayout'
 import { AttachmentDetailData } from '@/components/AttachmentDetailModal'
 import AttachmentDetailModal from '@/components/AttachmentDetailModal'
+import type { AttachmentType } from './AttachmentModal'
+import { useTrips } from '@/context/TripContext'
+import { toggleHtmlCheckbox } from '@/lib/rich-text-utils'
 import { MediaGrid } from '@/components/MediaGrid'
 import { Button } from '@/components/Button'
 import { FormLabel, FormListItem, FormTextarea } from '@/components/FormLayout'
 import { ConfirmationModal } from './ConfirmationModal'
+import RichTextEditor from '@/components/RichTextEditor'
 
 const Map = dynamic(() => import('./Map'), {
   ssr: false,
   loading: () => <div className="h-48 bg-neutral-800/50 rounded-xl flex items-center justify-center text-neutral-500">Loading map...</div>
 })
+
+function getMediaType(url: string): 'image' | 'video' | 'pdf' | 'other' {
+  if (url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith('data:video')) return 'video'
+  if (url.match(/\.pdf$/i) || url.startsWith('data:application/pdf')) return 'pdf'
+  if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) || url.startsWith('data:image')) return 'image'
+  return 'other'
+}
 
 interface PlaceDetailModalProps {
   place: Place
@@ -45,6 +56,9 @@ interface PlaceDetailModalProps {
   onOpenPlace?: (place: Place) => void
   onEditLocation?: () => void
   mapStyle?: string
+  onAddAttachment?: (type: AttachmentType, placeId: string, day?: number) => void
+  onAddTransport?: (placeId: string, day?: number) => void
+  timeFormat?: '12h' | '24h'
 }
 
 export default function PlaceDetailModal({ 
@@ -61,8 +75,12 @@ export default function PlaceDetailModal({
   lastStopCoords,
   onOpenTransport = () => {},
   onOpenPlace = () => {},
+  onMapClick,
   onEditLocation,
-  mapStyle
+  mapStyle,
+  onAddAttachment,
+  onAddTransport,
+  timeFormat = '12h'
 }: PlaceDetailModalProps) {
   // --- 1. State & Logic ---
   const [isEditMode, setIsEditMode] = useState(initialEditMode)
@@ -83,20 +101,41 @@ export default function PlaceDetailModal({
   const [arrivalTime, setArrivalTime] = useState(updatedPlace.arrival || '')
   const [departureTime, setDepartureTime] = useState(updatedPlace.departure || '')
   const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetailData | null>(null)
-  const [mediaViewer, setMediaViewer] = useState<{ items: string[]; index: number } | null>(null)
+  const [mediaViewer, setMediaViewer] = useState<{ items: any[]; index: number } | null>(null)
   const [isImageSearchOpen, setIsImageSearchOpen] = useState(false)
   const [imageSearchQuery, setImageSearchQuery] = useState('')
   const [imageSearchResults, setImageSearchResults] = useState<string[]>([])
   const [isImageSearching, setIsImageSearching] = useState(false)
   const imageSearchInputRef = useRef<HTMLInputElement>(null)
-  const [expandedDay, setExpandedDay] = useState<number | null>(initialDay || updatedPlace.day || 1)
+  const [collapsedDays, setCollapsedDays] = useState<Set<number>>(() => {
+    // By default, if initialDay is provided, collapse everything ELSE.
+    // If no initialDay, keep everything expanded (empty set).
+    return new Set()
+  })
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['notes', 'media']))
+  const currentMediaDay = Array.from({ length: 1 }, (_, i) => updatedPlace.day || 1)[0] // Placeholder for current active day logic if needed
 
   const toggleSection = (id: string) => {
     const next = new Set(openSections)
     if (next.has(id)) next.delete(id)
     else next.add(id)
     setOpenSections(next)
+  }
+
+  const toggleDayCollapse = (day: number) => {
+    setCollapsedDays(prev => {
+      const next = new Set(prev)
+      if (next.has(day)) next.delete(day)
+      else next.add(day)
+      return next
+    })
+  }
+
+  const expandAllDays = () => setCollapsedDays(new Set())
+  const collapseAllDays = (start: number, count: number) => {
+    const all = new Set<number>()
+    for (let i = 0; i < count; i++) all.add(start + i)
+    setCollapsedDays(all)
   }
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -127,19 +166,7 @@ export default function PlaceDetailModal({
   }, [allDaysCount, tripStartDate])
 
   // --- 3. Handlers ---
-  const formatTime12h = (time: string): string => {
-    if (!time) return ''
-    const m24 = time.match(/^(\d{1,2}):(\d{2})$/)
-    if (m24) {
-      let h = parseInt(m24[1])
-      const min = m24[2]
-      const period = h >= 12 ? 'PM' : 'AM'
-      if (h === 0) h = 12
-      else if (h > 12) h -= 12
-      return `${h}:${min} ${period}`
-    }
-    return time
-  }
+
 
   const handleArrivalChange = (time: string) => {
     setArrivalTime(time)
@@ -180,10 +207,65 @@ export default function PlaceDetailModal({
     if (!isNew) onSave(updated)
   }
 
+  const handleDeleteTransport = (legId: string, sourcePlaceId: string) => {
+    const trips = JSON.parse(localStorage.getItem('trippi_trips') || '[]')
+    const tripId = allPlaces[0]?.tripId // Use tripId from any place
+    if (!tripId) return
+
+    const updatedPlaces = allPlaces.map(p => {
+      if (p.id === sourcePlaceId) {
+        return { ...p, transport: (p.transport || []).filter((t: any) => t.id !== legId) }
+      }
+      return p
+    })
+
+    // Update local state
+    const updatedPlaceSource = updatedPlaces.find(p => p.id === place.id)
+    if (updatedPlaceSource) setUpdatedPlace(updatedPlaceSource)
+    
+    // In a real app, this should call onSave with the whole trip or specific place
+    if (!isNew) onSave(updatedPlaceSource || updatedPlace)
+  }
+
   const handleRemovePhoto = (idx: number) => {
-    const updated = { ...updatedPlace, photos: updatedPlace.photos?.filter((_, i) => i !== idx) }
+    const updated = { 
+      ...updatedPlace, 
+      photos: updatedPlace.photos?.filter((_, i) => i !== idx),
+      photoDays: updatedPlace.photoDays?.filter((_, i) => i !== idx)
+    }
     setUpdatedPlace(updated)
     if (!isNew) onSave(updated)
+  }
+
+  const handleUploadPhoto = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.onchange = (e: any) => {
+      const files = Array.from(e.target.files) as File[]
+      if (files.length === 0) return
+
+      let loadedCount = 0
+      const newUrls: string[] = []
+
+      files.forEach(file => {
+        const reader = new FileReader()
+        reader.onload = (re) => {
+          newUrls.push(re.target?.result as string)
+          loadedCount++
+          if (loadedCount === files.length) {
+            const newPhotos = [...(updatedPlace.photos || []), ...newUrls]
+            const newPhotoDays = [...(updatedPlace.photoDays || []), ...newUrls.map(() => currentMediaDay)]
+            const updated = { ...updatedPlace, photos: newPhotos, photoDays: newPhotoDays }
+            setUpdatedPlace(updated)
+            if (!isNew) onSave(updated)
+          }
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+    input.click()
   }
 
   const handleImageSearch = async (query: string) => {
@@ -221,6 +303,40 @@ export default function PlaceDetailModal({
 
   const renderNoteText = (text: string, noteId: string) => {
     if (!text) return <span className="text-neutral-500 italic text-xs">No notes...</span>
+    
+    // If it looks like HTML, render it directly with the prose-renderer class
+    if (text.trim().startsWith('<')) {
+      return (
+        <div 
+          className="prose-renderer text-sm leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: text }}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
+              e.stopPropagation();
+              const container = e.currentTarget;
+              const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+              const index = checkboxes.indexOf(target as HTMLInputElement);
+              
+              if (index !== -1) {
+                const updatedText = toggleHtmlCheckbox(text, index);
+                
+                // Update local and context state
+                const nextNotes = updatedPlace.notes?.map(n => n.id === noteId ? { ...n, text: updatedText } : n) || [];
+                const nextPlace = {
+                  ...updatedPlace,
+                  notes: nextNotes
+                };
+                setNotes(nextNotes);
+                setUpdatedPlace(nextPlace);
+                commitPlaceUpdate(nextPlace);
+              }
+            }
+          }}
+        />
+      )
+    }
+
     const parts = text.split(/(\[[ xX]\])/g)
     let checkpointIdx = 0
     return (
@@ -255,8 +371,15 @@ export default function PlaceDetailModal({
     )
   }
 
-  const openViewer = (items: string[], index: number) => {
-    setMediaViewer({ items, index })
+  const openViewer = (items: string[], index: number, days?: (number | null)[]) => {
+    setMediaViewer({ 
+      items: items.map((url, i) => ({ 
+        url, 
+        type: getMediaType(url),
+        day: days?.[i] ?? undefined
+      })), 
+      index 
+    })
   }
 
   const handleDeleteEvent = (id: string) => {
@@ -281,6 +404,93 @@ export default function PlaceDetailModal({
     const updated = { ...updatedPlace, links: updatedPlace.links?.filter(l => l.id !== id) }
     setUpdatedPlace(updated)
     if (!isNew) onSave(updated)
+  }
+
+  const commitPlaceUpdate = (nextPlace: Place) => {
+    setUpdatedPlace(nextPlace)
+    if (!isNew) onSave(nextPlace)
+  }
+
+  const createDraftAttachment = (type: AttachmentType) => {
+    const draftId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+    if (type === 'accommodation') {
+      const accommodation = {
+        id: draftId,
+        name: 'New stay',
+        type: 'hotel' as const,
+        checkIn: '',
+        checkInDay: currentMediaDay,
+        checkOut: '',
+        checkOutDay: currentMediaDay,
+        documents: [],
+        photos: [],
+      }
+      const nextPlace = { ...updatedPlace, accommodations: [...(updatedPlace.accommodations || []), accommodation] }
+      commitPlaceUpdate(nextPlace)
+      setAttachmentDetail({ type: 'accommodation', accommodation })
+      return
+    }
+
+    if (type === 'event') {
+      const event = {
+        id: draftId,
+        title: 'New activity',
+        description: '',
+        time: '',
+        endTime: '',
+        date: '',
+        type: 'activity' as const,
+        location: '',
+        documents: [],
+        photos: [],
+        day: currentMediaDay,
+        endDay: currentMediaDay,
+      }
+      const nextPlace = { ...updatedPlace, events: [...(updatedPlace.events || []), event] }
+      commitPlaceUpdate(nextPlace)
+      setAttachmentDetail({ type: 'event', event })
+      return
+    }
+
+    if (type === 'document') {
+      const document = {
+        id: draftId,
+        name: 'New document',
+        type: 'other' as const,
+        day: currentMediaDay,
+      }
+      const nextPlace = { ...updatedPlace, documents: [...(updatedPlace.documents || []), document] }
+      commitPlaceUpdate(nextPlace)
+      setAttachmentDetail({ type: 'document', document })
+      return
+    }
+
+    if (type === 'link') {
+      const link = {
+        id: draftId,
+        title: 'New link',
+        url: '',
+        day: currentMediaDay,
+      }
+      const nextPlace = { ...updatedPlace, links: [...(updatedPlace.links || []), link] }
+      commitPlaceUpdate(nextPlace)
+      setAttachmentDetail({ type: 'link', link })
+    }
+  }
+
+  const handleAddAttachment = (type: AttachmentType) => {
+    if (!isNew && onAddAttachment) {
+      onAddAttachment(type, updatedPlace.id, currentMediaDay)
+      return
+    }
+    createDraftAttachment(type)
+  }
+
+  const handleAddTransport = () => {
+    if (onAddTransport && !isNew) {
+      onAddTransport(updatedPlace.id, currentMediaDay)
+    }
   }
 
   // --- 4. Effects ---
@@ -358,9 +568,34 @@ export default function PlaceDetailModal({
 
       {/* 1. Note Section */}
       <div className="space-y-4 pb-4 border-b border-white/10">
-        <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-base">sticky_note_2</span> Notes & Checkpoints
-        </FormLabel>
+        <div className="flex items-center justify-between mb-2">
+          <FormLabel variant="primary" className="!mb-0 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">sticky_note_2</span> Notes & Checkpoints
+          </FormLabel>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                const start = updatedPlace.day || 1;
+                const end = updatedPlace.endDay || start;
+                expandAllDays();
+              }}
+              className="text-[9px] font-bold text-neutral-500 hover:text-primary uppercase tracking-wider transition-colors"
+            >
+              Expand All
+            </button>
+            <span className="text-neutral-700 text-[9px]">•</span>
+            <button 
+              onClick={() => {
+                const start = updatedPlace.day || 1;
+                const end = updatedPlace.endDay || start;
+                collapseAllDays(start, end - start + 1);
+              }}
+              className="text-[9px] font-bold text-neutral-500 hover:text-primary uppercase tracking-wider transition-colors"
+            >
+              Collapse All
+            </button>
+          </div>
+        </div>
         <div className="space-y-2">
           {(() => {
             const start = updatedPlace.day || 1
@@ -370,13 +605,14 @@ export default function PlaceDetailModal({
             return Array.from({ length: daysCount }, (_, i) => {
               const d = start + i
               const dayNote = notes.find(n => n.day === d)
-              const isExpanded = expandedDay === d
+              const isCollapsed = collapsedDays.has(d)
+              const isExpanded = !isCollapsed
               const dateInfo = getDayInfo(tripStartDate, d)
 
               return (
                 <div key={`day-notes-${d}`} className="overflow-hidden rounded-xl border border-white/5 bg-white/5">
                   <button
-                    onClick={() => setExpandedDay(isExpanded ? null : d)}
+                    onClick={() => toggleDayCollapse(d)}
                     className={`w-full flex items-center justify-between px-3 py-2 transition-all ${
                       isExpanded ? 'bg-primary/10 text-primary' : 'text-white/60 hover:bg-white/5'
                     }`}
@@ -402,25 +638,24 @@ export default function PlaceDetailModal({
                   {isExpanded && (
                     <div className="p-3 border-t border-white/5 bg-black/20 animate-in slide-in-from-top-1 duration-200">
                       {isEditMode ? (
-                        <FormTextarea
-                          className="min-h-[80px] text-xs bg-transparent border-none p-0 focus:ring-0 shadow-none placeholder-white/10"
-                          value={dayNote?.text || ''}
-                          onChange={(e) => {
-                            const newText = e.target.value
-                            let newNotes = [...notes]
-                            const idx = newNotes.findIndex(n => n.day === d)
-                            if (idx >= 0) {
-                              newNotes[idx] = { ...newNotes[idx], text: newText }
-                            } else {
-                              newNotes.push({ id: Math.random().toString(36).substr(2, 9), day: d, text: newText })
-                            }
-                            setNotes(newNotes)
-                            const updated = { ...updatedPlace, notes: newNotes }
-                            setUpdatedPlace(updated)
-                            if (!isNew) onSave(updated)
-                          }}
-                          placeholder={`Write something for Day ${d}...`}
-                        />
+                        <RichTextEditor
+                            content={dayNote?.text || ''}
+                            onChange={(newText) => {
+                              let newNotes = [...notes]
+                              const idx = newNotes.findIndex(n => n.day === d)
+                              if (idx >= 0) {
+                                newNotes[idx] = { ...newNotes[idx], text: newText }
+                              } else {
+                                newNotes.push({ id: Math.random().toString(36).substr(2, 9), day: d, text: newText })
+                              }
+                              setNotes(newNotes)
+                              const updated = { ...updatedPlace, notes: newNotes }
+                              setUpdatedPlace(updated)
+                              if (!isNew) onSave(updated)
+                            }}
+                            placeholder={`Write something for Day ${d}...`}
+                            showToolbar={true}
+                          />
                       ) : (
                         <div className="text-xs">
                           {dayNote?.text ? renderNoteText(dayNote.text, dayNote.id) : (
@@ -444,10 +679,12 @@ export default function PlaceDetailModal({
         </FormLabel>
         <MediaGrid
           photos={updatedPlace.photos || []}
+          photoDays={(updatedPlace.photos || []).map((_, i) => updatedPlace.photoDays?.[i] ?? currentMediaDay)}
           editing={isEditMode}
-          onMediaClick={(idx) => openViewer(updatedPlace.photos!, idx)}
+          onMediaClick={(idx) => openViewer(updatedPlace.photos!, idx, updatedPlace.photoDays)}
           onRemove={handleRemovePhoto}
           onAdd={() => setIsImageSearchOpen(true)}
+          onUpload={handleUploadPhoto}
         />
       </div>
 
@@ -470,6 +707,7 @@ export default function PlaceDetailModal({
             }}
             onTimeChange={handleArrivalChange}
             disabled={!isEditMode}
+            timeFormat={timeFormat}
           />
           
           <DateTimeSelector
@@ -485,15 +723,29 @@ export default function PlaceDetailModal({
             }}
             onTimeChange={handleDepartureChange}
             disabled={!isEditMode}
+            timeFormat={timeFormat}
           />
         </div>
       </div>
 
       {/* 4. Accommodation */}
       <div className="space-y-4 pb-4 border-b border-white/10">
-        <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-base">bed</span> Accommodation
-        </FormLabel>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">bed</span> Accommodation
+          </FormLabel>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => handleAddAttachment('accommodation')}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 hover:bg-yellow-400/20 transition-colors"
+              title="Add Accommodation"
+            >
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span className="material-symbols-outlined text-xs text-yellow-400">bed</span>
+            </button>
+          )}
+        </div>
         <div className="space-y-3">
           {updatedPlace.accommodations?.map((acc, idx) => (
             <FormListItem key={acc.id || `acc-${idx}`} onDelete={isEditMode ? () => handleDeleteAccommodation(acc.id) : undefined} className="group border-yellow-400/20" onClick={() => setAttachmentDetail({ type: 'accommodation', accommodation: acc })}>
@@ -510,10 +762,10 @@ export default function PlaceDetailModal({
                         return (
                           <>
                             {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
-                            {acc.checkIn}
+                            {formatTime(acc.checkIn, timeFormat)}
                             <span className="mx-1 opacity-50">→</span>
                             {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
-                            {acc.checkOut}
+                            {formatTime(acc.checkOut, timeFormat)}
                           </>
                         )
                       })()}
@@ -531,9 +783,22 @@ export default function PlaceDetailModal({
 
       {/* 5. Activities */}
       <div className="space-y-4 pb-4 border-b border-white/10">
-        <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-base">flag</span> Activities
-        </FormLabel>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">flag</span> Activities
+          </FormLabel>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => handleAddAttachment('event')}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-red-400 bg-red-400/10 border border-red-400/20 hover:bg-red-400/20 transition-colors"
+              title="Add Activity"
+            >
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span className="material-symbols-outlined text-xs text-red-400">flag</span>
+            </button>
+          )}
+        </div>
         <div className="space-y-3">
           {updatedPlace.events?.map((event, idx) => (
             <FormListItem key={event.id || `event-${idx}`} onDelete={isEditMode ? () => handleDeleteEvent(event.id) : undefined} className="group border-red-400/20" onClick={() => setAttachmentDetail({ type: 'event', event })}>
@@ -543,7 +808,24 @@ export default function PlaceDetailModal({
                   <p className="text-white text-xs font-bold truncate mb-0.5">{event.title}</p>
                   <div className="flex items-center gap-2">
                     <span className="text-white/60 text-[10px] font-mono flex items-center">
-                      {formatTime12h(event.time || '')}
+                      {(() => {
+                        const start = event.day || updatedPlace.day || 1
+                        const end = event.endDay || event.day || updatedPlace.day || 1
+                        const isMulti = end > start
+                        return (
+                          <>
+                            {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
+                            {formatTime(event.time || '', timeFormat)}
+                            {event.endTime && (
+                              <>
+                                <span className="mx-1 opacity-50">→</span>
+                                {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
+                                {formatTime(event.endTime, timeFormat)}
+                              </>
+                            )}
+                          </>
+                        )
+                      })()}
                     </span>
                   </div>
                 </div>
@@ -558,9 +840,24 @@ export default function PlaceDetailModal({
 
       {/* 6. Documents */}
       <div className="space-y-4 pb-4 border-b border-white/10">
-        <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-base">folder_open</span> Documents
-        </FormLabel>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">folder_open</span> Documents
+          </FormLabel>
+          {isEditMode && (
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => handleAddAttachment('document')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/20 hover:bg-blue-400/20 transition-colors"
+                title="Add Document"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span className="material-symbols-outlined text-xs text-blue-400">description</span>
+              </button>
+            </div>
+          )}
+        </div>
         <div className="space-y-2">
           {updatedPlace.documents?.map((doc, idx) => (
             <FormListItem key={doc.id || `doc-${idx}`} onDelete={isEditMode ? () => handleDeleteDocument(doc.id) : undefined} className="border-blue-400/20" onClick={() => setAttachmentDetail({ type: 'document', document: doc })}>
@@ -574,6 +871,33 @@ export default function PlaceDetailModal({
             </FormListItem>
           ))}
 
+          {!updatedPlace.documents?.length && (
+            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents added</p>
+          )}
+        </div>
+      </div>
+
+      {/* 7. URLs & Links */}
+      <div className="space-y-4 pb-4 border-b border-white/10">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">link</span> URLs & Links
+          </FormLabel>
+          {isEditMode && (
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <button
+                type="button"
+                onClick={() => handleAddAttachment('link')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 hover:bg-cyan-400/20 transition-colors"
+                title="Add URL"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span className="material-symbols-outlined text-xs text-cyan-400">link</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="space-y-2">
           {updatedPlace.links?.map((link, idx) => (
             <FormListItem key={link.id || `link-${idx}`} onDelete={isEditMode ? () => handleDeleteLink(link.id) : undefined} className="border-cyan-400/20" onClick={() => setAttachmentDetail({ type: 'link', link })}>
               <div className="flex items-center gap-3 w-full p-1">
@@ -585,17 +909,30 @@ export default function PlaceDetailModal({
             </FormListItem>
           ))}
 
-          {!updatedPlace.documents?.length && !updatedPlace.links?.length && (
-            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents or links</p>
+          {!updatedPlace.links?.length && (
+            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No links added</p>
           )}
         </div>
       </div>
 
-      {/* 6. Transport Section */}
+      {/* 8. Transport Section */}
       <div className="space-y-4 pb-8">
-        <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-base">commute</span> Transport
-        </FormLabel>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">commute</span> Transport
+          </FormLabel>
+          {isEditMode && !isNew && onAddTransport && (
+            <button
+              type="button"
+              onClick={handleAddTransport}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 transition-colors"
+              title="Add Transport"
+            >
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span className="material-symbols-outlined text-xs text-emerald-400">commute</span>
+            </button>
+          )}
+        </div>
         {(() => {
           const globalIndex = allPlaces.findIndex(p => p.id === place.id);
           if (globalIndex === -1) return null;
@@ -608,26 +945,46 @@ export default function PlaceDetailModal({
                 <div key={`inbound-${leg.id || idx}`} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between group cursor-pointer hover:bg-white/10 transition-all" onClick={() => onOpenTransport(leg, inboundSource.name, place.name)}>
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-primary">login</span>
-                    <div>
-                      <p className="text-[10px] text-white/40 font-bold">Arrival from {inboundSource.name}</p>
-                      <p className="text-xs text-white font-medium">{leg.mode} • {leg.arrival}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-white/40 font-bold truncate">Arrival from {inboundSource.name}</p>
+                      <p className="text-xs text-white font-medium truncate">{leg.mode} • {leg.arrival}</p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-white/20 group-hover:text-primary transition-colors">chevron_right</span>
+                  <div className="flex items-center gap-3 relative w-6 h-6 flex-shrink-0">
+                    <span className={`material-symbols-outlined absolute inset-0 flex items-center justify-center text-white/20 transition-all ${isEditMode ? 'group-hover:opacity-0 group-hover:scale-75' : 'group-hover:text-primary'}`}>chevron_right</span>
+                    {isEditMode && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTransport(leg.id, inboundSource.id); }}
+                        className="absolute inset-0 flex items-center justify-center text-neutral-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 group-hover:scale-110"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {outboundLegs.map((leg, idx) => {
                 const destination = allPlaces.find(p => p.id === leg.to);
                 return (
                   <div key={`outbound-${leg.id || idx}`} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between group cursor-pointer hover:bg-white/10 transition-all" onClick={() => onOpenTransport(leg, place.name, destination?.name || 'Unknown')}>
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-green-400">logout</span>
-                      <div>
-                        <p className="text-[10px] text-white/40 font-bold">Departure to {destination?.name || 'Next'}</p>
-                        <p className="text-xs text-white font-medium">{leg.mode} • {leg.departure}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="material-symbols-outlined text-green-400 shrink-0">logout</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-white/40 font-bold truncate">Departure to {destination?.name || 'Next'}</p>
+                        <p className="text-xs text-white font-medium truncate">{leg.mode} • {leg.departure}</p>
                       </div>
                     </div>
-                    <span className="material-symbols-outlined text-white/20 group-hover:text-green-400 transition-colors">chevron_right</span>
+                    <div className="flex items-center gap-3 relative w-6 h-6 flex-shrink-0">
+                      <span className={`material-symbols-outlined absolute inset-0 flex items-center justify-center text-white/20 transition-all ${isEditMode ? 'group-hover:opacity-0 group-hover:scale-75' : 'group-hover:text-green-400'}`}>chevron_right</span>
+                      {isEditMode && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteTransport(leg.id, place.id); }}
+                          className="absolute inset-0 flex items-center justify-center text-neutral-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 group-hover:scale-110"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -650,11 +1007,11 @@ export default function PlaceDetailModal({
         showDayNumbers={true}
         showControls={true}
         mapStyle={mapStyle}
-        onPlaceClick={(pid) => {
-          if (pid === place.id) return;
-          const target = allPlaces.find(p => p.id === pid);
-          if (target) onOpenPlace(target);
+        onMarkerClick={(p) => {
+          if (p.id === place.id) return;
+          onOpenPlace(p);
         }}
+        onMapClick={onMapClick}
       />
     </div>
   )
@@ -665,6 +1022,7 @@ export default function PlaceDetailModal({
       <BaseDetailModal
         isOpen={true}
         onClose={onClose}
+        isEditMode={isEditMode}
         title={updatedPlace.name}
         subtitle={updatedPlace.location || (isNew ? "Set details for your new destination" : "No address set")}
         icon="location_on"
@@ -684,34 +1042,52 @@ export default function PlaceDetailModal({
         rightColumn={rightColumnContent}
         footer={
           <div className="flex items-center justify-between w-full gap-3">
-            <Button
-              variant="modal-danger"
-              icon="delete"
-              onClick={() => setDeleteConfirm({
-                isOpen: true,
-                title: 'Delete Place?',
-                message: `Are you sure you want to delete "${updatedPlace.name}"? This will also delete all associated accommodations, events, and transport legs.`,
-                onConfirm: () => {
-                  onDelete?.();
-                  onClose();
-                }
-              })}
-            >
-              Delete
-            </Button>
+            {isEditMode && onDelete ? (
+              <Button
+                variant="modal-danger"
+                icon="delete"
+                onClick={() => setDeleteConfirm({
+                  isOpen: true,
+                  title: 'Delete Place?',
+                  message: `Are you sure you want to delete "${updatedPlace.name}"? This will also delete all associated accommodations, events, and transport legs.`,
+                  onConfirm: () => {
+                    onDelete?.();
+                    onClose();
+                  }
+                })}
+              >
+                Delete
+              </Button>
+            ) : null}
             <div className="flex-1" />
             <div className="flex items-center gap-3">
               {isEditMode ? (
                 <React.Fragment key="edit-mode-actions">
-                  <Button variant="modal-secondary" onClick={() => setIsEditMode(false)}>Cancel</Button>
+                  <button 
+                    onClick={() => setIsEditMode(false)}
+                    className="px-4 py-2 rounded-xl text-neutral-400 hover:text-white hover:bg-white/5 transition-all text-sm font-medium active:scale-95"
+                  >
+                    Cancel
+                  </button>
                   <Button variant="modal-primary" icon="check_circle" onClick={() => {
                     onSave(updatedPlace)
+                    onClose()
                     setIsEditMode(false)
                   }}>Save Changes</Button>
                 </React.Fragment>
               ) : (
                 <React.Fragment key="view-mode-actions">
-                  <Button variant="modal-secondary" icon="edit" onClick={() => setIsEditMode(true)}>Edit Details</Button>
+                  <button 
+                    onClick={(e) => {
+                      const el = e.currentTarget;
+                      el.classList.add('animate-[spin_0.3s_ease-out]');
+                      setTimeout(() => setIsEditMode(true), 150);
+                    }}
+                    className="group flex items-center justify-center w-10 h-10 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                    title="Edit Details"
+                  >
+                    <span className="material-symbols-outlined text-[20px] transition-transform duration-300 group-hover:rotate-12 group-active:-rotate-45">edit</span>
+                  </button>
                   <Button variant="modal-primary" onClick={onClose}>Close</Button>
                 </React.Fragment>
               )}
@@ -722,10 +1098,7 @@ export default function PlaceDetailModal({
 
       {mediaViewer && (
         <MediaViewer
-          items={mediaViewer.items.map(url => ({
-            url,
-            type: url.match(/\.(mp4|webm|ogg)$/i) ? 'video' : 'image'
-          }))}
+          items={mediaViewer.items}
           initialIndex={mediaViewer.index}
           onClose={() => setMediaViewer(null)}
         />
@@ -735,6 +1108,7 @@ export default function PlaceDetailModal({
         <AttachmentDetailModal
           data={attachmentDetail}
           isEditMode={isEditMode}
+          placeId={updatedPlace.id}
           placeName={updatedPlace.name}
           placeCoords={updatedPlace.lat && updatedPlace.lng ? { lat: updatedPlace.lat, lng: updatedPlace.lng } : undefined}
           placeStartDay={updatedPlace.day || 1}
@@ -802,10 +1176,16 @@ export default function PlaceDetailModal({
                     <button
                       key={index}
                       onClick={() => {
-                        const newPhotos = isSelected 
+                        const isRemoving = isSelected;
+                        const newPhotos = isRemoving 
                           ? updatedPlace.photos?.filter(p => p !== url) 
                           : [...(updatedPlace.photos || []), url]
-                        const updated = { ...updatedPlace, photos: newPhotos }
+                        
+                        const newPhotoDays = isRemoving
+                          ? (updatedPlace.photoDays || []).filter((_, i) => updatedPlace.photos?.[i] !== url)
+                          : [...(updatedPlace.photoDays || []), currentMediaDay]
+
+                        const updated = { ...updatedPlace, photos: newPhotos, photoDays: newPhotoDays }
                         setUpdatedPlace(updated)
                         if (!isNew) onSave(updated)
                       }}

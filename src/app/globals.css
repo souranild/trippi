@@ -118,6 +118,125 @@
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5), inset 0 -1px 0 0 rgba(255, 255, 255, 0.05);
 }
 
+/* Rich Text Rendering (Tiptap / Prose) */
+.prose-renderer {
+  color: rgba(255, 255, 255, 0.9);
+}
+.prose-renderer p {
+  margin-bottom: 0.15rem;
+}
+.prose-renderer p:last-child {
+  margin-bottom: 0;
+}
+.prose-renderer ul, .prose-renderer ol {
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+.prose-renderer ul {
+  list-style-type: disc;
+}
+.prose-renderer ol {
+  list-style-type: decimal;
+}
+.prose-renderer b, .prose-renderer strong {
+  font-weight: 800;
+  color: #8ff5ff;
+}
+.prose-renderer i, .prose-renderer em {
+  font-style: italic;
+  opacity: 0.9;
+}
+.prose-renderer u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-renderer s, .prose-renderer strike {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.prose-renderer ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.prose-renderer ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.prose-renderer ul[data-type="taskList"] li label {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+.prose-renderer ul[data-type="taskList"] li input[type="checkbox"] {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+.prose-renderer ul[data-type="taskList"] li input[type="checkbox"]:checked {
+  background: #8ff5ff;
+  border-color: #8ff5ff;
+}
+.prose-renderer ul[data-type="taskList"] li input[type="checkbox"]:checked::after {
+  content: 'check';
+  font-family: 'Material Symbols Outlined';
+  font-size: 10px;
+  color: black;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 900;
+}
+.prose-renderer ul[data-type="taskList"] li div {
+  flex: 1 1 auto;
+}
+.prose-renderer ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+.prose-renderer blockquote {
+  border-left: 2px solid #8ff5ff;
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  font-style: italic;
+  color: rgba(143, 245, 255, 0.8);
+  background: rgba(143, 245, 255, 0.05);
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  border-radius: 0 4px 4px 0;
+}
+.prose-renderer pre {
+  background: #000;
+  color: #fff;
+  font-family: monospace;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4rem;
+  margin: 0.75rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+}
+.prose-renderer code {
+  color: #8ff5ff;
+  background: rgba(143, 245, 255, 0.1);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.2rem;
+  font-size: 0.85em;
+}
+.prose-renderer pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+}
+
 .brushed-chrome {
   background: linear-gradient(145deg, #262626 0%, #131313 100%);
   border-top: 1px solid rgba(143, 245, 255, 0.2);
@@ -266,7 +385,7 @@ body {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(24px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -450,4 +569,111 @@ body {
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* Edit Mode Construction Tape Animation */
+@keyframes scroll-tape-left {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -28.284px 0;
+  }
+}
+
+@keyframes scroll-tape-right {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28.284px 0;
+  }
+}
+
+@keyframes hammer {
+  0% { transform: rotate(0deg) translate(0, 0); }
+  15% { transform: rotate(-35deg) translate(2px, -2px); }
+  30% { transform: rotate(0deg) translate(0, 0); }
+  45% { transform: rotate(-35deg) translate(2px, -2px); }
+  60% { transform: rotate(0deg) translate(0, 0); }
+  100% { transform: rotate(0deg) translate(0, 0); }
+}
+
+.animate-scroll-tape-left {
+  animation: scroll-tape-left 5s linear infinite;
+}
+
+.animate-scroll-tape-right {
+  animation: scroll-tape-right 5s linear infinite;
+}
+
+/* Modal Exit Animation - Falling Glass */
+@keyframes fall-down-glass {
+  0% {
+    transform: translateY(0) rotateX(0) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  40% {
+    transform: translateY(20px) rotateX(-10deg) scale(0.95);
+    opacity: 0.8;
+    filter: brightness(1.2);
+  }
+  100% {
+    transform: translateY(100vh) rotateX(-45deg) rotateY(20deg) scale(0.8);
+    opacity: 0;
+    filter: brightness(1.5) blur(10px);
+  }
+}
+
+.animate-fall-down-glass {
+  animation: fall-down-glass 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+/* Compact Mode Styles */
+.compact-mode #itinerary-card .p-5 {
+  padding: 0.75rem 1.25rem !important;
+}
+
+.compact-mode .space-y-8 {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse))) !important;
+  margin-bottom: calc(1rem * var(--tw-space-y-reverse)) !important;
+}
+
+.compact-mode .space-y-6 {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse))) !important;
+  margin-bottom: calc(0.75rem * var(--tw-space-y-reverse)) !important;
+}
+
+.compact-mode .gap-8 {
+  gap: 1rem !important;
+}
+
+.compact-mode .gap-6 {
+  gap: 0.75rem !important;
+}
+
+.compact-mode .p-6 {
+  padding: 1rem !important;
+}
+
+.compact-mode .p-4 {
+  padding: 0.75rem !important;
+}
+
+.compact-mode .text-lg {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+}
+
+.compact-mode .text-sm {
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.compact-mode .h-48, 
+.compact-mode .h-64 {
+  height: 120px !important;
 }

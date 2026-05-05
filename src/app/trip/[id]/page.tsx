@@ -8,6 +8,7 @@ import { Trip, loadTrips, updateTrip, updatePlace, removePlace, Document, Link a
 import { useTrips } from '@/context/TripContext'
 import EmojiAvatar from '@/components/EmojiAvatar'
 import { searchWallpapers, getRandomPlaceholder, searchWikipediaImages } from '@/lib/wallpaper-search'
+import { toggleHtmlCheckbox } from '@/lib/rich-text-utils'
 import TripForm from '@/components/TripForm'
 import TimePicker from '@/components/TimePicker'
 import PlaceForm from '@/components/PlaceForm'
@@ -36,22 +37,16 @@ import AttachmentDetailModal, { type AttachmentDetailData } from '@/components/A
 import AppHeader from '@/components/AppHeader'
 import ItineraryTable from '@/components/ItineraryTable'
 import MediaViewer from '@/components/MediaViewer'
-import { formatDate, formatDuration, formatDateShort } from '@/lib/date-utils'
+import { formatDate, formatDuration, formatDateShort, formatTime } from '@/lib/date-utils'
+import { isSameDay } from 'date-fns'
+import CalendarView from '@/components/CalendarView'
 import LocationPickerModal from '@/components/LocationPickerModal'
 
+// Kept for backward compat — prefer formatTime() from date-utils everywhere
 function formatTime12h(time: string): string {
-  if (!time) return ''
-  const m24 = time.match(/^(\d{1,2}):(\d{2})$/)
-  if (m24) {
-    let h = parseInt(m24[1])
-    const min = m24[2]
-    const period = h >= 12 ? 'PM' : 'AM'
-    if (h === 0) h = 12
-    else if (h > 12) h -= 12
-    return `${h}:${min} ${period}`
-  }
-  return time
+  return formatTime(time, timeFormatRef.current)
 }
+const timeFormatRef = { current: '12h' as '12h' | '24h' }
 
 const emojis = [
   '✈️', '🏖️', '🏔️', '🏙️', '🌴', '🏰', '🗽', '🗼', '🎭', '🍜', '🏃', '🎨', '🎵', '🍷', '🏂', '🚀',
@@ -79,7 +74,7 @@ export default function TripDetail() {
   const [places, setPlaces] = useState<Place[]>([])
   
   // -- View State --
-  const [itineraryViewMode, setItineraryViewMode] = useState<'timeline' | 'table'>('timeline')
+  const [itineraryViewMode, setItineraryViewMode] = useState<'timeline' | 'calendar' | 'table'>('timeline')
   const [showMap, setShowMap] = useState(true)
   const [showPlaces, setShowPlaces] = useState(true)
   const [showTransports, setShowTransports] = useState(true)
@@ -87,7 +82,13 @@ export default function TripDetail() {
   const [showEvents, setShowEvents] = useState(true)
   const [showDocuments, setShowDocuments] = useState(true)
   const [showLinks, setShowLinks] = useState(true)
+  const [showNotes, setShowNotes] = useState(true)
+  const [compactMode, setCompactMode] = useState(false)
+  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('12h')
+  const [distanceUnit, setDistanceUnit] = useState<'metric' | 'imperial'>('metric')
+  const [timezone, setTimezone] = useState('auto')
   const [isViewSettingsOpen, setIsViewSettingsOpen] = useState(false)
+  const [now, setNow] = useState(new Date())
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [mobileStep, setMobileStep] = useState<1 | 2>(1)
@@ -140,10 +141,15 @@ export default function TripDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(65); // Percentage
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [mediaViewer, setMediaViewer] = useState<{ items: string[]; index: number } | null>(null)
   const [previewWallpaper, setPreviewWallpaper] = useState<string | null>(null)
   const [wallpaperOpacity, setWallpaperOpacity] = useState(1)
+  const [isDiscovering, setIsDiscovering] = useState(false)
+  const [suggestedDiscoveries, setSuggestedDiscoveries] = useState<PlaceSearchHit[]>([])
 
   // -- Callbacks (Order is Important!) --
 
@@ -241,6 +247,7 @@ export default function TripDetail() {
       departure: suggestedDeparture,
       notes: place.description ? [{ day: newPlaceDay, text: place.description }] : [],
       events: [],
+      accommodations: [],
       photos: place.images || (place.image ? [place.image] : []),
       documents: [],
       links: []
@@ -530,6 +537,15 @@ export default function TripDetail() {
     reader.readAsDataURL(file)
   }
   
+  // Keep timeFormatRef in sync with state so formatTime12h uses it
+  useEffect(() => { timeFormatRef.current = timeFormat }, [timeFormat])
+
+  // Live clock — update every 30s
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
   // Load settings from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(`trip_settings_${id}`)
@@ -543,6 +559,11 @@ export default function TripDetail() {
         if (settings.showEvents !== undefined) setShowEvents(settings.showEvents)
         if (settings.showDocuments !== undefined) setShowDocuments(settings.showDocuments)
         if (settings.showLinks !== undefined) setShowLinks(settings.showLinks)
+        if (settings.showNotes !== undefined) setShowNotes(settings.showNotes)
+        if (settings.compactMode !== undefined) setCompactMode(settings.compactMode)
+        if (settings.timeFormat !== undefined) setTimeFormat(settings.timeFormat)
+        if (settings.distanceUnit !== undefined) setDistanceUnit(settings.distanceUnit)
+        if (settings.timezone !== undefined) setTimezone(settings.timezone)
       } catch (e) {
         console.error('Failed to parse trip settings', e)
       }
@@ -552,16 +573,12 @@ export default function TripDetail() {
   // Save settings to localStorage when they change
   useEffect(() => {
     const settings = {
-      showPlaces,
-      showTransports,
-      showMap,
-      showAccommodations,
-      showEvents,
-      showDocuments,
-      showLinks
+      showPlaces, showTransports, showMap, showAccommodations,
+      showEvents, showDocuments, showLinks, showNotes,
+      compactMode, timeFormat, distanceUnit, timezone
     }
     localStorage.setItem(`trip_settings_${id}`, JSON.stringify(settings))
-  }, [showPlaces, showTransports, showMap, showAccommodations, showEvents, showDocuments, showLinks, id])
+  }, [showPlaces, showTransports, showMap, showAccommodations, showEvents, showDocuments, showLinks, showNotes, compactMode, timeFormat, distanceUnit, timezone, id])
   
   const editModalScrollRef = useRef<HTMLDivElement>(null)
   
@@ -883,6 +900,8 @@ export default function TripDetail() {
     setEventDate('')
     setEventTime('')
     setEventEndTime('')
+    setEventDay(1)
+    setEventEndDay(1)
   }
 
   // Apply a fully-formed transport leg (called by TransportDetailModal onSave)
@@ -1008,6 +1027,24 @@ export default function TripDetail() {
         const loadedPlaces = migratePlaces(found.places || [])
         setPlaces(loadedPlaces)
         
+        // Load settings
+        if (found.settings) {
+          if (found.settings.showTransports !== undefined) setShowTransports(found.settings.showTransports)
+          if (found.settings.showPlaces !== undefined) setShowPlaces(found.settings.showPlaces)
+          if (found.settings.showMap !== undefined) setShowMap(found.settings.showMap)
+          if (found.settings.showAccommodations !== undefined) setShowAccommodations(found.settings.showAccommodations)
+          if (found.settings.showEvents !== undefined) setShowEvents(found.settings.showEvents)
+          if (found.settings.showDocuments !== undefined) setShowDocuments(found.settings.showDocuments)
+          if (found.settings.showLinks !== undefined) setShowLinks(found.settings.showLinks)
+          if (found.settings.showNotes !== undefined) setShowNotes(found.settings.showNotes)
+          if (found.settings.compactMode !== undefined) setCompactMode(found.settings.compactMode)
+          if (found.settings.timeFormat !== undefined) {
+             setTimeFormat(found.settings.timeFormat)
+             timeFormatRef.current = found.settings.timeFormat
+          }
+          if (found.settings.distanceUnit !== undefined) setDistanceUnit(found.settings.distanceUnit)
+        }
+
         // If no places exist, default to Edit mode
         if (loadedPlaces.length === 0) {
           setIsEditMode(true)
@@ -1131,6 +1168,91 @@ export default function TripDetail() {
     return { day, placeId: `day-${day}-place-${activePlace ? activePlace.id : ''}` };
   };
 
+  const renderNoteText = (text: string, place: Place, dayNum: number) => {
+    if (!text) return null;
+    
+    const commitPlaceUpdate = (p: Place) => {
+      const newPlaces = [...places];
+      const idx = newPlaces.findIndex(pl => pl.id === p.id);
+      if (idx !== -1) {
+        newPlaces[idx] = p;
+        setPlaces(newPlaces);
+        updateTrip?.(trip!.id, { places: newPlaces });
+      }
+    };
+
+    // If it looks like HTML, render it directly with the prose-renderer class
+    if (text.trim().startsWith('<')) {
+      return (
+        <div 
+          className="prose-renderer text-[11px] leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: text }}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox') {
+              e.stopPropagation();
+              const container = e.currentTarget;
+              const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+              const index = checkboxes.indexOf(target as HTMLInputElement);
+              
+              if (index !== -1) {
+                const updatedText = toggleHtmlCheckbox(text, index);
+                const updatedPlace = {
+                  ...place,
+                  notes: place.notes?.map(n => n.day === dayNum ? { ...n, text: updatedText } : n)
+                };
+                commitPlaceUpdate(updatedPlace);
+              }
+            }
+          }}
+        />
+      )
+    }
+
+    const parts = text.split(/(\[[ xX]\])/g)
+    let checkpointIdx = 0
+    return (
+      <div className="space-y-1">
+        {parts.map((part, i) => {
+          if (part.match(/\[[ xX]\]/)) {
+            const idx = checkpointIdx++
+            const isChecked = part.toLowerCase() === '[x]'
+            return (
+              <button
+                key={i}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const allCheckboxes = text.match(/\[[ xX]\]/g) || [];
+                  let currentIdx = 0;
+                  const updatedText = text.replace(/\[[ xX]\]/g, (match) => {
+                    if (currentIdx++ === idx) {
+                      return isChecked ? '[ ]' : '[x]';
+                    }
+                    return match;
+                  });
+                  
+                  const updatedPlace = {
+                    ...place,
+                    notes: place.notes?.map(n => n.day === dayNum ? { ...n, text: updatedText } : n)
+                  };
+                  commitPlaceUpdate(updatedPlace);
+                }}
+                className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded border transition-all mr-2 align-middle ${
+                  isChecked 
+                    ? 'bg-primary border-primary text-slate-950 shadow-[0_0_8px_rgba(143,245,255,0.5)]' 
+                    : 'border-white/20 bg-white/5 text-transparent hover:border-primary/50'
+                }`}
+              >
+                {isChecked && <span className="material-symbols-outlined text-[10px] font-black">check</span>}
+              </button>
+            )
+          }
+          return <span key={i} className="text-neutral-400">{part}</span>
+        })}
+      </div>
+    )
+  };
+
   // Robust Scroll-to Handler with polling
   useEffect(() => {
     const scrollId = searchParams.get('scrollTo')
@@ -1199,6 +1321,7 @@ export default function TripDetail() {
       )}
       <AppHeader 
         onBack={() => router.push('/')}
+        isEditMode={isEditMode}
         className={isScrolled ? 'bg-neutral-900/80 border-b border-white/10 transition-all duration-300' : 'transition-all duration-300'}
         left={isScrolled ? (
           <div className="flex items-center gap-1.5 sm:gap-2 max-w-[120px] xs:max-w-[200px] sm:max-w-md animate-in slide-in-from-left duration-500 overflow-hidden">
@@ -1224,28 +1347,32 @@ export default function TripDetail() {
               {!isEditMode && (
                 <button
                   type="button"
-                  disabled={itineraryViewMode === 'table'}
                   onClick={(e) => { e.stopPropagation(); setIsViewSettingsOpen(true); }}
-                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 border border-white/20 text-white hover:bg-primary hover:text-black transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 border border-white/20 text-white hover:bg-primary hover:text-black transition-all active:scale-90"
                   title="View Settings"
                 >
                   <span className="material-symbols-outlined text-sm sm:text-[20px]">settings</span>
                 </button>
               )}
-              <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 sm:p-1">
+              <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 sm:p-1 relative">
                 <button
                   type="button"
                   onClick={() => setIsEditMode(false)}
-                  className={`rounded-full px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold transition-all ${!isEditMode ? 'bg-white text-slate-950' : 'text-neutral-400 hover:text-white'}`}
+                  className={`rounded-full px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold transition-all ${!isEditMode ? 'bg-white text-slate-950 shadow-lg' : 'text-neutral-400 hover:text-white'}`}
                 >
                   Trip
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsEditMode(true)}
-                  className={`rounded-full px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold transition-all ${isEditMode ? 'bg-primary text-slate-950' : 'text-neutral-400 hover:text-white'}`}
+                  className={`rounded-full px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold transition-all relative ${isEditMode ? 'bg-primary text-slate-950 shadow-lg' : 'text-neutral-400 hover:text-white'}`}
                 >
                   Edit
+                  {isEditMode && (
+                    <div className="absolute -top-4 -right-1 pointer-events-none animate-[hammer_1.2s_infinite] z-[100]">
+                      <span className="material-symbols-outlined text-[16px] text-yellow-400 font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">hammer</span>
+                    </div>
+                  )}
                 </button>
               </div>
             </div>
@@ -1330,9 +1457,28 @@ export default function TripDetail() {
           </div>
 
           {/* Three Main Sections */}
-          <div className={`${showMap ? "grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8 items-start" : "max-w-3xl mx-auto w-full"} transition-all duration-500 min-w-0`}>
+          <div 
+            ref={containerRef}
+            className={`${showMap ? "grid grid-cols-1 lg:grid-cols-[var(--left-width)_minmax(0,1fr)]" : "max-w-3xl mx-auto w-full"} min-w-0 gap-0 items-start relative transition-all duration-700 ${isResizing ? 'select-none cursor-col-resize' : ''} ${compactMode ? 'compact-mode' : ''}`}
+            style={{ '--left-width': showMap ? `${leftPanelWidth}%` : '100%' } as React.CSSProperties}
+          >
+            {isResizing && (
+              <div 
+                className="fixed inset-0 z-[1000] cursor-col-resize select-none"
+                onPointerMove={(e) => {
+                  if (!containerRef.current) return;
+                  const rect = containerRef.current.getBoundingClientRect();
+                  const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+                  if (newWidth > 10 && newWidth < 90) {
+                    setLeftPanelWidth(newWidth);
+                    window.dispatchEvent(new Event('resize'));
+                  }
+                }}
+                onPointerUp={() => setIsResizing(false)}
+              />
+            )}
             {/* Section 1: Unified Timeline */}
-            <div className="min-w-0 overflow-hidden">
+            <div className={`min-w-0 overflow-hidden lg:pr-4 transition-all duration-500 ${isEditMode ? 'scale-[0.99] origin-right' : 'scale-100'}`}>
               <div className="bg-neutral-900/30 backdrop-blur-xl border border-white/10 rounded-3xl animate-in slide-in-from-left-4 duration-500 shadow-2xl overflow-hidden" id="itinerary-card">
                 <div className="p-5 border-b border-white/10 flex items-center justify-between">
                   <div>
@@ -1357,10 +1503,25 @@ export default function TripDetail() {
                           title="Timeline View"
                         >
                           <span className="material-symbols-outlined text-xs">timeline</span>
-                        <span className={`overflow-hidden transition-all duration-500 ease-out ${itineraryViewMode === 'timeline' ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}`}>
-                          Timeline
-                        </span>
-                      </button>
+                          <span className={`overflow-hidden transition-all duration-500 ease-out ${itineraryViewMode === 'timeline' ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}`}>
+                            Timeline
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setItineraryViewMode('calendar')}
+                          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-500 ease-out h-[22px] ${
+                            itineraryViewMode === 'calendar'
+                              ? 'bg-primary text-slate-950 shadow-[0_0_15px_rgba(143,245,255,0.3)] scale-100'
+                              : 'text-neutral-500 hover:text-white scale-95'
+                          }`}
+                          title="Calendar View"
+                        >
+                          <span className="material-symbols-outlined text-xs">calendar_month</span>
+                          <span className={`overflow-hidden transition-all duration-500 ease-out ${itineraryViewMode === 'calendar' ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}`}>
+                            Calendar
+                          </span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setItineraryViewMode('table')}
@@ -1372,11 +1533,11 @@ export default function TripDetail() {
                           title="Table View"
                         >
                           <span className="material-symbols-outlined text-xs">table_rows</span>
-                        <span className={`overflow-hidden transition-all duration-500 ease-out ${itineraryViewMode === 'table' ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}`}>
-                          Table
-                        </span>
-                      </button>
-                    </div>
+                          <span className={`overflow-hidden transition-all duration-500 ease-out ${itineraryViewMode === 'table' ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'}`}>
+                            Table
+                          </span>
+                        </button>
+                      </div>
 
                     {trip.startDate && trip.places.length > 0 && (() => {
                     const start = new Date(trip.startDate);
@@ -1443,6 +1604,23 @@ export default function TripDetail() {
                         <p className="text-neutral-400 text-sm">Switch to edit mode to add your first place.</p>
                       )}
                     </div>
+                  ) : itineraryViewMode === 'calendar' ? (
+                    <div className="h-[700px]">
+                      <CalendarView
+                        trip={trip}
+                        places={places}
+                        timeFormat={timeFormat}
+                        onPlaceClick={(p) => {
+                          setEditingPlaceForDetail(p)
+                          setIsPlaceDetailModalOpen(true)
+                        }}
+                        onAddPlace={(day) => {
+                          setNewPlaceDay(day)
+                          setNewPlaceEndDay(day)
+                          handleOpenAddPlace()
+                        }}
+                      />
+                    </div>
                   ) : itineraryViewMode === 'table' ? (
                     <ItineraryTable 
                       trip={trip} 
@@ -1452,7 +1630,6 @@ export default function TripDetail() {
                           setIsPlaceDetailModalOpen(true);
                         } else if (type === 'transport') {
                           setEditingTransportLegId(id);
-                          // Needs to find placeId for transport
                           const place = places.find(p => p.transport?.some(t => t.id === id));
                           if (place) {
                             setIsTransportModalOpen(true);
@@ -1474,11 +1651,19 @@ export default function TripDetail() {
                         <div key={day.dayNumber} id={`day-${day.dayNumber}`} className="relative ml-[15px] transition-all duration-700 rounded-2xl p-2 -m-2">
                           {/* Day Header */}
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <div className="text-xs font-bold text-primary font-mono uppercase tracking-wider">Day {day.dayNumber}</div>
                               <div className="text-sm text-neutral-400">•</div>
                               <div className="text-sm text-neutral-300">{day.formattedDate}</div>
-                              <div className="text-xs text-neutral-500">({day.places.length} place{day.places.length !== 1 ? 's' : ''})</div>
+                              <div className="text-xs text-neutral-500 flex items-center gap-1.5">
+                                ({day.places.length} place{day.places.length !== 1 ? 's' : ''})
+                                {isSameDay(day.date, now) && (
+                                  <span className="inline-flex items-center gap-1 text-primary font-bold ml-1">
+                                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                                    {formatTime(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`, timeFormat)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -1684,13 +1869,13 @@ export default function TripDetail() {
                                               {(place.arrival && day.dayNumber === (place.day || 1)) && (
                                                 <div className="flex items-center gap-0.5">
                                                   <span className="text-[8px] text-neutral-500 uppercase font-bold tracking-tighter leading-none">↓</span>
-                                                  <span className="text-[10px] font-bold text-white font-mono leading-none">{formatTime12h(place.arrival)}</span>
+                                                  <span className="text-[10px] font-bold text-white font-mono leading-none">{formatTime(place.arrival || '', timeFormat)}</span>
                                                 </div>
                                               )}
                                               {(place.departure && day.dayNumber === (place.endDay || place.day || 1)) && (
                                                 <div className="flex items-center gap-0.5">
                                                   <span className="text-[8px] text-neutral-500 uppercase font-bold tracking-tighter leading-none">↑</span>
-                                                  <span className="text-[10px] font-bold text-neutral-400 font-mono leading-none">{formatTime12h(place.departure)}</span>
+                                                  <span className="text-[10px] font-bold text-neutral-400 font-mono leading-none">{formatTime(place.departure || '', timeFormat)}</span>
                                                 </div>
                                               )}
                                             </div>
@@ -1699,10 +1884,10 @@ export default function TripDetail() {
 
 
                                         {/* Place Card Column */}
-                                        <div className="flex-1 flex flex-col gap-1">
+                                        <div className="flex-1 flex flex-col gap-1 min-w-0">
                                           {/* Place Card */}
                                           {showPlaces && (
-                                            <div className={`w-full backdrop-blur-xl border rounded-xl p-4 transition-all duration-300 group cursor-pointer shadow-lg relative overflow-hidden ${isLiveHighlight ? 'bg-primary/10 border-primary ring-2 ring-primary/40 shadow-[0_0_50px_rgba(195,244,0,0.25)] animate-pulse-subtle' : (isEditMode && isLiveBase) ? 'bg-primary/5 border-primary/50 ring-1 ring-primary/20 shadow-[0_0_30px_rgba(195,244,0,0.15)]' : focusedPlaceId === place.id ? 'bg-neutral-800/40 border-primary ring-1 ring-primary/30' : 'bg-neutral-900/20 border-white/10 hover:bg-neutral-800/30'}`}
+                                            <div className={`w-full backdrop-blur-xl border rounded-xl p-4 transition-all duration-300 group cursor-pointer shadow-lg relative overflow-hidden min-w-0 ${isLiveHighlight ? 'bg-primary/10 border-primary ring-2 ring-primary/40 shadow-[0_0_50px_rgba(195,244,0,0.25)] animate-pulse-subtle' : (isEditMode && isLiveBase) ? 'bg-primary/5 border-primary/50 ring-1 ring-primary/20 shadow-[0_0_30px_rgba(195,244,0,0.15)]' : focusedPlaceId === place.id ? 'bg-neutral-800/40 border-primary ring-1 ring-primary/30' : 'bg-neutral-900/20 border-white/10 hover:bg-neutral-800/30'}`}
                                                onClick={() => {
                                                  setFocusedPlaceId(place.id)
                                                  setEditingPlaceForDetail(place)
@@ -1765,24 +1950,18 @@ export default function TripDetail() {
                                                 )}
                                               </div>
                                                   {Array.isArray(place.notes) && place.notes.find(n => n.day === day.dayNumber && n.text) && (
-                                                    <div className="mt-1">
-                                                      <p className="text-[11px] text-neutral-400/80 italic leading-relaxed whitespace-pre-wrap">
-                                                        {(() => {
-                                                          const note = place.notes.find(n => n.day === day.dayNumber)
-                                                          const text = note?.text || ''
-                                                          return text.length > 500 ? `${text.slice(0, 497)}...` : text
-                                                        })()}
-                                                      </p>
+                                                    <div className="mt-3 pt-3 border-t border-white/5">
+                                                      {renderNoteText(place.notes.find(n => n.day === day.dayNumber)?.text || '', place, day.dayNumber)}
                                                     </div>
                                                   )}
 
                                                   {/* Place main photos (Gallery) */}
                                                   {place.photos && place.photos.length > 0 && (day.dayNumber === (place.day || 1)) && (
-                                                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1 custom-scrollbar scroll-smooth no-scrollbar">
+                                                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1 custom-scrollbar scroll-smooth no-scrollbar w-full">
                                                       {place.photos.map((photo, idx) => (
                                                         <div 
                                                           key={idx} 
-                                                          className="relative w-32 h-20 rounded-xl border border-white/10 overflow-hidden shrink-0 group/photo cursor-zoom-in"
+                                                          className="relative w-24 h-16 rounded-lg border border-white/10 overflow-hidden shrink-0 group/photo cursor-zoom-in"
                                                           onClick={(e) => { 
                                                             e.stopPropagation(); 
                                                             openViewer(place.photos!, idx);
@@ -1818,7 +1997,7 @@ export default function TripDetail() {
                                                 const checkInDay = acc.checkInDay || place.day || 1
                                                 const checkOutDay = acc.checkOutDay || place.endDay || place.day || 1
                                                 return day.dayNumber >= checkInDay && day.dayNumber <= checkOutDay
-                                              }) && showAccommodations) || (place.events?.length > 0 && showEvents) || (place.documents?.length > 0 && showDocuments) || (place.links?.length > 0 && showLinks) || isEditMode ? "flex flex-col gap-2 mt-2" : ""}>
+                                              }) && showAccommodations) || (place.events?.length > 0 && showEvents) || (place.documents?.length > 0 && showDocuments) || (place.links?.length > 0 && showLinks) || isEditMode ? "flex flex-col gap-2 mt-3 pt-3 border-t border-white/5" : ""}>
 
                                                 {place.accommodations?.filter(acc => {
                                                   const checkInDay = acc.checkInDay || place.day || 1
@@ -2231,22 +2410,70 @@ export default function TripDetail() {
                     </div>
                   )}
                 </div>
-            </div>
-          </div>
+              </div>
+  
+          {/* Trip Wisdom Section */}
 
-          {/* Section 2: Map Card - Shown on desktop, mobile has floating drawer instead */}
-          {showMap && !isMobile && (
-          <div className="min-w-0 overflow-hidden lg:sticky lg:top-24 h-fit">
-              <div className="bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="p-5 border-b border-white/10 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary text-xl">map</span>
-                    <div>
-                      <h2 className="text-lg font-bold text-white font-headline">Trip Map</h2>
-                      <p className="text-neutral-400 text-xs mt-0.5">Full route and location map</p>
-                    </div>
+
+          {!isEditMode && places.length > 0 && (() => {
+            const WISDOM = [
+              "The world is a book, and those who do not travel read only one page.",
+              "Not all those who wander are lost. But some are definitely just bad at Google Maps.",
+              "Travel is the only thing you buy that makes you richer — and a little jet-lagged.",
+              "A bad day of travel is still better than a good day in the office.",
+              "Life is short and the world is wide. Start packing.",
+              "Jet lag is for amateurs. Real travellers just call it 'timezone expansion'.",
+              "The best souvenir? The stories no one at home will fully understand.",
+              "Every trip changes you. Some for better, some for blisters.",
+              "You can't buy happiness, but you can buy plane tickets. Same thing.",
+              "Travelling — because adulting is overrated, but boarding passes are not.",
+              "Adventure awaits. So does your overweight baggage fee.",
+              "Getting lost is just discovering a place that wasn't on the itinerary.",
+              "The world is too big to stay in one place. Your comfort zone included.",
+              "Collect moments, not things. Except maybe that one fridge magnet.",
+              "Travelling solo teaches you that you were never really alone.",
+            ];
+            const seed = (trip.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+            const quote = WISDOM[seed % WISDOM.length];
+            return (
+              <div className="mt-8 px-4 sm:px-8 py-6 border-t border-white/5 text-center animate-in fade-in duration-700">
+                <p className="text-neutral-600 text-xs uppercase tracking-[0.3em] font-bold mb-2">Trip Wisdom</p>
+                <p className="text-neutral-400 text-sm italic leading-relaxed max-w-xl mx-auto">&ldquo;{quote}&rdquo;</p>
+              </div>
+            )
+          })()}
+        </div>
+
+            {/* Resize Handle */}
+            {showMap && !isMobile && (
+              <div 
+                className={`hidden lg:flex absolute top-0 bottom-0 z-50 cursor-col-resize group items-center justify-center w-8 -translate-x-1/2 hover:opacity-100 transition-opacity ${isResizing ? 'opacity-100' : 'opacity-0'}`}
+                style={{ left: `${leftPanelWidth}%` }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                }}
+              >
+                <div className={`w-0.5 h-full transition-colors ${isResizing ? 'bg-primary' : 'bg-primary/20 group-hover:bg-primary/50'} shadow-[0_0_15px_rgba(143,245,255,0.3)]`} />
+                <div className="absolute top-1/2 -translate-y-1/2 w-6 h-10 rounded-full bg-neutral-900 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+                  <div className="w-0.5 h-3 bg-white/20 rounded-full" />
+                  <div className="w-0.5 h-3 bg-white/20 rounded-full" />
+                </div>
+              </div>
+            )}
+
+            {showMap && !isMobile && (
+              <div className={`min-w-0 overflow-hidden lg:sticky lg:top-24 h-fit lg:pl-4 transition-all duration-500 ${isEditMode ? 'scale-[0.99] origin-left' : 'scale-100'}`}>
+            <div className="bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-primary text-xl">map</span>
+                  <div>
+                    <h2 className="text-lg font-bold text-white font-headline">Trip Map</h2>
+                    <p className="text-neutral-400 text-xs mt-0.5">Full route and location map</p>
                   </div>
                 </div>
+              </div>
                 {places.length > 0 ? (
                   <div className="relative">
                     <MapSlot 
@@ -2278,11 +2505,10 @@ export default function TripDetail() {
                 )}
               </div>
             </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Floating Mobile Map Button */}
+      {/* Floating Mobile Map Button */}
         {showMap && isMobile && (
           <button
             onClick={() => setIsMobileMapOpen(true)}
@@ -2376,6 +2602,7 @@ export default function TripDetail() {
             </div>
           </div>
         )}
+      </div>
       </main>
 
 
@@ -2787,6 +3014,51 @@ export default function TripDetail() {
 
 
       {/* Place Detail Modal - New unified modal for viewing and editing place details */}
+
+      {/* Edit Mode Background Overlay (Mario Maker style blueprint) */}
+      <div 
+        className={`fixed inset-0 pointer-events-none transition-all duration-1000 ease-in-out z-0 ${
+          isEditMode ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px',
+          backgroundPosition: 'center center'
+        }}
+      />
+
+      {/* Construction Tapes for Edit Mode - Unified with Modal Style */}
+      {/* Top Tape */}
+      <div 
+        className={`fixed top-16 left-0 right-0 h-2 z-40 overflow-hidden backdrop-blur-sm bg-black/20 border-b border-yellow-500/20 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          isEditMode ? 'translate-y-0' : '-translate-y-[calc(100%+64px)]'
+        }`}
+      >
+        <div 
+          className="w-[200%] h-full animate-scroll-tape-left opacity-90"
+          style={{
+            background: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #000 12px, #000 24px)'
+          }}
+        />
+      </div>
+      
+      {/* Bottom Tape */}
+      <div 
+        className={`fixed bottom-0 left-0 right-0 h-2 z-[2000] overflow-hidden backdrop-blur-sm bg-black/20 border-t border-yellow-500/20 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+          isEditMode ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        <div 
+          className="w-[200%] h-full animate-scroll-tape-right opacity-90"
+          style={{
+            background: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #000 12px, #000 24px)'
+          }}
+        />
+      </div>
+
       {isPlaceDetailModalOpen && editingPlaceForDetail && trip && (
         <PlaceDetailModal
           place={editingPlaceForDetail}
@@ -2827,6 +3099,7 @@ export default function TripDetail() {
           onEditLocation={() => setIsPlaceSearchOpen(true)}
           allPlaces={places}
           mapStyle={trip.mapStyle}
+          timeFormat={timeFormat}
         />
       )}
 
@@ -2854,6 +3127,7 @@ export default function TripDetail() {
           }}
           onEditLocation={() => setIsPlaceSearchOpen(true)}
           mapStyle={trip.mapStyle}
+          timeFormat={timeFormat}
         />
       )}
 
@@ -3026,109 +3300,300 @@ export default function TripDetail() {
       {/* Trip View Settings Modal */}
       {isViewSettingsOpen && (
         <ModalBackdrop onClick={() => setIsViewSettingsOpen(false)}>
-          <ModalContainer>
+          <ModalContainer size="md">
             <ModalHeader title="Trip View Settings" onClose={() => setIsViewSettingsOpen(false)} />
             <ModalContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h4 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-3">Core Elements</h4>
+              <div className="space-y-6">
+                {/* 1. Core Visibility */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                    <span className="w-4 h-px bg-neutral-800" />
+                    Visibility
+                    <span className="flex-1 h-px bg-neutral-800" />
+                  </h4>
                   
-                  <button 
-                    onClick={() => setShowTransports(!showTransports)}
-                    className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`material-symbols-outlined ${showTransports ? 'text-primary' : 'text-neutral-500'}`}>directions_bus</span>
-                      <span className="text-sm font-medium text-white">Transports</span>
-                    </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${showTransports ? 'bg-primary' : 'bg-neutral-600'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showTransports ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </div>
-                  </button>
-
-                  <button 
-                    onClick={() => setShowPlaces(!showPlaces)}
-                    className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`material-symbols-outlined ${showPlaces ? 'text-primary' : 'text-neutral-500'}`}>location_on</span>
-                      <span className="text-sm font-medium text-white">Places</span>
-                    </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${showPlaces ? 'bg-primary' : 'bg-neutral-600'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showPlaces ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </div>
-                  </button>
-                  
-                  <button 
-                    onClick={() => setShowMap(!showMap)}
-                    className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`material-symbols-outlined ${showMap ? 'text-primary' : 'text-neutral-500'}`}>map</span>
-                      <span className="text-sm font-medium text-white">Map View</span>
-                    </div>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${showMap ? 'bg-primary' : 'bg-neutral-600'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showMap ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </div>
-                  </button>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-white/10">
-                  <h4 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-3">Place Details</h4>
-                  
-                  <div className={`space-y-2 transition-opacity ${!showPlaces ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button 
-                      onClick={() => setShowAccommodations(!showAccommodations)}
-                      className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
+                      onClick={() => {
+                        const next = !showTransports
+                        setShowTransports(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showTransports: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showTransports ? 'bg-primary/5 border-primary/20' : 'bg-neutral-900/40 border-white/5'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined ${showAccommodations ? 'text-yellow-400' : 'text-neutral-500'}`}>bed</span>
-                        <span className="text-sm font-medium text-white">Accommodations</span>
+                        <span className={`material-symbols-outlined text-[20px] ${showTransports ? 'text-primary' : 'text-neutral-600'}`}>directions_bus</span>
+                        <span className={`text-xs font-bold ${showTransports ? 'text-white' : 'text-neutral-500'}`}>Transports</span>
                       </div>
-                      <div className={`w-10 h-5 rounded-full relative transition-colors ${showAccommodations ? 'bg-yellow-500' : 'bg-neutral-600'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showAccommodations ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showTransports ? 'bg-primary' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showTransports ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                       </div>
                     </button>
 
                     <button 
-                      onClick={() => setShowEvents(!showEvents)}
-                      className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
+                      onClick={() => {
+                        const next = !showPlaces
+                        setShowPlaces(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showPlaces: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showPlaces ? 'bg-primary/5 border-primary/20' : 'bg-neutral-900/40 border-white/5'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined ${showEvents ? 'text-red-400' : 'text-neutral-500'}`}>flag</span>
-                        <span className="text-sm font-medium text-white">Events & Activities</span>
+                        <span className={`material-symbols-outlined text-[20px] ${showPlaces ? 'text-primary' : 'text-neutral-600'}`}>location_on</span>
+                        <span className={`text-xs font-bold ${showPlaces ? 'text-white' : 'text-neutral-500'}`}>Places</span>
                       </div>
-                      <div className={`w-10 h-5 rounded-full relative transition-colors ${showEvents ? 'bg-red-500' : 'bg-neutral-600'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showEvents ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showPlaces ? 'bg-primary' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showPlaces ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+                    
+                    <button 
+                      onClick={() => {
+                        const next = !showMap
+                        setShowMap(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showMap: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showMap ? 'bg-primary/5 border-primary/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${showMap ? 'text-primary' : 'text-neutral-600'}`}>map</span>
+                        <span className={`text-xs font-bold ${showMap ? 'text-white' : 'text-neutral-500'}`}>Map View</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showMap ? 'bg-primary' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showMap ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                       </div>
                     </button>
 
                     <button 
-                      onClick={() => setShowDocuments(!showDocuments)}
-                      className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
+                      onClick={() => {
+                        const next = !showNotes
+                        setShowNotes(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showNotes: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showNotes ? 'bg-primary/5 border-primary/20' : 'bg-neutral-900/40 border-white/5'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined ${showDocuments ? 'text-blue-400' : 'text-neutral-500'}`}>description</span>
-                        <span className="text-sm font-medium text-white">Documents</span>
+                        <span className={`material-symbols-outlined text-[20px] ${showNotes ? 'text-primary' : 'text-neutral-600'}`}>notes</span>
+                        <span className={`text-xs font-bold ${showNotes ? 'text-white' : 'text-neutral-500'}`}>Notes</span>
                       </div>
-                      <div className={`w-10 h-5 rounded-full relative transition-colors ${showDocuments ? 'bg-blue-500' : 'bg-neutral-600'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showDocuments ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </div>
-                    </button>
-
-                    <button 
-                      onClick={() => setShowLinks(!showLinks)}
-                      className="flex w-full items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`material-symbols-outlined ${showLinks ? 'text-cyan-400' : 'text-neutral-500'}`}>link</span>
-                        <span className="text-sm font-medium text-white">URLs & Links</span>
-                      </div>
-                      <div className={`w-10 h-5 rounded-full relative transition-colors ${showLinks ? 'bg-cyan-500' : 'bg-neutral-600'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${showLinks ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showNotes ? 'bg-primary' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showNotes ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                       </div>
                     </button>
                   </div>
+
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-white/5 transition-opacity ${!showPlaces ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <button 
+                      onClick={() => {
+                        const next = !showAccommodations
+                        setShowAccommodations(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showAccommodations: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showAccommodations ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${showAccommodations ? 'text-yellow-400' : 'text-neutral-600'}`}>bed</span>
+                        <span className={`text-xs font-bold ${showAccommodations ? 'text-white' : 'text-neutral-500'}`}>Hotels</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showAccommodations ? 'bg-yellow-500' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showAccommodations ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const next = !showEvents
+                        setShowEvents(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showEvents: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showEvents ? 'bg-red-500/5 border-red-500/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${showEvents ? 'text-red-400' : 'text-neutral-600'}`}>flag</span>
+                        <span className={`text-xs font-bold ${showEvents ? 'text-white' : 'text-neutral-500'}`}>Events</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showEvents ? 'bg-red-500' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showEvents ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const next = !showDocuments
+                        setShowDocuments(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showDocuments: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showDocuments ? 'bg-blue-500/5 border-blue-500/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${showDocuments ? 'text-blue-400' : 'text-neutral-600'}`}>description</span>
+                        <span className={`text-xs font-bold ${showDocuments ? 'text-white' : 'text-neutral-500'}`}>Files</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showDocuments ? 'bg-blue-500' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showDocuments ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const next = !showLinks
+                        setShowLinks(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, showLinks: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${showLinks ? 'bg-cyan-500/5 border-cyan-500/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${showLinks ? 'text-cyan-400' : 'text-neutral-600'}`}>link</span>
+                        <span className={`text-xs font-bold ${showLinks ? 'text-white' : 'text-neutral-500'}`}>Links</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${showLinks ? 'bg-cyan-500' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showLinks ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Preferences */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                    <span className="w-4 h-px bg-neutral-800" />
+                    Preferences
+                    <span className="flex-1 h-px bg-neutral-800" />
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    {/* Time Format */}
+                    <div className="flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-neutral-900/40">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-[20px] text-neutral-500">schedule</span>
+                        <span className="text-xs font-bold text-neutral-400">Time Format</span>
+                      </div>
+                      <div className="flex bg-neutral-800 p-0.5 rounded-full border border-white/5">
+                        <button 
+                          onClick={() => {
+                            setTimeFormat('12h')
+                            timeFormatRef.current = '12h'
+                            if (trip) {
+                              const updated = { ...trip, settings: { ...trip.settings, timeFormat: '12h' as const } }
+                              setTrip(updated)
+                              updateTripContext(updated)
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${timeFormat === '12h' ? 'bg-white text-black shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                        >
+                          12H
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setTimeFormat('24h')
+                            timeFormatRef.current = '24h'
+                            if (trip) {
+                              const updated = { ...trip, settings: { ...trip.settings, timeFormat: '24h' as const } }
+                              setTrip(updated)
+                              updateTripContext(updated)
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${timeFormat === '24h' ? 'bg-white text-black shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                        >
+                          24H
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Distance Units */}
+                    <div className="flex items-center justify-between p-3 rounded-2xl border border-white/5 bg-neutral-900/40">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-[20px] text-neutral-500">straighten</span>
+                        <span className="text-xs font-bold text-neutral-400">Distance Units</span>
+                      </div>
+                      <div className="flex bg-neutral-800 p-0.5 rounded-full border border-white/5">
+                        <button 
+                          onClick={() => {
+                            setDistanceUnit('metric')
+                            if (trip) {
+                              const updated = { ...trip, settings: { ...trip.settings, distanceUnit: 'metric' as const } }
+                              setTrip(updated)
+                              updateTripContext(updated)
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${distanceUnit === 'metric' ? 'bg-white text-black shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                        >
+                          METRIC
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setDistanceUnit('imperial')
+                            if (trip) {
+                              const updated = { ...trip, settings: { ...trip.settings, distanceUnit: 'imperial' as const } }
+                              setTrip(updated)
+                              updateTripContext(updated)
+                            }
+                          }}
+                          className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${distanceUnit === 'imperial' ? 'bg-white text-black shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                        >
+                          IMPERIAL
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Compact Mode */}
+                    <button 
+                      onClick={() => {
+                        const next = !compactMode
+                        setCompactMode(next)
+                        if (trip) {
+                          const updated = { ...trip, settings: { ...trip.settings, compactMode: next } }
+                          setTrip(updated)
+                          updateTripContext(updated)
+                        }
+                      }}
+                      className={`flex w-full items-center justify-between p-3 rounded-2xl border transition-all ${compactMode ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-neutral-900/40 border-white/5'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`material-symbols-outlined text-[20px] ${compactMode ? 'text-yellow-400' : 'text-neutral-500'}`}>compress</span>
+                        <span className={`text-xs font-bold ${compactMode ? 'text-white' : 'text-neutral-500'}`}>Compact Mode</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full relative transition-colors ${compactMode ? 'bg-yellow-500' : 'bg-neutral-700'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${compactMode ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                   <p className="text-[10px] text-neutral-600 text-center uppercase tracking-widest font-bold">Trip Settings are saved locally</p>
                 </div>
               </div>
             </ModalContent>
@@ -3148,6 +3613,11 @@ export default function TripDetail() {
             placeStartDay={place?.day || 1}
             placeEndDay={place?.endDay || place?.day || 1}
             tripStartDate={trip?.startDate}
+            tripEndDate={trip?.endDate}
+            totalDays={allDays.length || 1}
+            allPlaces={places}
+            mapStyle={trip?.mapStyle}
+            timeFormat={timeFormat}
             onClose={() => setAttachmentDetail(null)}
             onDelete={async () => {
               if (!place) { setAttachmentDetail(null); return }

@@ -13,12 +13,15 @@ interface ModalBackdropProps {
   children: React.ReactNode
   onClick?: () => void
   className?: string
+  isClosing?: boolean
 }
 
-export function ModalBackdrop({ children, onClick, className = '' }: ModalBackdropProps) {
+export function ModalBackdrop({ children, onClick, className = '', isClosing = false }: ModalBackdropProps) {
   return (
     <div 
-      className={`modal-backdrop p-4 md:p-8 animate-in fade-in duration-300 backdrop-blur-[2px] ${className}`}
+      className={`modal-backdrop p-4 md:p-8 backdrop-blur-xl bg-black/40 flex items-center justify-center ${
+        isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-500'
+      } ${className}`}
       onClick={onClick}
     >
       {children}
@@ -33,13 +36,15 @@ interface ModalContainerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
   tint?: string // Optional color tint, e.g., "rgba(59, 130, 246, 0.05)"
   className?: string
+  isClosing?: boolean
 }
 
 export function ModalContainer({ 
   children, 
   size = 'md',
   tint,
-  className = ''
+  className = '',
+  isClosing = false
 }: ModalContainerProps) {
   const sizeStyles = {
     sm: 'max-w-xl',      // 576px (was max-w-md 448px)
@@ -51,9 +56,11 @@ export function ModalContainer({
   
   return (
     <div 
-      className={`modal-container glass-card ${sizeStyles[size]} w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-500 flex flex-col rounded-[2rem] border border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] ${className}`}
+      className={`modal-container glass-card ${sizeStyles[size]} w-full overflow-hidden flex flex-col rounded-[2.5rem] border border-white/20 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5),0_0_60px_rgba(255,255,255,0.05)] backdrop-blur-[40px] ring-1 ring-white/10 transform-gpu transition-all duration-300 ${
+        isClosing ? 'animate-out zoom-out-95 fade-out duration-300' : 'animate-in zoom-in-95 fade-in slide-in-from-bottom-4 duration-500'
+      } ${className}`}
       style={{ 
-        backgroundColor: tint || 'transparent',
+        backgroundColor: tint || 'rgba(15, 15, 15, 0.4)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -90,7 +97,7 @@ export function ModalHeader({
   className = ''
 }: ModalHeaderProps) {
   return (
-    <div className={`flex items-center gap-4 p-5 border-b border-white/10 bg-white/5 backdrop-blur-3xl shrink-0 relative ${className}`}>
+    <div className={`flex items-center gap-4 p-5 border-b border-white/10 bg-white/5 backdrop-blur-3xl shrink-0 relative rounded-t-[inherit] ${className}`}>
       {showBackButton && onClose && (
         <button
           type="button"
@@ -168,7 +175,7 @@ interface ModalFooterProps {
 
 export function ModalFooter({ children, className = '' }: ModalFooterProps) {
   return (
-    <div className={`flex gap-3 p-5 border-t border-white/10 bg-white/5 backdrop-blur-2xl shrink-0 ${className}`}>
+    <div className={`flex gap-3 p-5 border-t border-white/10 bg-white/5 backdrop-blur-2xl shrink-0 rounded-b-[inherit] ${className}`}>
       {children}
     </div>
   )
@@ -191,11 +198,21 @@ export function FullModal({
   size = 'md',
   className = ''
 }: FullModalProps) {
-  if (!isOpen) return null
+  const [isClosing, setIsClosing] = React.useState(false)
+
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      onClose?.()
+      setIsClosing(false)
+    }, 300)
+  }
+
+  if (!isOpen && !isClosing) return null
   
   return (
-    <ModalBackdrop onClick={onClose}>
-      <ModalContainer size={size} className={className}>
+    <ModalBackdrop onClick={handleClose} isClosing={isClosing}>
+      <ModalContainer size={size} className={className} isClosing={isClosing}>
         {children}
       </ModalContainer>
     </ModalBackdrop>
@@ -215,6 +232,7 @@ interface BaseDetailModalProps {
   tint?: string
   actions?: React.ReactNode
   footer?: React.ReactNode
+  isEditMode?: boolean
   
   // Two-column layout content
   leftColumn: React.ReactNode
@@ -237,38 +255,83 @@ export function BaseDetailModal({
   tint,
   actions,
   footer,
+  isEditMode,
   leftColumn,
   rightColumn,
   containerClassName = '',
   leftColumnClassName = '',
   rightColumnClassName = ''
 }: BaseDetailModalProps) {
-  if (!isOpen) return null
+  const [isClosing, setIsClosing] = React.useState(false)
+
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      onClose()
+      setIsClosing(false)
+    }, 300)
+  }
+
+  if (!isOpen && !isClosing) return null
 
   return (
-    <ModalBackdrop onClick={onClose}>
+    <ModalBackdrop onClick={handleClose} isClosing={isClosing}>
       <ModalContainer 
         size={size} 
-        tint={tint} 
-        className={`max-h-[85vh] flex flex-col ${containerClassName}`}
+        tint={tint}
+        isClosing={isClosing}
+        className={`max-h-[85vh] flex flex-col relative overflow-hidden transition-all duration-500 rounded-[2.5rem] ${
+          isEditMode ? 'ring-2 ring-yellow-400/50 scale-[0.98]' : ''
+        } ${containerClassName}`}
       >
-        <ModalHeader
-          title={title}
-          subtitle={subtitle}
-          icon={icon}
-          iconColor={iconColor}
-          onClose={onClose}
-          actions={actions}
+        {/* Edit Mode Background Overlay (Mario Maker style blueprint) */}
+        <div 
+          className={`absolute inset-0 pointer-events-none transition-all duration-700 ease-in-out z-0 ${
+            isEditMode ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px',
+            backgroundPosition: 'center center'
+          }}
         />
 
-        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+        {/* Edit Mode Construction Tape Borders */}
+        <div 
+          className={`absolute top-0 left-0 right-0 h-2 z-50 pointer-events-none transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-scroll-tape-left ${
+            isEditMode ? 'translate-y-0' : '-translate-y-full'
+          }`}
+          style={{ background: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #000 12px, #000 24px)' }}
+        />
+        <div 
+          className={`absolute bottom-0 left-0 right-0 h-2 z-50 pointer-events-none transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] animate-scroll-tape-right ${
+            isEditMode ? 'translate-y-0' : 'translate-y-full'
+          }`}
+          style={{ background: 'repeating-linear-gradient(45deg, #facc15, #facc15 12px, #000 12px, #000 24px)' }}
+        />
+
+        <div className="relative z-10">
+          <ModalHeader
+            title={title}
+            subtitle={subtitle}
+            icon={icon}
+            iconColor={iconColor}
+            onClose={handleClose}
+            actions={actions}
+          />
+        </div>
+
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row relative z-10">
           {/* Left Column - Form/Details */}
-          <div className={`flex-1 md:flex-[0.5] overflow-y-auto custom-scrollbar p-4 space-y-4 border-b md:border-b-0 md:border-r border-white/10 ${leftColumnClassName}`}>
+          <div className={`flex-1 md:flex-[0.5] min-w-0 overflow-y-auto custom-scrollbar p-4 space-y-4 border-b md:border-b-0 md:border-r border-white/10 ${leftColumnClassName}`}>
             {leftColumn}
           </div>
 
           {/* Right Column - Map/Preview */}
-          <div className={`hidden md:flex md:flex-1 md:flex-[0.5] flex-col ${rightColumnClassName}`}>
+          <div className={`hidden md:flex md:flex-1 md:flex-[0.5] min-w-0 flex-col ${rightColumnClassName}`}>
             {rightColumn || (
               <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 space-y-4 p-6 bg-white/5">
                 <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -280,11 +343,13 @@ export function BaseDetailModal({
           </div>
         </div>
 
-        {footer && (
-          <ModalFooter>
-            {footer}
-          </ModalFooter>
-        )}
+        <div className="relative z-10">
+          {footer && (
+            <ModalFooter>
+              {footer}
+            </ModalFooter>
+          )}
+        </div>
       </ModalContainer>
     </ModalBackdrop>
   )

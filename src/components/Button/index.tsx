@@ -60,7 +60,7 @@ export const Button = React.forwardRef<HTMLButtonElement, BaseButtonProps>(
           ${sizeStyles[size]} 
           ${fullWidth ? 'w-full' : ''} 
           ${iconPosition === 'top' ? 'flex-col py-1.5 px-4 min-w-[80px]' : 'flex-row'}
-          flex items-center justify-center gap-2 transition-all duration-300 rounded-2xl font-bold active:scale-95
+          flex items-center justify-center gap-2 transition-all duration-300 rounded-full font-bold active:scale-95
           ${className}
         `}
         {...props}

@@ -84,6 +84,7 @@ export interface Event {
   lat?: number
   lng?: number
   icon?: string
+  photoDays?: (number | null)[]
 }
 
 export interface Accommodation {
@@ -102,9 +103,11 @@ export interface Accommodation {
   icon?: string
   description?: string
   link?: string
+  photoDays?: (number | null)[]
 }
 
 export interface Note {
+  id?: string
   day: number
   text: string
 }
@@ -128,6 +131,8 @@ export interface Transport {
   ticketNumber?: string
   fromLocation?: string
   toLocation?: string
+  photos?: string[]
+  photoDays?: (number | null)[]
 }
 
 export interface Place {
@@ -138,6 +143,7 @@ export interface Place {
   country: string
   lat?: number
   lng?: number
+  emoji?: string
   arrival?: string
   departure?: string
   day?: number
@@ -149,6 +155,22 @@ export interface Place {
   documents: Document[]
   links: Link[]
   photos?: string[]
+  photoDays?: (number | null)[]
+}
+
+export interface TripSettings {
+  compactMode?: boolean
+  timeFormat?: '12h' | '24h'
+  distanceUnit?: 'metric' | 'imperial'
+  timezone?: string
+  showTransports?: boolean
+  showPlaces?: boolean
+  showMap?: boolean
+  showAccommodations?: boolean
+  showEvents?: boolean
+  showDocuments?: boolean
+  showLinks?: boolean
+  showNotes?: boolean
 }
 
 export interface Trip {
@@ -162,6 +184,7 @@ export interface Trip {
   emoji?: string
   wallpaper?: string // base64 or URL
   mapStyle?: string
+  settings?: TripSettings
   places: Place[]
   itinerary?: DayItinerary[] // New calendar-style itinerary
 }
@@ -243,6 +266,24 @@ function migrateTrip(trip: any): Trip {
     // Ensure notes is array
     if (!Array.isArray(place.notes)) {
       place.notes = []
+    }
+
+    // Fix backwards links where URL was pasted into Title
+    if (Array.isArray(place.links)) {
+      place.links = place.links.map((link: any) => {
+        if (link.title && link.url && typeof link.title === 'string' && typeof link.url === 'string') {
+          if (link.title.match(/^https?:\/\//)) {
+            // Title looks like a URL. Check if url looks like a label.
+            const urlLooksLikeLabel = !link.url.includes('.') || link.url.includes(' ') || link.url.match(/^https?:\/\/[^.]+$/) || link.url.match(/^https?:\/\/.+\s/);
+            if (urlLooksLikeLabel) {
+              const temp = link.url;
+              link.url = link.title;
+              link.title = temp.replace(/^https?:\/\//, ''); // Clean up accidental https:// on the label
+            }
+          }
+        }
+        return link;
+      })
     }
     
     return place

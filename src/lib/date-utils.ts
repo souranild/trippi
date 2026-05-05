@@ -26,13 +26,16 @@ export function formatDateShort(dateStr: string | Date): string {
   }).toUpperCase()
 }
 
-// Format: 10:30 AM
-export function formatTime(timeStr: string): string {
+// Format: 10:30 AM or 10:30
+export function formatTime(timeStr: string, format: '12h' | '24h' = '12h'): string {
   if (!timeStr) return ''
   
   // Handle HH:mm format
   const m24 = timeStr.match(/^(\d{1,2}):(\d{2})$/)
   if (m24) {
+    if (format === '24h') {
+      return `${m24[1].padStart(2, '0')}:${m24[2]}`
+    }
     let h = parseInt(m24[1])
     const min = m24[2]
     const period = h >= 12 ? 'PM' : 'AM'
@@ -42,7 +45,16 @@ export function formatTime(timeStr: string): string {
   }
   
   // Already in 12h format?
-  if (timeStr.match(/^\d{1,2}:\d{2}\s*(AM|PM)$/i)) {
+  const m12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (m12) {
+    if (format === '24h') {
+      let h = parseInt(m12[1])
+      const min = m12[2]
+      const period = m12[3].toUpperCase()
+      if (period === 'PM' && h < 12) h += 12
+      if (period === 'AM' && h === 12) h = 0
+      return `${h.toString().padStart(2, '0')}:${min}`
+    }
     return timeStr.toUpperCase()
   }
   

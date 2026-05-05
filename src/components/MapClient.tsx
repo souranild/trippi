@@ -6,8 +6,8 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect, useState, useMemo, useRef, Fragment, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { transportModeIcon } from '@/lib/transport-options'
-import type { Transport, TransportMode } from '@/lib/storage'
-import { fetchHybridDiscovery, calculateDistance, enrichDiscoveryResult, searchLocations } from '@/lib/discovery'
+import type { Transport, TransportMode, Place as StoragePlace } from '@/lib/storage'
+import { fetchHybridDiscovery, calculateDistance, enrichDiscoveryResult, searchLocations, type DiscoveryResult } from '@/lib/discovery'
 import { useMapContext } from '@/context/MapContext'
 
 // Fix for default marker icons in Leaflet with Next.js
@@ -23,20 +23,10 @@ const DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon
 L.Marker.prototype.options.autoPanOnFocus = false
 
-interface Place {
-  id: string
-  name: string
-  location: string
-  lat?: number
-  lng?: number
-  day?: number
-  endDay?: number
-  emoji?: string
+interface Place extends StoragePlace {
   tripId?: string
   tripTitle?: string
   tripDates?: string
-  transport?: Transport[]
-  photos?: string[]
 }
 
 interface MapProps {
@@ -48,9 +38,9 @@ interface MapProps {
   previewCoords?: { lat: number, lng: number } | null
   onMapClick?: (coords: { lat: number, lng: number }) => void
   onViewportChange?: (center: { lat: number, lng: number }, zoom: number) => void
-  searchResults?: PlaceSearchHit[]
+  searchResults?: DiscoveryResult[]
   selectedSearchResultId?: string | null
-  onSearchResultClick?: (hit: PlaceSearchHit) => void
+  onSearchResultClick?: (hit: DiscoveryResult) => void
   onSearchChange?: (query: string) => void
   mapStyle?: string
   onStyleChange?: (style: string) => void
@@ -60,6 +50,8 @@ interface MapProps {
   liveTransportId?: string | null
   isPreview?: boolean
   onAddDiscovery?: (discovery: any) => void
+  defaultDiscovery?: boolean
+  onMarkerClick?: (place: Place) => void
 }
 
 function MapLifecycle({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
@@ -69,16 +61,28 @@ function MapLifecycle({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
     if (onMapReady) {
       onMapReady(map)
     }
+    // Initial check
+    map.invalidateSize();
     
-    // Force a resize check after a short delay to handle drawers/animations
+    // Force a resize check after short delays to handle drawers/animations
     // This is critical for maps that start in hidden or animating containers
-    const timer = setTimeout(() => {
+    const t1 = setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+
+    const t2 = setTimeout(() => {
       map.invalidateSize();
     }, 800);
 
+    const t3 = setTimeout(() => {
+      map.invalidateSize();
+    }, 2000);
+
     // Cleanup function
     return () => {
-      clearTimeout(timer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
     }
   }, [map, onMapReady])
   
@@ -159,7 +163,7 @@ function RecenterMap({ places, focusedPlaceId, previewCoords, isGlobal, isFollow
           
           // If following just started, force zoom to a good detail level (14)
           // Otherwise maintain zoom or zoom in to at least 14
-          const targetZoom = followingJustStarted ? 14 : (map.getZoom() < 14 ? 14 : map.getZoom());
+          const targetZoom = followingJustStarted ? 15 : (map.getZoom() < 15 ? 15 : map.getZoom());
           
           // Stop any current animation to prevent conflicts
           map.stop();
@@ -334,7 +338,7 @@ function createIcon(emoji: string, showDayNumbers: boolean, name?: string, dayLa
         </div>
       `,
       className: 'custom-marker',
-      iconSize: [undefined, undefined],
+      iconSize: [40, 40],
       iconAnchor: showLabel ? [20, 45] : [16, 38],
     })
   }
@@ -383,7 +387,7 @@ function getRotation(p1: [number, number], p2: [number, number]) {
   return Math.atan2(dy, dx) * 180 / Math.PI
 }
 
-type MapStyle = 'midnight' | 'satellite' | 'voyager' | 'retro'
+type MapStyle = 'midnight' | 'satellite' | 'voyager' | 'retro' | 'dark' | 'cyber' | 'mono' | 'topo'
 
 const TILE_LAYERS: Record<MapStyle, { url: string, attribution: string }> = {
   midnight: {
@@ -411,11 +415,11 @@ const TILE_LAYERS: Record<MapStyle, { url: string, attribution: string }> = {
     attribution: '&copy; CARTO'
   },
   mono: {
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: 'Map data: &copy; OSM contributors, SRTM | Map style: &copy; OpenTopoMap'
   },
   topo: {
-    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: 'Map data: &copy; OSM contributors, SRTM | Map style: &copy; OpenTopoMap'
   }
 }
@@ -440,28 +444,47 @@ export default function MapClient({
   livePlaceId,
   liveTransportId,
   isPreview = false,
-  onAddDiscovery
+  onAddDiscovery,
+  defaultDiscovery
 }: MapProps) {
   const router = useRouter()
   
   // Use memo for initial map state to prevent flickering when props change
   const initialMapState = useMemo(() => {
     const valid = places.filter(p => p.lat != null && p.lng != null && !isNaN(Number(p.lat)) && !isNaN(Number(p.lng)));
+    const focusPoint = focusedPlaceId ? places.find(p => p.id === focusedPlaceId) : null;
+    const focusPointValid = focusPoint && focusPoint.lat != null && focusPoint.lng != null && !isNaN(Number(focusPoint.lat)) && !isNaN(Number(focusPoint.lng));
+
+    if (focusPointValid) {
+      return {
+        center: [Number(focusPoint!.lat), Number(focusPoint!.lng)] as [number, number],
+        zoom: 15
+      };
+    }
+
+    if (valid.length > 0) {
+      return {
+        center: [Number(valid[0].lat), Number(valid[0].lng)] as [number, number],
+        zoom: 10
+      };
+    }
+
     return {
-      center: valid.length > 0 ? [Number(valid[0].lat), Number(valid[0].lng)] as [number, number] : [20, 0] as [number, number],
-      zoom: valid.length > 0 ? 10 : 2
+      center: [20, 0] as [number, number],
+      zoom: 2
     };
-  }, []); // Truly only once per MapClient instance
+  }, [focusedPlaceId]); // Only depends on focusedPlaceId for initial mount logic
   const [zoom, setZoom] = useState(10)
   const [activeMap, setActiveMap] = useState<L.Map | null>(null)
   const [mapStyle, setMapStyle] = useState<MapStyle>((externalMapStyle as MapStyle) || 'midnight')
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false)
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
+  const [hoveredItem, setHoveredItem] = useState<any | null>(null)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [localSearchQuery, setLocalSearchQuery] = useState('')
-  const [internalSearchResults, setInternalSearchResults] = useState<PlaceSearchHit[]>([])
+  const [internalSearchResults, setInternalSearchResults] = useState<DiscoveryResult[]>([])
   const { setMapState, setIsMapVisible, isExpanded, setIsExpanded, discoveries, setDiscoveries } = useMapContext()
-  const [showDiscovery, setShowDiscovery] = useState(true)
+  const [showDiscovery, setShowDiscovery] = useState(defaultDiscovery || false)
   const [discoveryCategory, setDiscoveryCategory] = useState<string>('attractions')
   const [isFollowing, setIsFollowing] = useState(false)
   const [selectedDiscovery, setSelectedDiscovery] = useState<any | null>(null);
@@ -474,7 +497,7 @@ export default function MapClient({
   const [mapCenterForDiscovery, setMapCenterForDiscovery] = useState<L.LatLng | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const discoveryAbortRef = useRef<AbortController | null>(null)
-  const discoveryCacheRef = useRef<Record<string, PlaceSearchHit[]>>({})
+  const discoveryCacheRef = useRef<Record<string, DiscoveryResult[]>>({})
 
   const DISCOVERY_CATEGORIES = [
     { id: 'famous', label: 'Famous', icon: 'star', emoji: '🌟', search: 'famous popular tourist attraction landmark' },
@@ -488,9 +511,9 @@ export default function MapClient({
   const rawSearchResults = searchResults?.length > 0 ? searchResults : internalSearchResults
   const activeSearchResults = useMemo(() => {
     return rawSearchResults.filter(r => 
-      r.coordinates && 
-      !isNaN(Number(r.coordinates.lat)) && 
-      !isNaN(Number(r.coordinates.lng))
+      r.lat !== undefined && r.lng !== undefined &&
+      !isNaN(Number(r.lat)) && 
+      !isNaN(Number(r.lng))
     )
   }, [rawSearchResults])
 
@@ -532,9 +555,9 @@ export default function MapClient({
 
   // Create coordinates for search results - with NaN protection
   const searchMarkers = searchResults.filter(r => 
-    r.coordinates && 
-    !isNaN(Number(r.coordinates.lat)) && 
-    !isNaN(Number(r.coordinates.lng))
+    r && 
+    !isNaN(Number(r.lat)) && 
+    !isNaN(Number(r.lng))
   );
 
   // Create polyline coordinates for connecting places - ONLY for itinerary view
@@ -577,12 +600,21 @@ export default function MapClient({
 
   const handleHover = (placeId: string | null) => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+    
     if (placeId) {
-      setHoveredPlaceId(placeId)
+      // Find the item
+      const item = places.find(p => p.id === placeId) || 
+                   discoveries.find(d => d.id === placeId) || 
+                   internalSearchResults.find(r => r.id === placeId);
+      if (item) {
+        setHoveredPlaceId(placeId)
+        setHoveredItem(item)
+      }
     } else {
       hoverTimeoutRef.current = setTimeout(() => {
         setHoveredPlaceId(null)
-      }, 300)
+        setHoveredItem(null)
+      }, 100) // Fast dismissal
     }
   }
   const performSearch = async (query: string) => {
@@ -598,11 +630,11 @@ export default function MapClient({
         
         const center = activeMap.getCenter();
         const results = await searchLocations(query, center.lat, center.lng, discoveryAbortRef.current.signal);
-        const hits: PlaceSearchHit[] = results.map(res => ({
+        const hits: DiscoveryResult[] = results.map(res => ({
           id: res.id,
           name: res.name,
           location: res.tags['addr:city'] || res.tags['addr:full'] || '',
-          coordinates: { lat: res.lat, lng: res.lng },
+          lat: res.lat, lng: res.lng,
           type: res.type as any,
           emoji: '📍',
           image: res.image,
@@ -614,7 +646,7 @@ export default function MapClient({
 
         // Auto-fit bounds if we have results
         if (hits.length > 0) {
-          const coords = hits.map(h => [h.coordinates.lat, h.coordinates.lng] as [number, number]);
+          const coords = hits.map(h => [h.lat, h.lng] as [number, number]);
           const bounds = L.latLngBounds(coords);
           activeMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
         }
@@ -690,7 +722,7 @@ export default function MapClient({
           id: res.id,
           name: res.name,
           location: res.tags['addr:city'] || '',
-          coordinates: { lat: res.lat, lng: res.lng },
+          lat: res.lat, lng: res.lng,
           type: res.type as any,
           emoji: cat.emoji,
           image: res.image,
@@ -737,8 +769,8 @@ export default function MapClient({
       // Highlight logic: Fit bounds if a category was explicitly clicked
       if (categoryId && newSuggestions.length > 0 && activeMap) {
         const coords = newSuggestions
-          .filter(s => s.coordinates.lat != null && s.coordinates.lng != null && !isNaN(s.coordinates.lat) && !isNaN(s.coordinates.lng))
-          .map(s => [s.coordinates.lat, s.coordinates.lng] as [number, number]);
+          .filter(s => s.lat != null && s.lng != null && !isNaN(s.lat) && !isNaN(s.lng))
+          .map(s => [s.lat, s.lng] as [number, number]);
         
         if (coords.length > 0) {
           const bounds = L.latLngBounds(coords);
@@ -936,14 +968,14 @@ export default function MapClient({
           {activeSearchResults.map((hit) => (
             <Marker
               key={hit.id}
-              position={[hit.coordinates.lat, hit.coordinates.lng]}
+              position={[hit.lat, hit.lng]}
               icon={createIcon('', false, '', '', false, hit.id === selectedSearchResultId, true, zoom)}
               eventHandlers={{
                 click: (e) => {
                   L.DomEvent.stopPropagation(e as any);
                   if (onSearchResultClick) onSearchResultClick(hit);
                   else if (activeMap) {
-                    activeMap.setView([hit.coordinates.lat, hit.coordinates.lng], 15);
+                    activeMap.setView([hit.lat, hit.lng], 15);
                   }
                 },
                 mouseover: () => handleHover(hit.id),
@@ -962,7 +994,7 @@ export default function MapClient({
                   onMouseLeave={() => handleHover(null)}
                   onClick={() => {
                     if (onSearchResultClick) onSearchResultClick(hit);
-                    else if (activeMap) activeMap.setView([hit.coordinates.lat, hit.coordinates.lng], 15);
+                    else if (activeMap) activeMap.setView([hit.lat, hit.lng], 15);
                   }}
                   className="bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt cursor-pointer"
                 >
@@ -1000,10 +1032,10 @@ export default function MapClient({
           ))}
 
           {/* Render Discoveries / Top Places */}
-          {showDiscovery && discoveries.filter(d => d.coordinates && !isNaN(Number(d.coordinates.lat)) && !isNaN(Number(d.coordinates.lng))).map((hit) => (
+          {showDiscovery && discoveries.filter(d => d && !isNaN(Number(d.lat)) && !isNaN(Number(d.lng))).map((hit) => (
             <Marker
               key={hit.id}
-              position={[hit.coordinates.lat, hit.coordinates.lng]}
+              position={[hit.lat, hit.lng]}
               icon={createIcon(
                 hit.type === 'restaurant' || hit.type === 'fast_food' ? 'restaurant' : 
                 hit.type === 'cafe' ? 'local_cafe' :
@@ -1018,8 +1050,8 @@ export default function MapClient({
                   L.DomEvent.stopPropagation(e as any);
                   if (onSearchResultClick) {
                     onSearchResultClick(hit);
-                  } else if (activeMap && !isNaN(hit.coordinates.lat) && !isNaN(hit.coordinates.lng)) {
-                    activeMap.flyTo([hit.coordinates.lat, hit.coordinates.lng], 15);
+                  } else if (activeMap && !isNaN(hit.lat) && !isNaN(hit.lng)) {
+                    activeMap.flyTo([hit.lat, hit.lng], 15);
                   }
                 },
                 mouseover: () => handleHover(hit.id),
@@ -1242,15 +1274,15 @@ export default function MapClient({
           {(internalSearchResults || discoveries).map(hit => (
             <Marker
               key={`marker-${hit.id}`}
-              position={[hit.coordinates.lat, hit.coordinates.lng]}
+              position={[hit.lat, hit.lng]}
               icon={createIcon(hit.emoji || '📍', false, hit.name, '', false, (selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id), false, zoom, true, false)}
               eventHandlers={{
                 click: (e) => {
                   L.DomEvent.stopPropagation(e as any);
                   setSelectedDiscovery(hit);
                 },
-                mouseover: () => setHoveredPlaceId(hit.id),
-                mouseout: () => setHoveredPlaceId(null),
+                mouseover: () => handleHover(hit.id),
+                mouseout: () => handleHover(null),
               }}
               zIndexOffset={selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id ? 1000 : 0}
             >
@@ -1305,7 +1337,7 @@ export default function MapClient({
 
           {selectedDiscovery && (
             <Popup
-              position={[selectedDiscovery.coordinates.lat, selectedDiscovery.coordinates.lng]}
+              position={[selectedDiscovery.lat, selectedDiscovery.lng]}
               onClose={() => setSelectedDiscovery(null)}
               className="custom-map-popup"
             >
@@ -1340,7 +1372,69 @@ export default function MapClient({
           )}
         </MapContainer>
       </div>
-        
+
+      {/* Hover Preview Card Overlay (Redesigned for Compactness & Glassmorphism) */}
+      {hoveredItem && (
+        <div 
+          className="absolute top-4 left-4 sm:top-6 sm:left-6 z-[2000] w-[220px] sm:w-[240px] bg-neutral-900/40 backdrop-blur-3xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-left-4 duration-300 ease-out pointer-events-none border border-white/10"
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
+          }}
+          onMouseLeave={() => handleHover(null)}
+        >
+          {/* Image Section */}
+          <div className="relative aspect-[16/10] w-full">
+            <img 
+              src={hoveredItem.image || (hoveredItem.photos && hoveredItem.photos[0]) || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=800&auto=format&fit=crop'} 
+              className="w-full h-full object-cover" 
+              alt={hoveredItem.name} 
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-transparent to-transparent" />
+            
+            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[8px] font-black text-white tracking-widest uppercase">
+              Preview
+            </div>
+          </div>
+
+          {/* Content Section */}
+          <div className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-xs font-black text-white leading-tight tracking-tight flex-1">
+                {hoveredItem.name}
+              </h3>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-amber-500 text-xs leading-none">★</span>
+                <span className="text-[10px] font-black text-white">{hoveredItem.tags?.rating || 4.9}</span>
+              </div>
+            </div>
+
+            {/* Description/Notes (Sanitized HTML Rendering) */}
+            {(() => {
+              const content = hoveredItem.description || (hoveredItem.notes && hoveredItem.notes[0]?.text) || hoveredItem.note;
+              if (!content) return null;
+              return (
+                <div 
+                  className="text-[10px] text-neutral-300 leading-relaxed font-medium line-clamp-3 prose-renderer opacity-80"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
+              );
+            })()}
+
+            {/* Tags/Badges */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <div className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-md text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
+                {hoveredItem.type || 'Landmark'}
+              </div>
+              {hoveredItem.day && (
+                <div className="px-2 py-0.5 bg-primary/20 border border-primary/30 rounded-md text-[8px] font-black text-primary uppercase tracking-wider">
+                  Day {hoveredItem.day}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Control Center - Collapsible Floating Overlay */}
       {(showDayNumbers || isGlobal || showControls) && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl z-[1000] no-print">
@@ -1446,7 +1540,7 @@ export default function MapClient({
                             key={hit.id}
                             onClick={() => {
                                if (onSearchResultClick) onSearchResultClick(hit);
-                               if (activeMap) activeMap.flyTo([hit.coordinates.lat, hit.coordinates.lng], 15);
+                               if (activeMap) activeMap.flyTo([hit.lat, hit.lng], 15);
                             }}
                             className="flex items-start gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all shrink-0 active:scale-95 group max-w-[280px] min-w-[200px] shadow-sm overflow-hidden"
                           >

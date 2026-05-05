@@ -50,6 +50,11 @@ export default function ParallaxBackground({
   // Otherwise it must be fixed (page-level scroll via window).
   const isContained = !!containerRef
 
+  // Keep generous overscan so long pages never reveal empty background at max scroll.
+  const overscanMultiplier = Math.min(3, Math.max(2.2, 1 + parallaxFactor * 8))
+  const overscanHeight = `${overscanMultiplier * 100}%`
+  const overscanTop = `-${((overscanMultiplier - 1) * 50).toFixed(1)}%`
+
   useEffect(() => {
     const el = bgRef.current
     const prevEl = prevBgRef.current
@@ -101,8 +106,8 @@ export default function ParallaxBackground({
           style={{
             backgroundImage: `url(${prevSrc})`,
             opacity: isTransitioning ? 0 : opacity,
-            top: '-20%',
-            height: '140%',
+            top: overscanTop,
+            height: overscanHeight,
             transition: 'opacity 1s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         />
@@ -115,8 +120,8 @@ export default function ParallaxBackground({
         style={{
           backgroundImage: (displaySrc.startsWith('data:video') || displaySrc.includes('video') || displaySrc.match(/\.(mp4|webm|ogg)$/i)) ? 'none' : `url(${displaySrc})`,
           opacity: isTransitioning ? opacity : opacity,
-          top: '-20%',
-          height: '140%',
+          top: overscanTop,
+          height: overscanHeight,
           transition: 'opacity 1s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >

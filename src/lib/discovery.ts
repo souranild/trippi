@@ -73,13 +73,27 @@ async function fetchOverpass(query: string, signal?: AbortSignal): Promise<any> 
     });
     
     if (response.ok) return await response.json();
-    
-    const err = await response.json();
-    throw new Error(err.error || 'Proxy fetch failed');
+
+    let err: any = null;
+    try {
+      err = await response.json();
+    } catch {
+      err = null;
+    }
+
+    const message = err?.error || `Proxy fetch failed (${response.status})`;
+    // Mirror outages are expected occasionally; treat as soft-failure.
+    if (response.status >= 500) {
+      console.warn('Discovery proxy unavailable:', message);
+      return { elements: [] };
+    }
+
+    throw new Error(message);
   } catch (e: any) {
     if (e.name === 'AbortError') throw e;
-    console.error('Proxy Discovery Error:', e);
-    throw e;
+    // Network/CORS/proxy failures should not break map interactions.
+    console.warn('Proxy Discovery Error:', e);
+    return { elements: [] };
   }
 }
 
@@ -88,20 +102,22 @@ const WIKI_API_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 /**
  * Search via Nominatim for better global/text results (same as OSM.org)
  */
-async function fetchNominatimSearch(q: string, lat: number, lng: number, signal?: AbortSignal): Promise<DiscoveryResult[]> {
+async function fetchNominatimSearch(q: string, lat?: number, lng?: number, signal?: AbortSignal): Promise<DiscoveryResult[]> {
   try {
-    // Bias results towards current view if possible
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=20&addressdetails=1&extratags=1&viewbox=${lng-2},${lat+2},${lng+2},${lat-2}`;
+    // Bias results towards current view if possible, but only if coordinates are valid numbers
+    const hasValidCoords = lat !== undefined && lng !== undefined && !isNaN(lat) && !isNaN(lng);
+    const viewboxParam = hasValidCoords ? `&viewbox=${lng-2},${lat+2},${lng+2},${lat-2}&bounded=0` : '';
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=20&addressdetails=1&extratags=1${viewboxParam}`;
     
     const response = await fetch(url, {
       headers: {
         'Accept-Language': 'en-US,en;q=0.9',
-        'User-Agent': 'Trippi/1.0 (https://trippi.app)'
+        'User-Agent': 'Trippi/1.0 (https://github.com/souranild/trippi)'
       },
       signal
     });
     
-    if (!response.ok) throw new Error('Nominatim search failed');
+    if (!response.ok) throw new Error(`Nominatim search failed: ${response.status}`);
     const data = await response.json();
     
     return data.map((res: any) => ({
@@ -436,4 +452,16 @@ export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2
     Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+/**
+ * Format distance based on user preference
+ */
+export function formatDistance(km: number | undefined, unit: 'metric' | 'imperial' = 'metric'): string {
+  if (km === undefined || isNaN(km)) return '';
+  if (unit === 'imperial') {
+    const miles = km * 0.621371;
+    return `${miles.toFixed(1)} mi`;
+  }
+  return `${km.toFixed(1)} km`;
 }

@@ -19,9 +19,10 @@ interface AppHeaderProps {
   extraRight?: React.ReactNode
   onBack?: () => void
   className?: string
+  isEditMode?: boolean
 }
 
-export default function AppHeader({ left, center, extraRight, onBack, className = '' }: AppHeaderProps) {
+export default function AppHeader({ left, center, extraRight, onBack, className = '', isEditMode = false }: AppHeaderProps) {
   const { userProfile, setIsEditingProfile } = useTrips()
 
   const defaultLeft = (
@@ -37,8 +38,9 @@ export default function AppHeader({ left, center, extraRight, onBack, className 
     <header
       className={`fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between bg-neutral-900/40 px-4 sm:px-6 shadow-[inset_0_1px_0_rgba(143,245,255,0.1)] backdrop-blur-xl ${className}`}
     >
-      {/* Left — back button + logo or custom */}
-      <div className="flex items-center gap-2 sm:gap-3 ml-12 sm:ml-16">
+      {/* Left — hamburger + back button + logo */}
+      <div className="flex items-center gap-2 sm:gap-4 h-full">
+        <div className="w-8 sm:w-12 h-full shrink-0" /> {/* Placeholder for hamburger rendered by MobileDrawer */}
         {onBack && (
           <button
             onClick={onBack}
@@ -48,7 +50,7 @@ export default function AppHeader({ left, center, extraRight, onBack, className 
             <span className="material-symbols-outlined text-sm">arrow_back</span>
           </button>
         )}
-        <div className={center ? 'hidden md:block' : ''}>
+        <div className={`flex items-center ${center ? 'hidden md:flex' : 'flex'}`}>
           {left ?? defaultLeft}
         </div>
       </div>
@@ -66,15 +68,17 @@ export default function AppHeader({ left, center, extraRight, onBack, className 
         {userProfile && (
           <button
             onClick={() => setIsEditingProfile(true)}
-            className={`flex items-center gap-2 px-2.5 py-1.5 bg-white/5 rounded-2xl border border-white/10 group hover:bg-white/10 hover:border-white/20 transition-all duration-300 active:scale-95 text-left ${center ? 'hidden md:flex' : 'flex'}`}
+            className={`flex items-center gap-2 px-2 sm:px-2.5 py-1.5 bg-white/5 rounded-2xl border border-white/10 group hover:bg-white/10 hover:border-white/20 transition-all duration-300 active:scale-95 text-left`}
           >
-            <EmojiAvatar
-              emoji={userProfile.avatar}
-              skinTone={userProfile.skinTone}
-              size="sm"
-              className="group-hover:scale-110 transition-transform bg-transparent shadow-none"
-            />
-            <span className="hidden sm:inline text-sm font-bold text-white pr-1 group-hover:text-cyan-400 transition-colors">
+            <div className="relative">
+              <EmojiAvatar
+                emoji={userProfile.avatar}
+                skinTone={userProfile.skinTone}
+                size="sm"
+                className="group-hover:scale-110 transition-transform bg-transparent shadow-none w-6 h-6 sm:w-8 sm:h-8"
+              />
+            </div>
+            <span className="hidden sm:inline text-xs sm:text-sm font-bold text-white pr-1 group-hover:text-cyan-400 transition-colors truncate max-w-[80px] lg:max-w-[120px]">
               {userProfile.name}
             </span>
           </button>

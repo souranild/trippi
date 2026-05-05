@@ -6,6 +6,7 @@ import { ModalBackdrop } from './ModalLayout'
 interface MediaItem {
   url: string
   type: 'image' | 'video' | 'pdf' | 'other'
+  day?: number
 }
 
 interface MediaViewerProps {
@@ -48,7 +49,13 @@ export default function MediaViewer({ items, initialIndex, onClose }: MediaViewe
         </div>
 
         {/* Content */}
-        <div className="w-full h-full flex items-center justify-center p-4">
+        <div className="w-full h-full flex flex-col items-center justify-center p-4 relative">
+          {currentItem.day && (
+            <div className="mb-4 px-4 py-1.5 bg-primary/20 backdrop-blur-xl border border-primary/30 rounded-full z-[8010] animate-in slide-in-from-top-2 duration-300">
+              <span className="text-xs font-bold text-primary tracking-widest uppercase">Day {currentItem.day}</span>
+            </div>
+          )}
+
           {currentItem.type === 'video' ? (
             <video 
               src={currentItem.url} 

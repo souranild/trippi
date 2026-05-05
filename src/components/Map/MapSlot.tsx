@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react'
 import { useMapContext } from '@/context/MapContext'
-import { Place } from '@/types'
+import { Place } from '@/lib/storage'
 
 interface MapSlotProps {
   places: Place[]
@@ -87,13 +87,15 @@ export default function MapSlot(props: MapSlotProps) {
   useEffect(() => {
     if (shouldBeActive && containerRef.current && portalTarget !== containerRef.current) {
       setPortalTarget(containerRef.current);
+    } else if (!shouldBeActive && portalTarget === containerRef.current) {
+      setPortalTarget(null);
     }
   }, [shouldBeActive, portalTarget, setPortalTarget]);
 
   // 2. Clear portal target only on unmount
   useEffect(() => {
     return () => {
-      setPortalTarget(prev => prev === containerRef.current ? null : prev);
+      setPortalTarget((prev: any) => prev === containerRef.current ? null : prev);
     }
   }, [setPortalTarget]);
 
