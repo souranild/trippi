@@ -37,7 +37,7 @@ interface MapProps {
   showDayNumbers?: boolean
   previewCoords?: { lat: number, lng: number } | null
   onMapClick?: (coords: { lat: number, lng: number }) => void
-  onViewportChange?: (center: { lat: number, lng: number }, zoom: number) => void
+  onViewportChange?: (center: { lat: number, lng: number }, zoom: number, bounds?: any) => void
   searchResults?: DiscoveryResult[]
   selectedSearchResultId?: string | null
   onSearchResultClick?: (hit: DiscoveryResult) => void
@@ -52,6 +52,7 @@ interface MapProps {
   onAddDiscovery?: (discovery: any) => void
   defaultDiscovery?: boolean
   onMarkerClick?: (place: Place) => void
+  focusedTransportId?: string | null
 }
 
 function MapLifecycle({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
@@ -361,23 +362,24 @@ function createIcon(emoji: string, showDayNumbers: boolean, name?: string, dayLa
   })
 }
 
-function createTransportIcon(iconName: string, rotation: number = 0, isTravelIcon: boolean = false, isLive: boolean = false) {
+function createTransportIcon(iconName: string, rotation: number = 0, isTravelIcon: boolean = false, isLive: boolean = false, isFocused: boolean = false) {
+  const highlight = isLive || isFocused;
   return L.divIcon({
     html: `
       <div class="flex items-center justify-center transition-all duration-300 relative ${
-        isLive
-          ? 'w-10 h-10 bg-primary text-slate-950 shadow-[0_0_30px_rgba(195,244,0,0.8)] border-2 border-white ring-4 ring-primary/30'
+        highlight
+          ? 'w-10 h-10 bg-primary text-slate-950 shadow-[0_0_30px_rgba(195,244,0,0.8)] border-2 border-white ring-4 ring-primary/30 scale-110'
           : isTravelIcon 
             ? 'w-8 h-8 bg-neutral-900 text-primary border border-primary/40 shadow-lg' 
             : 'w-6 h-6 bg-neutral-800 text-primary border border-primary/30 shadow-md'
       } rounded-full" style="transform: rotate(${rotation}deg)">
-        ${isLive ? '<div class="absolute -inset-2 rounded-full border-2 border-primary animate-ping opacity-30"></div>' : ''}
-        <span class="material-symbols-outlined !text-[18px] ${isTravelIcon || isLive ? 'font-black' : 'font-bold'}">${iconName}</span>
+        ${highlight ? '<div class="absolute -inset-2 rounded-full border-2 border-primary animate-ping opacity-30"></div>' : ''}
+        <span class="material-symbols-outlined !text-[18px] ${isTravelIcon || highlight ? 'font-black' : 'font-bold'}">${iconName}</span>
       </div>
     `,
-    className: `transport-marker ${isLive ? 'z-[2000]' : isTravelIcon ? 'z-[1000]' : 'z-[300]'}`,
-    iconSize: isLive ? [40, 40] : isTravelIcon ? [36, 36] : [24, 24],
-    iconAnchor: isLive ? [20, 20] : isTravelIcon ? [18, 18] : [12, 12],
+    className: `transport-marker ${highlight ? 'z-[2000]' : isTravelIcon ? 'z-[1000]' : 'z-[300]'}`,
+    iconSize: highlight ? [40, 40] : isTravelIcon ? [36, 36] : [24, 24],
+    iconAnchor: highlight ? [20, 20] : isTravelIcon ? [18, 18] : [12, 12],
   })
 }
 
@@ -445,7 +447,8 @@ export default function MapClient({
   liveTransportId,
   isPreview = false,
   onAddDiscovery,
-  defaultDiscovery
+  defaultDiscovery,
+  focusedTransportId
 }: MapProps) {
   const router = useRouter()
   
@@ -578,7 +581,7 @@ export default function MapClient({
     return `${itineraryIds}_${discoveryIds}`;
   }, [validPlaces, discoveries]);
 
-  const handleMarkerClick = (place: Place, originalEvent: any) => {
+  const handleMarkerClick = (place: Place, originalEvent?: any) => {
     if (originalEvent && typeof originalEvent.stopPropagation === 'function') {
       originalEvent.stopPropagation();
     } else if (originalEvent?.originalEvent?.stopPropagation) {
@@ -1043,7 +1046,7 @@ export default function MapClient({
                 hit.type === 'museum' ? 'museum' :
                 hit.type === 'park' || hit.type === 'nature_reserve' ? 'park' : 
                 hit.type === 'historic' || hit.type === 'castle' || hit.type === 'monument' ? 'castle' : 'star', 
-                false, '', false, false, false, false, zoom, true
+                false, '', undefined, false, false, false, zoom, true
               )}
               eventHandlers={{
                 click: (e) => {
@@ -1063,7 +1066,6 @@ export default function MapClient({
                   direction="top" 
                   offset={[0, -5]} 
                   permanent={false}
-                  delay={50}
                   className="interactive-discovery-tooltip"
                   interactive={true}
                   sticky={false}
@@ -1235,8 +1237,25 @@ export default function MapClient({
                   
                   const icon = transport ? transportModeIcon(transport.type) : null
                   const isLiveTransport = transport?.id === liveTransportId;
+                  const isFocusedTransport = transport?.id === focusedTransportId;
                   
-                  segments.push({ mid, angle, icon, id: `${p1.id}-${p2.id}`, transportTitle: transport?.title, isLive: isLiveTransport })
+                  // Use persisted distance if available, otherwise calculate it
+                  let distance = transport?.distance;
+                  if (!distance && !isNaN(start[0]) && !isNaN(start[1]) && !isNaN(end[0]) && !isNaN(end[1])) {
+                    const distKm = calculateDistance(start[0], start[1], end[0], end[1]);
+                    distance = distKm > 0 ? `${distKm.toFixed(1)} km` : undefined;
+                  }
+                  
+                  segments.push({ 
+                    mid, 
+                    angle, 
+                    icon, 
+                    id: `${p1.id}-${p2.id}`, 
+                    transportTitle: transport?.title, 
+                    isLive: isLiveTransport,
+                    isFocused: isFocusedTransport,
+                    distance
+                  })
                 }
                 
                 return segments.map(seg => {
@@ -1248,22 +1267,29 @@ export default function MapClient({
                       key={seg.id}
                       position={seg.mid} 
                       icon={seg.icon 
-                        ? createTransportIcon(seg.icon, iconRotation, true, seg.isLive) 
-                        : createTransportIcon('navigation', iconRotation, false, seg.isLive)
+                        ? createTransportIcon(seg.icon, iconRotation, true, seg.isLive, seg.isFocused) 
+                        : createTransportIcon('navigation', iconRotation, false, seg.isLive, seg.isFocused)
                       } 
-                      interactive={!!seg.transportTitle}
+                      interactive={true}
                       eventHandlers={{
                         click: (e) => L.DomEvent.stopPropagation(e as any)
                       }}
-                      zIndexOffset={seg.icon || seg.isLive ? 1000 : 500}
+                      zIndexOffset={seg.icon || seg.isLive || seg.isFocused ? 1000 : 500}
                     >
-                      {seg.transportTitle && (
-                        <Tooltip direction="top" offset={[0, -10]} className="custom-tooltip-wrapper">
-                          <div className="bg-neutral-900 shadow-2xl border border-white/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase">
-                            {seg.transportTitle}
+                        <Tooltip direction="top" offset={[0, -10]} className="custom-tooltip-wrapper" permanent={!!seg.distance && zoom >= 12}>
+                          <div className="flex flex-col items-center gap-1">
+                            {seg.transportTitle && (
+                              <div className="bg-neutral-900 shadow-2xl border border-white/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase">
+                                {seg.transportTitle}
+                              </div>
+                            )}
+                            {seg.distance && (
+                              <div className="bg-primary/20 backdrop-blur-md border border-primary/40 px-1.5 py-0.5 rounded-full text-[8px] font-black text-primary shadow-lg">
+                                {seg.distance}
+                              </div>
+                            )}
                           </div>
                         </Tooltip>
-                      )}
                     </Marker>
                   )
                 })
@@ -1275,7 +1301,7 @@ export default function MapClient({
             <Marker
               key={`marker-${hit.id}`}
               position={[hit.lat, hit.lng]}
-              icon={createIcon(hit.emoji || '📍', false, hit.name, '', false, (selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id), false, zoom, true, false)}
+              icon={createIcon('location_on', false, hit.name, '', false, (selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id), false, zoom, true, false)}
               eventHandlers={{
                 click: (e) => {
                   L.DomEvent.stopPropagation(e as any);
@@ -1322,7 +1348,7 @@ export default function MapClient({
                     <div className="flex items-center gap-1.5 mb-3">
                       <span className="text-[7px] font-black text-amber-500 uppercase tracking-[0.2em]">{hit.type || 'Landmark'}</span>
                       <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="text-[7px] font-bold text-neutral-500 uppercase tracking-wider">{hit.location || 'Local Site'}</span>
+                      <span className="text-[7px] font-bold text-neutral-500 uppercase tracking-wider">{hit.tags?.['addr:city'] || hit.tags?.['addr:country'] || 'Local Site'}</span>
                     </div>
 
                     <div className="w-full py-1.5 bg-white/10 rounded-lg text-[9px] font-black text-white uppercase tracking-widest group-hover/tt:bg-amber-500 group-hover/tt:text-black transition-all flex items-center justify-center gap-1.5">
@@ -1338,7 +1364,9 @@ export default function MapClient({
           {selectedDiscovery && (
             <Popup
               position={[selectedDiscovery.lat, selectedDiscovery.lng]}
-              onClose={() => setSelectedDiscovery(null)}
+              eventHandlers={{
+                remove: () => setSelectedDiscovery(null)
+              }}
               className="custom-map-popup"
             >
               <div className="w-64 bg-neutral-950 text-white rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
@@ -1551,7 +1579,7 @@ export default function MapClient({
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs leading-none shrink-0 group-hover:scale-110 transition-transform">{hit.emoji || '📍'}</span>
+                                 <span className="text-xs leading-none shrink-0 group-hover:scale-110 transition-transform">📍</span>
                                 <span className="text-[11px] font-bold text-neutral-300 group-hover:text-white truncate">{hit.name}</span>
                               </div>
                               {hit.description && (

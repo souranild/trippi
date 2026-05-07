@@ -132,10 +132,26 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center px-3 py-1 bg-primary/10 border border-primary/20 rounded-full">
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest">
-              Day {getDayNumber(currentDate)}
-            </span>
+          <div className="relative group/day-select">
+            <button className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/20 transition-all">
+              <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                Day {getDayNumber(currentDate)}
+              </span>
+              <span className="material-symbols-outlined text-primary text-xs">arrow_drop_down</span>
+            </button>
+            <div className="absolute top-full right-0 mt-1 w-32 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl z-[110] opacity-0 translate-y-2 pointer-events-none group-hover/day-select:opacity-100 group-hover/day-select:translate-y-0 group-hover/day-select:pointer-events-auto transition-all overflow-hidden">
+              <div className="max-h-60 overflow-y-auto no-scrollbar py-1">
+                {Array.from({ length: totalDays }, (_, i) => i + 1).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => jumpToDay(d)}
+                    className={`w-full px-4 py-2 text-left text-[10px] font-bold transition-colors hover:bg-white/5 ${getDayNumber(currentDate) === d ? 'text-primary' : 'text-neutral-400'}`}
+                  >
+                    Day {d}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="relative group/view-select">
@@ -157,7 +173,7 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
           </div>
 
           <button 
-            onClick={() => document.getElementById('calendar-jump-date')?.showPicker()}
+            onClick={() => (document.getElementById('calendar-jump-date') as HTMLInputElement | null)?.showPicker?.()}
             className="p-2 hover:bg-white/10 rounded-full text-neutral-400 hover:text-primary transition-all"
             title="Jump to date"
           >
@@ -185,16 +201,31 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
                   {eachDayOfInterval({ start: startOfWeek(startOfMonth(month)), end: endOfWeek(endOfMonth(month)) }).map((day) => {
                     const isCurrentMonth = isSameMonth(day, month)
                     const dayNum = getDayNumber(day)
-                    const hasPlaces = places.some(p => p.day === dayNum || (dayNum > (p.day || 0) && dayNum <= (p.endDay || p.day || 0)))
+                    const dayPlaces = places.filter(p => p.day === dayNum || (dayNum > (p.day || 0) && dayNum <= (p.endDay || p.day || 0)))
+                    const hasPlaces = dayPlaces.length > 0
                     
                     return (
                       <div 
                         key={day.toString()} 
-                        className={`aspect-square flex items-center justify-center rounded-md relative ${
+                        className={`aspect-square flex flex-col items-center justify-center rounded-lg relative ${
                           !isCurrentMonth ? 'opacity-20' : ''
-                        } ${hasPlaces ? 'bg-primary/20 text-primary font-bold' : 'text-neutral-400'}`}
+                        } ${hasPlaces ? 'bg-white/5' : ''}`}
                       >
-                        {format(day, 'd')}
+                        <span className={`text-[9px] ${hasPlaces ? 'text-white font-bold' : 'text-neutral-500'}`}>
+                          {format(day, 'd')}
+                        </span>
+                        {hasPlaces && (
+                          <div className="flex gap-0.5 mt-0.5">
+                            {dayPlaces.slice(0, 3).map((p, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`w-1 h-1 rounded-full ${
+                                  p.isTransport ? 'bg-blue-400' : p.isAccommodation ? 'bg-emerald-400' : 'bg-primary'
+                                } shadow-[0_0_4px_currentColor]`} 
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -216,31 +247,50 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
               return (
                 <div 
                   key={day.toString()} 
-                  className={`min-h-[120px] border-r border-b border-white/5 p-2 transition-colors hover:bg-white/[0.02] group ${
-                    !isCurrentMonth ? 'opacity-30' : ''
+                  className={`min-h-[140px] border-r border-b border-white/5 p-1 transition-colors hover:bg-white/[0.02] group ${
+                    !isCurrentMonth ? 'bg-black/10 opacity-20' : ''
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={`text-xs font-bold ${isToday ? 'w-6 h-6 rounded-full bg-primary text-black flex items-center justify-center shadow-[0_0_15px_rgba(143,245,255,0.5)]' : 'text-neutral-500'}`}>
+                  <div className="flex justify-between items-start p-1.5 mb-1">
+                    <span className={`text-xs font-black px-1.5 py-0.5 rounded-full ${isToday ? 'bg-primary text-black shadow-[0_0_15px_rgba(143,245,255,0.5)]' : 'text-neutral-500'}`}>
                       {format(day, 'd')}
                     </span>
                     <button 
                       onClick={() => onAddPlace(dayNum)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md bg-white/5 hover:bg-primary/20 hover:text-primary transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-white/5 hover:bg-primary/20 hover:text-primary transition-all active:scale-90"
                     >
-                      <span className="material-symbols-outlined text-sm">add</span>
+                      <span className="material-symbols-outlined text-[14px]">add</span>
                     </button>
                   </div>
                   <div className="space-y-1">
-                    {dayPlaces.map(p => (
-                      <div 
-                        key={p.id}
-                        onClick={() => onPlaceClick(p)}
-                        className="px-2 py-1 rounded bg-primary/10 border border-primary/20 text-[10px] text-primary font-bold truncate cursor-pointer hover:bg-primary/20 transition-all"
-                      >
-                        {p.emoji} {p.name}
+                    {dayPlaces.slice(0, 4).map(p => {
+                      const isMultiDay = p.endDay && p.endDay > (p.day || 0);
+                      const isStart = p.day === dayNum;
+                      
+                      const baseClass = "px-2 py-1 rounded-md text-[9px] font-bold truncate cursor-pointer transition-all active:scale-[0.98] flex items-center gap-1.5";
+                      const colorClass = p.isTransport 
+                        ? 'bg-blue-600/40 border-l-2 border-blue-400 text-blue-50' 
+                        : p.isAccommodation 
+                        ? 'bg-emerald-600/40 border-l-2 border-emerald-400 text-emerald-50'
+                        : 'bg-primary/20 border-l-2 border-primary text-primary';
+
+                      return (
+                        <div 
+                          key={p.id}
+                          onClick={() => onPlaceClick(p)}
+                          className={`${baseClass} ${colorClass} ${!isStart && isMultiDay ? 'opacity-70 border-dashed' : ''}`}
+                        >
+                          <span className="text-xs leading-none shrink-0">{p.emoji}</span>
+                          <span className="truncate">{p.name}</span>
+                          {p.arrival && !isMultiDay && <span className="text-[7px] ml-auto opacity-60 font-black">{formatTime(p.arrival, timeFormat)}</span>}
+                        </div>
+                      )
+                    })}
+                    {dayPlaces.length > 4 && (
+                      <div className="px-2 py-0.5 text-[8px] font-black text-neutral-500 uppercase tracking-wider">
+                        + {dayPlaces.length - 4} more
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               )

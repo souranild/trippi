@@ -56,7 +56,7 @@ export function ModalContainer({
   
   return (
     <div 
-      className={`modal-container glass-card ${sizeStyles[size]} w-full overflow-hidden flex flex-col rounded-[2.5rem] border border-white/20 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5),0_0_60px_rgba(255,255,255,0.05)] backdrop-blur-[40px] ring-1 ring-white/10 transform-gpu transition-all duration-300 ${
+      className={`modal-container glass-card ${sizeStyles[size]} w-full max-h-[90vh] overflow-hidden flex flex-col rounded-[2.5rem] border border-white/20 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5),0_0_60px_rgba(255,255,255,0.05)] backdrop-blur-[40px] ring-1 ring-white/10 transform-gpu transition-all duration-300 ${
         isClosing ? 'animate-out zoom-out-95 fade-out duration-300' : 'animate-in zoom-in-95 fade-in slide-in-from-bottom-4 duration-500'
       } ${className}`}
       style={{ 
@@ -76,7 +76,7 @@ interface ModalHeaderProps {
   subtitle?: React.ReactNode
   icon?: string
   iconColor?: string
-  onClose?: void | (() => void)
+  onClose?: () => void
   showBackButton?: boolean
   leading?: React.ReactNode
   actions?: React.ReactNode

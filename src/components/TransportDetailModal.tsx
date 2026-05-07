@@ -71,9 +71,13 @@ export default function TransportDetailModal({
   )
   const [title, setTitle] = useState(leg?.title || '')
   const [departure, setDeparture] = useState(leg?.departure || '')
-  const [departureDay, setDepartureDay] = useState<number>(leg?.departureDay ?? leg?.arrivalDay ?? defaultDay ?? 1)
+  const [departureDay, setDepartureDay] = useState<number>(
+    leg?.departureDay ?? leg?.arrivalDay ?? (fromId === 'home' && !leg ? 0 : defaultDay ?? 1)
+  )
   const [arrival, setArrival] = useState(leg?.arrival || '')
-  const [arrivalDay, setArrivalDay] = useState<number>(leg?.arrivalDay ?? leg?.departureDay ?? defaultDay ?? 1)
+  const [arrivalDay, setArrivalDay] = useState<number>(
+    leg?.arrivalDay ?? leg?.departureDay ?? (fromId === 'home' && !leg ? 1 : defaultDay ?? 1)
+  )
   const [ticketNumber, setTicketNumber] = useState(leg?.ticketNumber || '')
   const [fromLocation, setFromLocation] = useState(leg?.fromLocation || '')
   const [toLocation, setToLocation] = useState(leg?.toLocation || '')
@@ -83,12 +87,44 @@ export default function TransportDetailModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [documents, setDocuments] = useState<Document[]>(leg?.documents || [])
   const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetailData | null>(null)
+  
+  // Calculated distance from coords
+  const autoDistance = useMemo(() => {
+    if (fromCoords && toCoords) {
+      const distKm = calculateDistance(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng)
+      return formatDistance(distKm, distanceUnit)
+    }
+    return null
+  }, [fromCoords, toCoords, distanceUnit])
+
+  const [distance, setDistance] = useState(leg?.distance || autoDistance || '')
 
   // --- 2. Derived State ---
-  const dayOptions = useMemo(() => Array.from({ length: totalDays }, (_, i) => ({
-    value: i + 1,
-    label: getDayWithDate(tripStartDate, i + 1)
-  })), [totalDays, tripStartDate])
+  const dayOptions = useMemo(() => {
+    const options = []
+    // Add 3 days before Day 1 (D-2, D-1, D0)
+    for (let i = -2; i <= 0; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    // Standard trip days
+    for (let i = 1; i <= totalDays; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    // Add 3 days after the last day
+    for (let i = totalDays + 1; i <= totalDays + 3; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    return options
+  }, [totalDays, tripStartDate])
 
   const currentMode = TRANSPORT_MODES.find(m => m.type === mode) || TRANSPORT_MODES[0]
 
@@ -138,6 +174,7 @@ export default function TransportDetailModal({
       ticketNumber,
       fromLocation,
       toLocation,
+      distance,
       photos: [],
       photoDays: [],
       documents: documents
@@ -231,14 +268,24 @@ export default function TransportDetailModal({
           </div>
         </FormGrid>
 
-        <FormInput
-          label="Ticket / Confirmation #"
-          labelVariant="primary"
-          disabled={!isEditMode}
-          value={ticketNumber}
-          onChange={e => setTicketNumber(e.target.value)}
-          placeholder="Booking reference..."
-        />
+        <FormGrid columns={2}>
+          <FormInput
+            label="Ticket / Confirmation #"
+            labelVariant="primary"
+            disabled={!isEditMode}
+            value={ticketNumber}
+            onChange={e => setTicketNumber(e.target.value)}
+            placeholder="Booking reference..."
+          />
+          <FormInput
+            label="Distance (Auto-generated)"
+            labelVariant="primary"
+            disabled={!isEditMode}
+            value={distance}
+            onChange={e => setDistance(e.target.value)}
+            placeholder="Distance..."
+          />
+        </FormGrid>
       </div>
 
       {/* Unified Timing Section */}
@@ -367,7 +414,7 @@ export default function TransportDetailModal({
         onClose={onClose}
         isEditMode={isEditMode}
         title={isEditMode ? 'Edit Transport' : (title || currentMode.label)}
-        subtitle={`${fromName} → ${toName}${calculatedDistance ? ` • ${calculatedDistance}` : ''}`}
+        subtitle={`${fromName} → ${toName}${distance ? ` • ${distance}` : ''}`}
         icon={currentMode.icon}
         iconColor={currentMode.color}
         leftColumn={leftColumnContent}

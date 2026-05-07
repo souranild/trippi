@@ -205,13 +205,13 @@
 }
 .prose-renderer blockquote {
   border-left: 2px solid #8ff5ff;
-  padding-left: 1rem;
-  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  margin: 0.4rem 0;
   font-style: italic;
   color: rgba(143, 245, 255, 0.8);
   background: rgba(143, 245, 255, 0.05);
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
   border-radius: 0 4px 4px 0;
 }
 .prose-renderer pre {

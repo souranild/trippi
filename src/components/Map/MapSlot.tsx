@@ -16,7 +16,7 @@ interface MapSlotProps {
   onMarkerClick?: (place: Place) => void
   onMapClick?: (coords: { lat: number, lng: number }) => void
   onStyleChange?: (style: string) => void
-  onViewportChange?: (viewport: any) => void
+  onViewportChange?: (center: { lat: number, lng: number }, zoom: number, bounds?: any) => void
   isPreview?: boolean
   previewCoords?: { lat: number, lng: number } | null
   isGlobal?: boolean
@@ -25,6 +25,7 @@ interface MapSlotProps {
   isModal?: boolean
   onAddDiscovery?: (discovery: any) => void
   onDiscoveriesLoaded?: (discoveries: any[]) => void
+  focusedTransportId?: string | null
 }
 
 export default function MapSlot(props: MapSlotProps) {
@@ -59,7 +60,8 @@ export default function MapSlot(props: MapSlotProps) {
     isGlobal: props.isGlobal,
     showControls: props.showControls,
     onAddDiscovery: props.onAddDiscovery,
-    onDiscoveriesLoaded: props.onDiscoveriesLoaded
+    onDiscoveriesLoaded: props.onDiscoveriesLoaded,
+    focusedTransportId: props.focusedTransportId
   }), [
     placesKey,
     searchResultsKey,
@@ -78,7 +80,8 @@ export default function MapSlot(props: MapSlotProps) {
     props.isGlobal,
     props.showControls,
     props.onAddDiscovery,
-    props.onDiscoveriesLoaded
+    props.onDiscoveriesLoaded,
+    props.focusedTransportId
   ]);
 
   const lastStateRef = React.useRef<string>('')

@@ -41,7 +41,7 @@ export default function ShareModal({ trip, places, onClose }: ShareModalProps) {
           .filter(t => t && t.trim())
           .join('; ')
         if (combinedNotes) text += `   Notes: ${combinedNotes}\n`
-      } else if (typeof p.notes === 'string' && p.notes.trim()) {
+      } else if (typeof (p.notes as any) === 'string' && (p.notes as any).trim()) {
         text += `   Notes: ${p.notes}\n`
       }
 

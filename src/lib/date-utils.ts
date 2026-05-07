@@ -107,3 +107,40 @@ export function getDayInfo(tripStartDate: string, dayNumber: number) {
 export function getDayWithDate(tripStartDate: string, dayNumber: number): string {
   return getDayInfo(tripStartDate, dayNumber).full
 }
+
+export function calculateTimeDuration(startTime: string, startDay: number, endTime: string, endDay: number): string {
+  if (!startTime || !endTime) return ''
+  
+  const toMins = (t: string) => {
+    // Handle both 12h and 24h
+    const m12 = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+    if (m12) {
+      let h = parseInt(m12[1])
+      const m = parseInt(m12[2])
+      const p = m12[3].toUpperCase()
+      if (p === 'PM' && h < 12) h += 12
+      if (p === 'AM' && h === 12) h = 0
+      return h * 60 + m
+    }
+    
+    const m24 = t.match(/^(\d{1,2}):(\d{2})$/)
+    if (m24) {
+      return parseInt(m24[1]) * 60 + parseInt(m24[2])
+    }
+    
+    return 0
+  }
+
+  const startTotal = (startDay * 24 * 60) + toMins(startTime)
+  const endTotal = (endDay * 24 * 60) + toMins(endTime)
+  
+  const diff = endTotal - startTotal
+  if (diff <= 0) return ''
+  
+  const hours = Math.floor(diff / 60)
+  const mins = diff % 60
+  
+  if (hours === 0) return `${mins}m`
+  if (mins === 0) return `${hours}h`
+  return `${hours}h ${mins}m`
+}

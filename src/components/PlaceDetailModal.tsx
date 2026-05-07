@@ -25,7 +25,7 @@ import { FormLabel, FormListItem, FormTextarea } from '@/components/FormLayout'
 import { ConfirmationModal } from './ConfirmationModal'
 import RichTextEditor from '@/components/RichTextEditor'
 
-const Map = dynamic(() => import('./Map'), {
+const MapPreview = dynamic(() => import('./Map'), {
   ssr: false,
   loading: () => <div className="h-48 bg-neutral-800/50 rounded-xl flex items-center justify-center text-neutral-500">Loading map...</div>
 })
@@ -90,8 +90,27 @@ export default function PlaceDetailModal({
       const oldText = p.notes
       p.notes = oldText ? [{ id: Math.random().toString(36).substr(2, 9), day: p.day || 1, text: oldText }] : []
     }
-    if (p.accommodation && !p.accommodations) {
-      p.accommodations = [p.accommodation]
+    
+    // Consolidate multiple notes for the same day to avoid "phantom" notes in the editor
+    if (Array.isArray(p.notes)) {
+      const consolidated: Note[] = []
+      const dayMap = new Map<number, Note>()
+      
+      p.notes.forEach(note => {
+        if (!note.text) return
+        const existing = dayMap.get(note.day)
+        if (existing) {
+          existing.text = existing.text.trim() + '\n\n' + note.text.trim()
+        } else {
+          const newNote = { ...note }
+          dayMap.set(note.day, newNote)
+          consolidated.push(newNote)
+        }
+      })
+      p.notes = consolidated
+    }
+    if ((p as any).accommodation && !p.accommodations) {
+      p.accommodations = [(p as any).accommodation]
       delete (p as any).accommodation
     }
     return p
@@ -159,10 +178,29 @@ export default function PlaceDetailModal({
   }, [tripStartDate, tripEndDate])
 
   const dayOptions = useMemo(() => {
-    return Array.from({ length: allDaysCount }, (_, i) => ({
-      value: i + 1,
-      label: getDayWithDate(tripStartDate, i + 1)
-    }))
+    const options = []
+    // Add 3 days before Day 1
+    for (let i = -2; i <= 0; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    // Standard trip days
+    for (let i = 1; i <= allDaysCount; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    // Add 3 days after last day
+    for (let i = allDaysCount + 1; i <= allDaysCount + 3; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    return options
   }, [allDaysCount, tripStartDate])
 
   // --- 3. Handlers ---
@@ -209,7 +247,7 @@ export default function PlaceDetailModal({
 
   const handleDeleteTransport = (legId: string, sourcePlaceId: string) => {
     const trips = JSON.parse(localStorage.getItem('trippi_trips') || '[]')
-    const tripId = allPlaces[0]?.tripId // Use tripId from any place
+    const tripId = (allPlaces[0] as any)?.tripId // Use tripId from any place
     if (!tripId) return
 
     const updatedPlaces = allPlaces.map(p => {
@@ -308,7 +346,7 @@ export default function PlaceDetailModal({
     if (text.trim().startsWith('<')) {
       return (
         <div 
-          className="prose-renderer text-sm leading-relaxed"
+          className="prose-renderer text-[11px] leading-relaxed text-neutral-300 font-medium"
           dangerouslySetInnerHTML={{ __html: text }}
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -658,7 +696,7 @@ export default function PlaceDetailModal({
                           />
                       ) : (
                         <div className="text-xs">
-                          {dayNote?.text ? renderNoteText(dayNote.text, dayNote.id) : (
+                          {dayNote?.text ? renderNoteText(dayNote.text, dayNote.id || '') : (
                             <p className="text-white/20 italic font-medium">No notes for this day</p>
                           )}
                         </div>
@@ -729,217 +767,227 @@ export default function PlaceDetailModal({
       </div>
 
       {/* 4. Accommodation */}
-      <div className="space-y-4 pb-4 border-b border-white/10">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
-            <span className="material-symbols-outlined text-base">bed</span> Accommodation
-          </FormLabel>
-          {isEditMode && (
-            <button
-              type="button"
-              onClick={() => handleAddAttachment('accommodation')}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 hover:bg-yellow-400/20 transition-colors"
-              title="Add Accommodation"
-            >
-              <span className="material-symbols-outlined text-xs">add</span>
-              <span className="material-symbols-outlined text-xs text-yellow-400">bed</span>
-            </button>
-          )}
-        </div>
-        <div className="space-y-3">
-          {updatedPlace.accommodations?.map((acc, idx) => (
-            <FormListItem key={acc.id || `acc-${idx}`} onDelete={isEditMode ? () => handleDeleteAccommodation(acc.id) : undefined} className="group border-yellow-400/20" onClick={() => setAttachmentDetail({ type: 'accommodation', accommodation: acc })}>
-              <div className="flex items-center gap-3 w-full p-1">
-                <span className="text-yellow-400 material-symbols-outlined text-base">bed</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-bold truncate mb-0.5">{acc.name}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/60 text-[10px] font-mono flex items-center">
-                      {(() => {
-                        const start = acc.checkInDay || updatedPlace.day || 1
-                        const end = acc.checkOutDay || acc.checkInDay || updatedPlace.day || 1
-                        const isMulti = end > start
-                        return (
-                          <>
-                            {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
-                            {formatTime(acc.checkIn, timeFormat)}
-                            <span className="mx-1 opacity-50">→</span>
-                            {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
-                            {formatTime(acc.checkOut, timeFormat)}
-                          </>
-                        )
-                      })()}
-                    </span>
+      {(isEditMode || (updatedPlace.accommodations?.length || 0) > 0) && (
+        <div className="space-y-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+              <span className="material-symbols-outlined text-base">bed</span> Accommodation
+            </FormLabel>
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={() => handleAddAttachment('accommodation')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 hover:bg-yellow-400/20 transition-colors"
+                title="Add Accommodation"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span className="material-symbols-outlined text-xs text-yellow-400">bed</span>
+              </button>
+            )}
+          </div>
+          <div className="space-y-3">
+            {updatedPlace.accommodations?.map((acc, idx) => (
+              <FormListItem key={acc.id || `acc-${idx}`} onDelete={isEditMode ? () => handleDeleteAccommodation(acc.id) : undefined} className="group border-yellow-400/20" onClick={() => setAttachmentDetail({ type: 'accommodation', accommodation: acc })}>
+                <div className="flex items-center gap-3 w-full p-1">
+                  <span className="text-yellow-400 material-symbols-outlined text-base">bed</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-bold truncate mb-0.5">{acc.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/60 text-[10px] font-mono flex items-center">
+                        {(() => {
+                          const start = acc.checkInDay || updatedPlace.day || 1
+                          const end = acc.checkOutDay || acc.checkInDay || updatedPlace.day || 1
+                          const isMulti = end > start
+                          return (
+                            <>
+                              {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
+                              {formatTime(acc.checkIn, timeFormat)}
+                              <span className="mx-1 opacity-50">→</span>
+                              {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
+                              {formatTime(acc.checkOut, timeFormat)}
+                            </>
+                          )
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </FormListItem>
-          ))}
-          {!updatedPlace.accommodations?.length && (
-            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No accommodation added</p>
-          )}
+              </FormListItem>
+            ))}
+            {isEditMode && !updatedPlace.accommodations?.length && (
+              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No accommodation added</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 5. Activities */}
-      <div className="space-y-4 pb-4 border-b border-white/10">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
-            <span className="material-symbols-outlined text-base">flag</span> Activities
-          </FormLabel>
-          {isEditMode && (
-            <button
-              type="button"
-              onClick={() => handleAddAttachment('event')}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-red-400 bg-red-400/10 border border-red-400/20 hover:bg-red-400/20 transition-colors"
-              title="Add Activity"
-            >
-              <span className="material-symbols-outlined text-xs">add</span>
-              <span className="material-symbols-outlined text-xs text-red-400">flag</span>
-            </button>
-          )}
-        </div>
-        <div className="space-y-3">
-          {updatedPlace.events?.map((event, idx) => (
-            <FormListItem key={event.id || `event-${idx}`} onDelete={isEditMode ? () => handleDeleteEvent(event.id) : undefined} className="group border-red-400/20" onClick={() => setAttachmentDetail({ type: 'event', event })}>
-              <div className="flex items-center gap-3 w-full p-1">
-                <span className="text-red-400 material-symbols-outlined text-base">flag</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-bold truncate mb-0.5">{event.title}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/60 text-[10px] font-mono flex items-center">
-                      {(() => {
-                        const start = event.day || updatedPlace.day || 1
-                        const end = event.endDay || event.day || updatedPlace.day || 1
-                        const isMulti = end > start
-                        return (
-                          <>
-                            {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
-                            {formatTime(event.time || '', timeFormat)}
-                            {event.endTime && (
-                              <>
-                                <span className="mx-1 opacity-50">→</span>
-                                {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
-                                {formatTime(event.endTime, timeFormat)}
-                              </>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </span>
+      {(isEditMode || (updatedPlace.events?.length || 0) > 0) && (
+        <div className="space-y-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+              <span className="material-symbols-outlined text-base">flag</span> Activities
+            </FormLabel>
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={() => handleAddAttachment('event')}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-red-400 bg-red-400/10 border border-red-400/20 hover:bg-red-400/20 transition-colors"
+                title="Add Activity"
+              >
+                <span className="material-symbols-outlined text-xs">add</span>
+                <span className="material-symbols-outlined text-xs text-red-400">flag</span>
+              </button>
+            )}
+          </div>
+          <div className="space-y-3">
+            {updatedPlace.events?.map((event, idx) => (
+              <FormListItem key={event.id || `event-${idx}`} onDelete={isEditMode ? () => handleDeleteEvent(event.id) : undefined} className="group border-red-400/20" onClick={() => setAttachmentDetail({ type: 'event', event })}>
+                <div className="flex items-center gap-3 w-full p-1">
+                  <span className="text-red-400 material-symbols-outlined text-base">flag</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-bold truncate mb-0.5">{event.title}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/60 text-[10px] font-mono flex items-center">
+                        {(() => {
+                          const start = event.day || updatedPlace.day || 1
+                          const end = event.endDay || event.day || updatedPlace.day || 1
+                          const isMulti = end > start
+                          return (
+                            <>
+                              {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
+                              {formatTime(event.time || '', timeFormat)}
+                              {event.endTime && (
+                                <>
+                                  <span className="mx-1 opacity-50">→</span>
+                                  {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
+                                  {formatTime(event.endTime, timeFormat)}
+                                </>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </FormListItem>
-          ))}
-          {!updatedPlace.events?.length && (
-            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No activities added</p>
-          )}
+              </FormListItem>
+            ))}
+            {isEditMode && !updatedPlace.events?.length && (
+              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No activities added</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 6. Documents */}
-      <div className="space-y-4 pb-4 border-b border-white/10">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
-            <span className="material-symbols-outlined text-base">folder_open</span> Documents
-          </FormLabel>
-          {isEditMode && (
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => handleAddAttachment('document')}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/20 hover:bg-blue-400/20 transition-colors"
-                title="Add Document"
-              >
-                <span className="material-symbols-outlined text-xs">add</span>
-                <span className="material-symbols-outlined text-xs text-blue-400">description</span>
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="space-y-2">
-          {updatedPlace.documents?.map((doc, idx) => (
-            <FormListItem key={doc.id || `doc-${idx}`} onDelete={isEditMode ? () => handleDeleteDocument(doc.id) : undefined} className="border-blue-400/20" onClick={() => setAttachmentDetail({ type: 'document', document: doc })}>
-              <div className="flex items-center gap-3 w-full p-1">
-                <span className="text-blue-400 material-symbols-outlined text-base">description</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-bold truncate">{doc.name}</p>
-                  <p className="text-blue-400/60 text-[10px]">{doc.type}</p>
-                </div>
+      {(isEditMode || (updatedPlace.documents?.length || 0) > 0) && (
+        <div className="space-y-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+              <span className="material-symbols-outlined text-base">folder_open</span> Documents
+            </FormLabel>
+            {isEditMode && (
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleAddAttachment('document')}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/20 hover:bg-blue-400/20 transition-colors"
+                  title="Add Document"
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                  <span className="material-symbols-outlined text-xs text-blue-400">description</span>
+                </button>
               </div>
-            </FormListItem>
-          ))}
-
-          {!updatedPlace.documents?.length && (
-            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents added</p>
-          )}
+            )}
+          </div>
+          <div className="space-y-2">
+            {updatedPlace.documents?.map((doc, idx) => (
+              <FormListItem key={doc.id || `doc-${idx}`} onDelete={isEditMode ? () => handleDeleteDocument(doc.id) : undefined} className="border-blue-400/20" onClick={() => setAttachmentDetail({ type: 'document', document: doc })}>
+                <div className="flex items-center gap-3 w-full p-1">
+                  <span className="text-blue-400 material-symbols-outlined text-base">description</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-bold truncate">{doc.name}</p>
+                    <p className="text-blue-400/60 text-[10px]">{doc.type}</p>
+                  </div>
+                </div>
+              </FormListItem>
+            ))}
+            {isEditMode && !updatedPlace.documents?.length && (
+              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents added</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 7. URLs & Links */}
-      <div className="space-y-4 pb-4 border-b border-white/10">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
-            <span className="material-symbols-outlined text-base">link</span> URLs & Links
-          </FormLabel>
-          {isEditMode && (
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => handleAddAttachment('link')}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 hover:bg-cyan-400/20 transition-colors"
-                title="Add URL"
-              >
-                <span className="material-symbols-outlined text-xs">add</span>
-                <span className="material-symbols-outlined text-xs text-cyan-400">link</span>
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="space-y-2">
-          {updatedPlace.links?.map((link, idx) => (
-            <FormListItem key={link.id || `link-${idx}`} onDelete={isEditMode ? () => handleDeleteLink(link.id) : undefined} className="border-cyan-400/20" onClick={() => setAttachmentDetail({ type: 'link', link })}>
-              <div className="flex items-center gap-3 w-full p-1">
-                <span className="text-cyan-400 material-symbols-outlined text-base">link</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-bold truncate">{link.title || link.url}</p>
-                </div>
+      {(isEditMode || (updatedPlace.links?.length || 0) > 0) && (
+        <div className="space-y-4 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+              <span className="material-symbols-outlined text-base">link</span> URLs & Links
+            </FormLabel>
+            {isEditMode && (
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleAddAttachment('link')}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 hover:bg-cyan-400/20 transition-colors"
+                  title="Add URL"
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                  <span className="material-symbols-outlined text-xs text-cyan-400">link</span>
+                </button>
               </div>
-            </FormListItem>
-          ))}
-
-          {!updatedPlace.links?.length && (
-            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No links added</p>
-          )}
+            )}
+          </div>
+          <div className="space-y-2">
+            {updatedPlace.links?.map((link, idx) => (
+              <FormListItem key={link.id || `link-${idx}`} onDelete={isEditMode ? () => handleDeleteLink(link.id) : undefined} className="border-cyan-400/20" onClick={() => setAttachmentDetail({ type: 'link', link })}>
+                <div className="flex items-center gap-3 w-full p-1">
+                  <span className="text-cyan-400 material-symbols-outlined text-base">link</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-bold truncate">{link.title || link.url}</p>
+                  </div>
+                </div>
+              </FormListItem>
+            ))}
+            {isEditMode && !updatedPlace.links?.length && (
+              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No links added</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 8. Transport Section */}
-      <div className="space-y-4 pb-8">
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
-            <span className="material-symbols-outlined text-base">commute</span> Transport
-          </FormLabel>
-          {isEditMode && !isNew && onAddTransport && (
-            <button
-              type="button"
-              onClick={handleAddTransport}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 transition-colors"
-              title="Add Transport"
-            >
-              <span className="material-symbols-outlined text-xs">add</span>
-              <span className="material-symbols-outlined text-xs text-emerald-400">commute</span>
-            </button>
-          )}
-        </div>
-        {(() => {
-          const globalIndex = allPlaces.findIndex(p => p.id === place.id);
-          if (globalIndex === -1) return null;
-          const inboundSource = globalIndex === 0 ? place : allPlaces[globalIndex - 1];
-          const inboundLegs = inboundSource.transport?.filter(t => t.to === place.id) || [];
-          const outboundLegs = updatedPlace.transport?.filter(t => t.from === place.id) || [];
-          return (
+      {(() => {
+        const globalIndex = allPlaces.findIndex(p => p.id === place.id);
+        if (globalIndex === -1) return null;
+        const inboundSource = globalIndex === 0 ? place : allPlaces[globalIndex - 1];
+        const inboundLegs = inboundSource.transport?.filter(t => t.to === place.id) || [];
+        const outboundLegs = updatedPlace.transport?.filter(t => t.from === place.id) || [];
+        const hasTransport = inboundLegs.length > 0 || outboundLegs.length > 0;
+        
+        if (!isEditMode && !hasTransport) return null;
+
+        return (
+          <div className="space-y-4 pb-8">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+                <span className="material-symbols-outlined text-base">commute</span> Transport
+              </FormLabel>
+              {isEditMode && !isNew && onAddTransport && (
+                <button
+                  type="button"
+                  onClick={handleAddTransport}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 hover:bg-emerald-400/20 transition-colors"
+                  title="Add Transport"
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                  <span className="material-symbols-outlined text-xs text-emerald-400">commute</span>
+                </button>
+              )}
+            </div>
             <div className="space-y-3">
               {inboundLegs.map((leg, idx) => (
                 <div key={`inbound-${leg.id || idx}`} className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center justify-between group cursor-pointer hover:bg-white/10 transition-all" onClick={() => onOpenTransport(leg, inboundSource.name, place.name)}>
@@ -947,7 +995,7 @@ export default function PlaceDetailModal({
                     <span className="material-symbols-outlined text-primary">login</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-white/40 font-bold truncate">Arrival from {inboundSource.name}</p>
-                      <p className="text-xs text-white font-medium truncate">{leg.mode} • {leg.arrival}</p>
+                      <p className="text-xs text-white font-medium truncate">{leg.type} • {leg.arrival}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 relative w-6 h-6 flex-shrink-0">
@@ -971,7 +1019,7 @@ export default function PlaceDetailModal({
                       <span className="material-symbols-outlined text-green-400 shrink-0">logout</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-white/40 font-bold truncate">Departure to {destination?.name || 'Next'}</p>
-                        <p className="text-xs text-white font-medium truncate">{leg.mode} • {leg.departure}</p>
+                        <p className="text-xs text-white font-medium truncate">{leg.type} • {leg.departure}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 relative w-6 h-6 flex-shrink-0">
@@ -988,19 +1036,19 @@ export default function PlaceDetailModal({
                   </div>
                 );
               })}
-              {!inboundLegs.length && !outboundLegs.length && (
+              {isEditMode && !inboundLegs.length && !outboundLegs.length && (
                 <p key="no-transport" className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No transport recorded</p>
               )}
             </div>
-          );
-        })()}
-      </div>
+          </div>
+        );
+      })()}
     </div>
   )
 
   const rightColumnContent = (
     <div className="h-full bg-neutral-900 relative">
-      <Map
+      <MapPreview
         className="w-full h-full"
         places={allPlaces}
         focusedPlaceId={place.id}
@@ -1152,7 +1200,7 @@ export default function PlaceDetailModal({
               subtitle={`Finding images for ${updatedPlace.name}`}
               onClose={() => setIsImageSearchOpen(false)}
             />
-            <div className="p-6 border-b border-white/10">
+            <div className="p-4 border-b border-white/5 bg-white/[0.02]">
               <div className="relative">
                 <input
                   ref={imageSearchInputRef}
@@ -1160,11 +1208,11 @@ export default function PlaceDetailModal({
                   value={imageSearchQuery}
                   onChange={(e) => setImageSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleImageSearch(imageSearchQuery)}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-12 text-white placeholder-white/20 outline-none focus:border-primary"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-white placeholder-neutral-500 outline-none focus:border-primary/50 text-sm transition-all"
                   placeholder="Search for photos..."
                 />
-                <button onClick={() => handleImageSearch(imageSearchQuery)} className="absolute right-3 top-3 text-white/40 hover:text-white">
-                  <span className="material-symbols-outlined">{isImageSearching ? 'refresh' : 'search'}</span>
+                <button onClick={() => handleImageSearch(imageSearchQuery)} className="absolute right-3 top-2.5 text-neutral-500 hover:text-white">
+                  <span className="material-symbols-outlined text-xs">{isImageSearching ? 'refresh' : 'search'}</span>
                 </button>
               </div>
             </div>

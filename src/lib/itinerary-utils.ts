@@ -54,8 +54,8 @@ export function getGlobalItinerary(trip: Trip): ItineraryItem[] {
 }
 
 function sortTransports(a: Transport, b: Transport) {
-  const dayA = a.departureDay || 1
-  const dayB = b.departureDay || 1
+  const dayA = a.departureDay ?? 1
+  const dayB = b.departureDay ?? 1
   if (dayA !== dayB) return dayA - dayB
   return (a.departure || '').localeCompare(b.departure || '')
 }
@@ -84,20 +84,20 @@ export function getItemBounds(
 
   if (prev) {
     if (prev.type === 'place') {
-      minDay = prev.data.endDay || prev.data.day || 1
+      minDay = (prev.data.endDay || prev.data.day) ?? 1
       minTime = prev.data.departure || ''
     } else {
-      minDay = prev.data.arrivalDay || prev.data.departureDay || 1
+      minDay = (prev.data.arrivalDay || prev.data.departureDay) ?? 1
       minTime = prev.data.arrival || ''
     }
   }
 
   if (next) {
     if (next.type === 'place') {
-      maxDay = next.data.day || 1
+      maxDay = next.data.day ?? 1
       maxTime = next.data.arrival || ''
     } else {
-      maxDay = next.data.departureDay || 1
+      maxDay = next.data.departureDay ?? 1
       maxTime = next.data.departure || ''
     }
   }

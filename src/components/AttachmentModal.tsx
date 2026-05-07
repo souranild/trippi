@@ -10,6 +10,7 @@ import {
   ModalContainer,
   ModalHeader,
   ModalFooter,
+  ModalContent,
 } from '@/components/ModalLayout'
 import LocationPickerModal from '@/components/LocationPickerModal'
 import { Button } from '@/components/Button'
@@ -565,10 +566,15 @@ export default function AttachmentModal({
       )}
 
       {isSearchingModalOpen && (
-        <div className="fixed inset-0 z-[6000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" onClick={() => setIsSearchingModalOpen(false)}>
-          <div className="bg-neutral-900 border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-white/5 flex items-center gap-3">
-              <div className="flex-1 relative">
+        <ModalBackdrop onClick={() => setIsSearchingModalOpen(false)}>
+          <ModalContainer size="sm">
+            <ModalHeader 
+              title="Search Photos" 
+              subtitle="Find images for your entry"
+              onClose={() => setIsSearchingModalOpen(false)}
+            />
+            <div className="p-4 border-b border-white/5 bg-white/[0.02]">
+              <div className="relative">
                 <input
                   autoFocus
                   placeholder="Search for photos..."
@@ -579,17 +585,14 @@ export default function AttachmentModal({
                 />
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">search</span>
               </div>
-              <button onClick={() => setIsSearchingModalOpen(false)} className="p-2 rounded-lg hover:bg-white/5 text-neutral-400">
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 min-h-[300px] custom-scrollbar">
+            <ModalContent className="p-4">
               {isSearching ? (
                 <div className="flex items-center justify-center h-48">
                   <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : searchResults.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {searchResults.map((photo: string, i: number) => {
                     const currentPhotos = type === 'accommodation' ? accPhotos : eventPhotos
                     const isSelected = currentPhotos.includes(photo)
@@ -624,12 +627,12 @@ export default function AttachmentModal({
                   <p className="text-xs font-bold">Search for photos</p>
                 </div>
               )}
-            </div>
-            <div className="p-4 border-t border-white/5">
+            </ModalContent>
+            <ModalFooter>
               <Button variant="modal-primary" fullWidth onClick={() => setIsSearchingModalOpen(false)}>Done</Button>
-            </div>
-          </div>
-        </div>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
     </>
   )

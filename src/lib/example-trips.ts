@@ -1,6 +1,6 @@
 import { Trip } from './storage'
 
-export const EXAMPLE_TRIPS: Trip[] = [
+export const EXAMPLE_TRIPS: Trip[] = ([
   {
     id: 'example-tokyo-2024',
     title: 'Tokyo Adventure',
@@ -316,7 +316,7 @@ export const EXAMPLE_TRIPS: Trip[] = [
       }
     ]
   }
-]
+] as any[]) as Trip[]
 
 export function getRandomExampleTrips(count: number = 2): Trip[] {
   const shuffled = [...EXAMPLE_TRIPS].sort(() => Math.random() - 0.5)

@@ -7,6 +7,7 @@ export interface Document {
   mimeType?: string
   day?: number
   endDay?: number
+  size?: number
 }
 
 export interface Link {
@@ -131,6 +132,7 @@ export interface Transport {
   ticketNumber?: string
   fromLocation?: string
   toLocation?: string
+  distance?: string
   photos?: string[]
   photoDays?: (number | null)[]
 }

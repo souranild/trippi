@@ -37,10 +37,11 @@ import AttachmentDetailModal, { type AttachmentDetailData } from '@/components/A
 import AppHeader from '@/components/AppHeader'
 import ItineraryTable from '@/components/ItineraryTable'
 import MediaViewer from '@/components/MediaViewer'
-import { formatDate, formatDuration, formatDateShort, formatTime } from '@/lib/date-utils'
+import { formatDate, formatDuration, formatDateShort, formatTime, calculateTimeDuration } from '@/lib/date-utils'
 import { isSameDay } from 'date-fns'
 import CalendarView from '@/components/CalendarView'
 import LocationPickerModal from '@/components/LocationPickerModal'
+import { Button } from '@/components/Button'
 
 // Kept for backward compat — prefer formatTime() from date-utils everywhere
 function formatTime12h(time: string): string {
@@ -96,6 +97,7 @@ export default function TripDetail() {
   // -- Map & Location State --
   const [mapViewport, setMapViewport] = useState<{ center: { lat: number, lng: number }, zoom: number } | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
+  const [focusedTransportId, setFocusedTransportId] = useState<string | null>(null)
   const [mapPreviewCoords, setMapPreviewCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [livePlaceId, setLivePlaceId] = useState<string | null>(null)
   const [liveTransportId, setLiveTransportId] = useState<string | null>(null)
@@ -139,6 +141,7 @@ export default function TripDetail() {
   const [selectedTransportMode, setSelectedTransportMode] = useState<TransportMode | null>(null)
   const [transportLegTitle, setTransportLegTitle] = useState('')
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isEditFormValid, setIsEditFormValid] = useState(false)
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [leftPanelWidth, setLeftPanelWidth] = useState(65); // Percentage
@@ -158,7 +161,7 @@ export default function TripDetail() {
     const queue = getGlobalItinerary({ ...trip, places } as Trip)
     const dayItems = queue.filter(item => {
       if (item.type === 'place') {
-        const start = item.data.day || 1
+        const start = item.data.day ?? 1
         const end = item.data.endDay || start
         return dayNum >= start && dayNum <= end
       } else {
@@ -207,7 +210,7 @@ export default function TripDetail() {
         lat,
         lng,
         photos: (place.images && place.images.length > 0) ? place.images : (place.image ? [place.image] : editingPlaceForDetail.photos),
-        notes: place.description ? [{ day: editingPlaceForDetail.day || 1, text: place.description }, ...editingPlaceForDetail.notes] : editingPlaceForDetail.notes
+        notes: place.description ? [{ day: editingPlaceForDetail.day ?? 1, text: place.description }, ...editingPlaceForDetail.notes] : editingPlaceForDetail.notes
       })
       return
     }
@@ -222,7 +225,7 @@ export default function TripDetail() {
         lat,
         lng,
         photos: (place.images && place.images.length > 0) ? place.images : (place.image ? [place.image] : configuringNewPlace.photos),
-        notes: place.description ? [{ day: configuringNewPlace.day || 1, text: place.description }, ...configuringNewPlace.notes] : configuringNewPlace.notes
+        notes: place.description ? [{ day: configuringNewPlace.day ?? 1, text: place.description }, ...configuringNewPlace.notes] : configuringNewPlace.notes
       })
       return
     }
@@ -254,6 +257,29 @@ export default function TripDetail() {
     }
     setConfiguringNewPlace(draft)
   }, [newPlaceDay, newPlaceEndDay, getLatestTimeOnDay, editingPlaceForDetail, configuringNewPlace]);
+
+  const tripQuote = useMemo(() => {
+    if (!trip) return 'Plan your journey day by day';
+    const WISDOM = [
+      "The world is a book, and those who do not travel read only one page.",
+      "Not all those who wander are lost. But some are definitely just bad at Google Maps.",
+      "Travel is the only thing you buy that makes you richer — and a little jet-lagged.",
+      "A bad day of travel is still better than a good day in the office.",
+      "Life is short and the world is wide. Start packing.",
+      "Jet lag is for amateurs. Real travellers just call it 'timezone expansion'.",
+      "The best souvenir? The stories no one at home will fully understand.",
+      "Every trip changes you. Some for better, some for blisters.",
+      "You can't buy happiness, but you can buy plane tickets. Same thing.",
+      "Travelling — because adulting is overrated, but boarding passes are not.",
+      "Adventure awaits. So does your overweight baggage fee.",
+      "Getting lost is just discovering a place that wasn't on the itinerary.",
+      "The world is too big to stay in one place. Your comfort zone included.",
+      "Collect moments, not things. Except maybe that one fridge magnet.",
+      "Travelling solo teaches you that you were never really alone.",
+    ];
+    const seed = (trip.id || '').split('').reduce((acc, c: string) => acc + c.charCodeAt(0), 0);
+    return WISDOM[seed % WISDOM.length];
+  }, [trip]);
 
   const handleAddDiscovery = useCallback((discovery: any) => {
     selectPlaceFromSearch(discovery);
@@ -289,7 +315,7 @@ export default function TripDetail() {
       const todayObj = new Date();
       const diffTime = todayObj.getTime() - startObj.getTime();
       const currentTripDay = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      const placeStart = place.day || 1;
+      const placeStart = place.day ?? 1;
       const placeEnd = place.endDay || placeStart;
       const placeDay = Math.max(placeStart, Math.min(currentTripDay, placeEnd));
       
@@ -306,7 +332,7 @@ export default function TripDetail() {
     }, 100);
     
     setEditingPlaceForDetail(place)
-    setPlaceDetailInitialDay(place.day || 1)
+    setPlaceDetailInitialDay(place.day ?? 1)
     setIsPlaceDetailModalOpen(true)
   }, [trip, isMobile]);
 
@@ -314,7 +340,7 @@ export default function TripDetail() {
     setFocusedPlaceId(place.id);
     closeMobileMap();
     setTimeout(() => {
-       const el = document.getElementById(`day-${place.day || 1}-place-${place.id}`);
+       const el = document.getElementById(`day-${place.day ?? 1}-place-${place.id}`);
        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 500);
   }, [closeMobileMap]);
@@ -374,13 +400,21 @@ export default function TripDetail() {
         const activeEntry = entries.find(e => e.isIntersecting);
         if (activeEntry) {
           const id = activeEntry.target.id;
-          const match = id.match(/day-\d+-place-(.+)/);
-          if (match && match[1]) {
-            // Only update if it's different to avoid redundant state updates
-            setFocusedPlaceId(prev => {
-              if (prev === match[1]) return prev;
-              return match[1];
-            });
+          
+          // Handle place focus
+          const placeMatch = id.match(/day-\d+-place-(.+)/);
+          if (placeMatch && placeMatch[1]) {
+            setFocusedPlaceId(prev => (prev === placeMatch[1] ? prev : placeMatch[1]));
+            setFocusedTransportId(null);
+            return;
+          }
+
+          // Handle transport focus
+          const legMatch = id.match(/leg-(.+)/);
+          if (legMatch && legMatch[1]) {
+            setFocusedTransportId(prev => (prev === legMatch[1] ? prev : legMatch[1]));
+            setFocusedPlaceId(null);
+            return;
           }
         }
       },
@@ -391,8 +425,8 @@ export default function TripDetail() {
       }
     );
 
-    // Select all place containers in the timeline
-    const elements = document.querySelectorAll('[id^="day-"][id*="-place-"]');
+    // Select all place and transport containers in the timeline
+    const elements = document.querySelectorAll('[id^="day-"][id*="-place-"], [id^="leg-"]');
     elements.forEach(el => observer.observe(el));
 
     return () => observer.disconnect();
@@ -444,14 +478,14 @@ export default function TripDetail() {
       const currentDay = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
       const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0')
 
-      const itinerary = getGlobalItinerary(places)
+      const itinerary = getGlobalItinerary({ ...trip, places } as Trip)
       
       let foundPlace: string | null = null
       let foundTransport: string | null = null
 
       for (const item of itinerary) {
         if (item.type === 'place') {
-          const startDay = item.data.day || 1
+          const startDay = item.data.day ?? 1
           const endDay = item.data.endDay || startDay
           const arrival = item.data.arrival || '00:00'
           const departure = item.data.departure || '23:59'
@@ -476,8 +510,8 @@ export default function TripDetail() {
             }
           }
         } else if (item.type === 'transport') {
-          const depDay = item.data.departureDay || 1
-          const arrDay = item.data.arrivalDay || depDay
+          const depDay = item.data.departureDay ?? 1
+          const arrDay = item.data.arrivalDay ?? depDay
           const depTime = item.data.departure || '00:00'
           const arrTime = item.data.arrival || '23:59'
 
@@ -598,7 +632,7 @@ export default function TripDetail() {
   const [triggeredLiveHighlightId, setTriggeredLiveHighlightId] = useState<string | null>(null)
 
   // Attachment detail modal (view/edit existing)
-  const [attachmentDetail, setAttachmentDetail] = useState<{ data: AttachmentDetailData; placeId: string } | null>(null)
+  const [attachmentDetail, setAttachmentDetail] = useState<{ data: AttachmentDetailData; placeId: string; transportLegId?: string } | null>(null)
 
   // Track state of nested pickers in TripForm to manage the global back button
   const [isEmojiPickerInForm, setIsEmojiPickerInForm] = useState(false)
@@ -608,27 +642,36 @@ export default function TripDetail() {
   const getAllDaysInTrip = () => {
     if (!trip?.startDate) return []
     
-    const startDate = new Date(trip.startDate)
-    const endDate = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
+    // Calculate default range from trip dates
+    const tripStart = new Date(trip.startDate)
+    const tripEnd = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
     
+    let minDay = 1
+    let maxDay = Math.ceil((tripEnd.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    
+    // Expand range based on actual content (places and transport)
+    places.forEach(place => {
+      const pStart = place.day ?? 1
+      const pEnd = (place.endDay || place.day) ?? 1
+      if (pStart < minDay) minDay = pStart
+      if (pEnd > maxDay) maxDay = pEnd
+    })
+
     const days = []
-    const currentDate = new Date(startDate)
-    let dayNumber = 1
-    
-    while (currentDate <= endDate) {
+    for (let d = minDay; d <= maxDay; d++) {
+      const currentDate = new Date(tripStart)
+      currentDate.setDate(tripStart.getDate() + (d - 1))
+      
       days.push({
-        dayNumber,
+        dayNumber: d,
         date: new Date(currentDate),
         formattedDate: formatDateShort(currentDate),
         places: places.filter(place => {
-          const start = place.day || 1
-          const end = place.endDay || start
-          return dayNumber >= start && dayNumber <= end
+          const start = place.day ?? 1
+          const end = (place.endDay || place.day) ?? 1
+          return d >= start && d <= end
         })
       })
-      
-      currentDate.setDate(currentDate.getDate() + 1)
-      dayNumber++
     }
     
     return days
@@ -685,6 +728,28 @@ export default function TripDetail() {
     setIsEditModalOpen(false)
     setIsEditSubmitting(false)
     setPreviewWallpaper(null)
+  }
+
+  const handleAddHome = (initialLocation: string, dayNum: number, position: 'start' | 'end') => {
+    setEditingPlace({
+      id: '',
+      name: 'Home',
+      location: initialLocation || '',
+      country: '',
+      notes: [],
+      accommodations: [],
+      events: [],
+      documents: [],
+      links: [],
+      photos: [],
+      day: dayNum,
+      endDay: dayNum,
+      arrival: position === 'start' ? '08:00' : '20:00',
+      departure: position === 'start' ? '10:00' : '22:00',
+      emoji: '🏠'
+    } as Place)
+    setNewPlaceDay(dayNum)
+    setNewPlaceEndDay(dayNum)
   }
 
   const searchEditWallpapers = async (query: string) => {
@@ -814,7 +879,6 @@ export default function TripDetail() {
     setNewPlaceDay(Math.max(1, places.length + 1))
     setNewPlaceEndDay(Math.max(1, places.length + 1))
     setNewPlacePhotos([])
-    setMapsUrlInput('')
     setMapPreviewCoords(null)
     setPlaceInputMode('search')
     setMobileStep(1)
@@ -851,11 +915,11 @@ export default function TripDetail() {
     setIsEventModalOpen(true)
     const place = places.find(p => p.id === placeId)
     if (place) {
-      setEventDay(place.day || 1)
-      setEventEndDay(place.day || 1)
+      setEventDay(place.day ?? 1)
+      setEventEndDay(place.day ?? 1)
       if (trip && trip.startDate) {
         const placeDate = new Date(trip.startDate)
-        placeDate.setDate(placeDate.getDate() + (place.day || 1) - 1)
+        placeDate.setDate(placeDate.getDate() + (place.day ?? 1) - 1)
         setEventDate(placeDate.toISOString().split('T')[0])
       }
     }
@@ -942,6 +1006,38 @@ export default function TripDetail() {
     setTransportToPlaceId(null)
   }
 
+  // Helper to check if a transport leg is currently active
+  const getTransportLiveStatus = (leg: Transport, currentDayNum: number, basePlace?: Place) => {
+    if (!trip || !trip.startDate) return false;
+    const now = new Date();
+    const nowTimeMins = now.getHours() * 60 + now.getMinutes();
+    const start = new Date(trip.startDate);
+    const isToday = isSameDay(new Date(start.getTime() + (currentDayNum - 1) * 86400000), now);
+    if (!isToday) return false;
+
+    if (!leg.departure || !leg.arrival) return false;
+    
+    const depDay = leg.departureDay ?? (basePlace?.day ?? currentDayNum);
+    const arrDay = leg.arrivalDay ?? (basePlace?.endDay ?? depDay);
+    
+    if (currentDayNum < depDay || currentDayNum > arrDay) return false;
+    
+    const [dh, dm] = leg.departure.split(':').map(Number);
+    const [ah, am] = leg.arrival.split(':').map(Number);
+    const depMins = dh * 60 + dm;
+    const arrMins = ah * 60 + am;
+    
+    if (currentDayNum === depDay && currentDayNum === arrDay) {
+      return nowTimeMins >= depMins && nowTimeMins <= arrMins;
+    } else if (currentDayNum === depDay) {
+      return nowTimeMins >= depMins;
+    } else if (currentDayNum === arrDay) {
+      return nowTimeMins <= arrMins;
+    } else {
+      return true; // Mid-day of a multi-day trip
+    }
+  };
+
   const openTransportModal = (placeIndex: number, position: 'before' | 'after', legId?: string, defaultDay?: number) => {
     setTransportLegDefaultDay(defaultDay ?? null)
     const fromPlaceId = position === 'before' ? (placeIndex === 0 ? 'home' : places[placeIndex - 1].id) : places[placeIndex].id
@@ -953,7 +1049,7 @@ export default function TripDetail() {
     const fromPlace = fromPlaceId === 'home' ? (places[0] || null) : places.find(p => p.id === fromPlaceId)
     
     // Bounds Calculation
-    const queue = getGlobalItinerary({ ...trip, places })
+    const queue = getGlobalItinerary({ ...trip, places } as Trip)
     let currentIndex = -1
     if (legId) {
       currentIndex = queue.findIndex(item => item.type === 'transport' && item.data.id === legId)
@@ -1077,7 +1173,7 @@ export default function TripDetail() {
       if (place) {
         setFocusedPlaceId(placeId)
         setEditingPlaceForDetail(place)
-        setPlaceDetailInitialDay(place.day || 1)
+        setPlaceDetailInitialDay(place.day ?? 1)
         setIsPlaceDetailModalOpen(true)
         // Clean up the URL to prevent re-opening on refresh
         const newParams = new URLSearchParams(searchParams.toString())
@@ -1127,31 +1223,37 @@ export default function TripDetail() {
     if (!dayData) return { day };
 
     // 1. Check for live transport first
-    if (dayData.transport && dayData.transport.length > 0) {
-      const activeTransport = dayData.transport.find(t => {
-        if (!t.departure || !t.arrival) return false;
-        const [dh, dm] = t.departure.split(':').map(Number);
-        const [ah, am] = t.arrival.split(':').map(Number);
-        const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
-        const depMins = dh * 60 + dm;
-        const arrMins = ah * 60 + am;
-
-        // Simple case: same day travel
-        if (t.arrivalDay === t.departureDay || !t.arrivalDay) {
-          return nowMins >= depMins && nowMins <= arrMins;
-        }
-        
-        // Multi-day travel
-        if (day === t.departureDay) return nowMins >= depMins;
-        if (day === t.arrivalDay) return nowMins <= arrMins;
-        if (day > (t.departureDay || 0) && day < (t.arrivalDay || 0)) return true;
-        
-        return false;
-      });
+    const itinerary = getGlobalItinerary({ ...trip, places } as Trip)
+    const activeTransport = itinerary.find(item => {
+      if (item.type !== 'transport') return false;
+      const t = item.data;
+      if (!t.departure || !t.arrival) return false;
       
-      if (activeTransport) {
-        return { day, transportId: activeTransport.id };
+      const [dh, dm] = t.departure.split(':').map(Number);
+      const [ah, am] = t.arrival.split(':').map(Number);
+      const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+      const depMins = dh * 60 + dm;
+      const arrMins = ah * 60 + am;
+
+      const depDay = t.departureDay ?? 1;
+      const arrDay = t.arrivalDay ?? depDay;
+
+      // Simple case: same day travel
+      if (arrDay === depDay) {
+        if (day !== depDay) return false;
+        return nowMins >= depMins && nowMins <= arrMins;
       }
+      
+      // Multi-day travel
+      if (day === depDay) return nowMins >= depMins;
+      if (day === arrDay) return nowMins <= arrMins;
+      if (day > depDay && day < arrDay) return true;
+      
+      return false;
+    });
+
+    if (activeTransport && activeTransport.type === 'transport') {
+      return { day, transportId: activeTransport.data.id };
     }
 
     // 2. Check for live place
@@ -1185,7 +1287,7 @@ export default function TripDetail() {
     if (text.trim().startsWith('<')) {
       return (
         <div 
-          className="prose-renderer text-[11px] leading-relaxed"
+          className="prose-renderer text-[11px] leading-relaxed text-neutral-300 font-medium"
           dangerouslySetInnerHTML={{ __html: text }}
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -1314,7 +1416,7 @@ export default function TripDetail() {
     <div className="relative min-h-screen bg-background text-on-surface font-body">
       {(previewWallpaper || trip?.wallpaper) && (
         <ParallaxBackground 
-          src={previewWallpaper || trip.wallpaper} 
+          src={previewWallpaper || trip?.wallpaper || ''} 
           opacity={wallpaperOpacity} 
           parallaxFactor={0.2}
         />
@@ -1344,16 +1446,19 @@ export default function TripDetail() {
               >
                 <span className="material-symbols-outlined text-sm sm:text-[20px]">share</span>
               </button>
-              {!isEditMode && (
                 <button
                   type="button"
+                  disabled={isEditMode}
                   onClick={(e) => { e.stopPropagation(); setIsViewSettingsOpen(true); }}
-                  className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 border border-white/20 text-white hover:bg-primary hover:text-black transition-all active:scale-90"
-                  title="View Settings"
+                  className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border text-white transition-all active:scale-90 ${
+                    isEditMode 
+                      ? 'bg-white/5 border-white/5 opacity-30 cursor-not-allowed' 
+                      : 'bg-white/10 border-white/20 hover:bg-primary hover:text-black hover:border-primary'
+                  }`}
+                  title={isEditMode ? "View settings disabled in Edit Mode" : "View Settings"}
                 >
                   <span className="material-symbols-outlined text-sm sm:text-[20px]">settings</span>
                 </button>
-              )}
               <div className="flex items-center bg-white/5 border border-white/10 rounded-full p-0.5 sm:p-1 relative">
                 <button
                   type="button"
@@ -1368,11 +1473,6 @@ export default function TripDetail() {
                   className={`rounded-full px-2 sm:px-3 py-1 text-[9px] sm:text-xs font-bold transition-all relative ${isEditMode ? 'bg-primary text-slate-950 shadow-lg' : 'text-neutral-400 hover:text-white'}`}
                 >
                   Edit
-                  {isEditMode && (
-                    <div className="absolute -top-4 -right-1 pointer-events-none animate-[hammer_1.2s_infinite] z-[100]">
-                      <span className="material-symbols-outlined text-[16px] text-yellow-400 font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] select-none">hammer</span>
-                    </div>
-                  )}
                 </button>
               </div>
             </div>
@@ -1418,22 +1518,20 @@ export default function TripDetail() {
                 >
                   <span className="material-symbols-outlined text-[20px]">share</span>
                 </button>
-                {!isEditMode && (
-                  <button
-                    type="button"
-                    disabled={itineraryViewMode === 'table'}
-                    onClick={(e) => { e.stopPropagation(); setIsViewSettingsOpen(true); }}
-                    className={`group relative flex items-center justify-center w-10 h-10 rounded-full border transition-all duration-300 shadow-lg active:scale-90 ${
-                      itineraryViewMode === 'table' 
-                        ? 'bg-white/5 border-white/5 text-neutral-600 cursor-not-allowed opacity-50' 
-                        : 'bg-white/10 border-white/20 text-white hover:bg-primary hover:text-black hover:border-primary'
-                    }`}
-                    title={itineraryViewMode === 'table' ? "Filter using table controls" : "View Settings"}
-                  >
-                    <span className={`material-symbols-outlined text-[20px] ${itineraryViewMode === 'table' ? '' : 'group-hover:rotate-90 transition-transform duration-500'}`}>settings</span>
-                  </button>
-                )}
-                <div className="inline-flex overflow-hidden rounded-full border border-white/10 bg-white/5 p-1">
+                <button
+                  type="button"
+                  disabled={isEditMode}
+                  onClick={(e) => { e.stopPropagation(); setIsViewSettingsOpen(true); }}
+                  className={`group relative flex items-center justify-center w-10 h-10 rounded-full border transition-all duration-300 shadow-lg active:scale-90 ${
+                    isEditMode 
+                      ? 'bg-white/5 border-white/5 text-neutral-600 cursor-not-allowed opacity-30' 
+                      : 'bg-white/10 border-white/20 text-white hover:bg-primary hover:text-black hover:border-primary'
+                  }`}
+                  title={isEditMode ? "View settings disabled in Edit Mode" : "View Settings"}
+                >
+                  <span className={`material-symbols-outlined text-[20px] ${isEditMode ? '' : 'group-hover:rotate-90 transition-transform duration-500'}`}>settings</span>
+                </button>
+                <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1 relative">
                 <button
                   type="button"
                   onClick={() => setIsEditMode(false)}
@@ -1444,7 +1542,7 @@ export default function TripDetail() {
                 <button
                   type="button"
                   onClick={() => setIsEditMode(true)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isEditMode ? 'bg-primary/90 text-slate-950' : 'text-neutral-400 hover:text-white'}`}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition relative ${isEditMode ? 'bg-primary text-slate-950 shadow-lg' : 'text-neutral-400 hover:text-white'}`}
                 >
                   Edit
                 </button>
@@ -1486,7 +1584,7 @@ export default function TripDetail() {
                       <span className="material-symbols-outlined text-primary text-xl">timeline</span>
                       Itinerary
                     </h2>
-                    <p className="text-neutral-500 text-sm mt-1">Plan your journey day by day</p>
+                    <p className="text-neutral-500 text-xs mt-1 italic line-clamp-1">&ldquo;{tripQuote}&rdquo;</p>
                   </div>
 
                     <div className="flex items-center gap-2">
@@ -1624,6 +1722,26 @@ export default function TripDetail() {
                   ) : itineraryViewMode === 'table' ? (
                     <ItineraryTable 
                       trip={trip} 
+                      isEditMode={isEditMode}
+                      onAdd={(type) => {
+                        if (type === 'place') handleOpenAddPlace()
+                        else if (type === 'transport') {
+                          setTransportBetweenIndex(-1)
+                          setIsTransportModalOpen(true)
+                        }
+                      }}
+                      onUpdateTrip={(updatedTrip) => updateTripContext(updatedTrip)}
+                      visibilitySettings={{
+                        showPlaces,
+                        showTransports,
+                        showAccommodations,
+                        showEvents,
+                        showDocuments,
+                        showLinks,
+                        showNotes,
+                        timeFormat,
+                        compactMode
+                      }}
                       onItemClick={(type, id, data) => {
                         if (type === 'place') {
                           setEditingPlaceForDetail(data);
@@ -1647,28 +1765,124 @@ export default function TripDetail() {
                     />
                   ) : (
                     <div className="space-y-6">
+                      {/* Start of Trip Connection Block */}
+                      {places.length > 0 && (
+                        (() => {
+                          const firstPlace = places[0];
+                          const targetId = 'home';
+                          const legs = firstPlace.transport?.filter(t => t.from === targetId && t.to === firstPlace.id)
+                            .sort((a,b) => (a.departureDay ?? 1) - (b.departureDay ?? 1) || (a.departure || '').localeCompare(b.departure || '')) || []
+                          
+                          if (legs.length === 0 && !isEditMode) return null;
+
+                          return (
+                            <div className="relative ml-[15px] mb-8">
+                                <div className="space-y-4">
+                                  {isEditMode && (
+                                    <div className="relative flex items-center gap-4 group/add">
+                                      <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                        <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
+                                        <button
+                                          onClick={() => handleAddHome(legs[0]?.fromLocation || legs[0]?.from || '', 1, 'start')}
+                                          className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
+                                        >
+                                          <span className="material-symbols-outlined text-sm transition-transform group-hover:scale-110">home</span>
+                                          <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
+                                        </button>
+                                      </div>
+                                      <button 
+                                        onClick={() => handleAddHome(legs[0]?.fromLocation || legs[0]?.from || '', 1, 'start')}
+                                        className="flex items-center gap-2 group/btn"
+                                      >
+                                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Start from Home</span>
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Render existing legs from home */}
+                                  {legs.map((leg) => {
+                                    const modeIcon = transportModeIcon(leg.type)
+                                    const isInboundLive = getTransportLiveStatus(leg, 1)
+                                    const isFocused = focusedTransportId === leg.id
+                                    const isHighlighted = isInboundLive || isFocused
+
+                                    return (
+                                      <div key={leg.id} id={`leg-${leg.id}`} className="relative flex items-center gap-4 group/leg">
+                                        <div className="relative flex flex-col items-center w-[50px] shrink-0 h-full">
+                                          <div className={`w-px h-full ${isHighlighted ? 'bg-primary/40' : 'bg-white/10'} absolute left-1/2 -translate-x-1/2 -z-10`} />
+                                          <div className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+                                            isHighlighted ? 'bg-primary border-primary shadow-[0_0_15px_rgba(195,244,0,0.4)]' : 'bg-neutral-900 border-white/10 group-hover/leg:border-primary/40 shadow-sm'
+                                          }`}>
+                                            <span className={`material-symbols-outlined text-sm ${isHighlighted ? 'text-slate-950' : 'text-neutral-500 group-hover/leg:text-primary'}`}>{modeIcon}</span>
+                                          </div>
+                                        </div>
+                                        <div className="flex-1 py-1">
+                                          <div 
+                                            className={`relative group/leg-card p-4 rounded-2xl transition-all duration-500 overflow-hidden border-l-4 ${
+                                              isHighlighted 
+                                                ? 'bg-primary/5 border-primary shadow-[0_0_30px_rgba(195,244,0,0.1)] ring-1 ring-primary/20 border-l-primary' 
+                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] border-l-white/20 hover:border-l-primary/40'
+                                            } border-y border-r backdrop-blur-sm cursor-pointer shadow-lg`}
+                                            onClick={() => openTransportModal(0, 'before', leg.id, 1)}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-white group-hover/leg-card:text-primary transition-colors line-clamp-1 leading-tight">
+                                                  {leg.title || transportModeLabel(leg.type)}
+                                                </h4>
+                                                <div className="flex items-center gap-2 text-white/50 text-[10px] font-mono mt-0.5 leading-none">
+                                                  <span>D{leg.departureDay ?? 0}</span>
+                                                  <span className="opacity-30">→</span>
+                                                  <span>D{leg.arrivalDay ?? 1}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  {isEditMode && (
+                                    <div className="relative flex items-center gap-4 group/add">
+                                      <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                        <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
+                                        <button
+                                          onClick={() => openTransportModal(0, 'before', undefined, 1)}
+                                          className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
+                                        >
+                                          <span className="material-symbols-outlined text-sm">commute</span>
+                                          <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
+                                        </button>
+                                      </div>
+                                      <button 
+                                        onClick={() => openTransportModal(0, 'before', undefined, 1)}
+                                        className="flex items-center gap-2 group/btn"
+                                      >
+                                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Add Initial Transport</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                            </div>
+                          )
+                        })()
+                      )}
+
                       {allDays.map((day, dayIndex) => (
                         <div key={day.dayNumber} id={`day-${day.dayNumber}`} className="relative ml-[15px] transition-all duration-700 rounded-2xl p-2 -m-2">
                           {/* Day Header */}
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <div className="text-xs font-bold text-primary font-mono uppercase tracking-wider">Day {day.dayNumber}</div>
-                              <div className="text-sm text-neutral-400">•</div>
-                              <div className="text-sm text-neutral-300">{day.formattedDate}</div>
-                              <div className="text-xs text-neutral-500 flex items-center gap-1.5">
-                                ({day.places.length} place{day.places.length !== 1 ? 's' : ''})
-                                {isSameDay(day.date, now) && (
-                                  <span className="inline-flex items-center gap-1 text-primary font-bold ml-1">
-                                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                                    {formatTime(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`, timeFormat)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                            {/* ... existing header ... */}
                           </div>
 
-                          {/* Vertical Timeline for the Day */}
-                          <div className="relative">
+                          {(() => {
+                            const isCurrentDay = isSameDay(day.date, now);
+                            const nowTimeMins = now.getHours() * 60 + now.getMinutes();
+
+                            
+                            return (
+                              <div className="relative">
 
                             {day.places.length === 0 ? (
                               <div className="relative flex items-center gap-4 mb-4">
@@ -1713,8 +1927,6 @@ export default function TripDetail() {
                                   const diffTime = todayObj.getTime() - startObj.getTime();
                                   const currentTripDay = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
                                   
-                                  const nowTimeMins = currentTime.getHours() * 60 + currentTime.getMinutes();
-                                  const isCurrentDay = day.dayNumber === currentTripDay;
                                   
                                   const activeByTimePlace = day.places.find(p => {
                                     if (!p.arrival || !p.departure) return false;
@@ -1735,144 +1947,202 @@ export default function TripDetail() {
                                   
                                   const isLiveHighlight = triggeredLiveHighlightId === `${day.dayNumber}-${place.id}`;
 
-                                  // Helper to check if a transport leg is currently active
-                                  const getTransportLiveStatus = (leg: Transport) => {
-                                    if (!isCurrentDay) return false;
-                                    if (!leg.departure || !leg.arrival) return false;
-                                    
-                                    const depDay = leg.departureDay || place.day || 1;
-                                    const arrDay = leg.arrivalDay || place.endDay || place.day || 1;
-                                    
-                                    if (day.dayNumber < depDay || day.dayNumber > arrDay) return false;
-                                    
-                                    const [dh, dm] = leg.departure.split(':').map(Number);
-                                    const [ah, am] = leg.arrival.split(':').map(Number);
-                                    const depMins = dh * 60 + dm;
-                                    const arrMins = ah * 60 + am;
-                                    
-                                    if (day.dayNumber === depDay && day.dayNumber === arrDay) {
-                                      return nowTimeMins >= depMins && nowTimeMins <= arrMins;
-                                    } else if (day.dayNumber === depDay) {
-                                      return nowTimeMins >= depMins;
-                                    } else if (day.dayNumber === arrDay) {
-                                      return nowTimeMins <= arrMins;
-                                    } else {
-                                      return true; // Mid-day of a multi-day trip
-                                    }
-                                  };
 
                                   return (
                                     <div key={`${day.dayNumber}-${place.id}`} id={`day-${day.dayNumber}-place-${place.id}`} className="relative flex flex-col mb-1 rounded-2xl">
                                       
                                       {/* Inbound Connection Section */}
                                       {(() => {
-                                        // Only show at the start of the stay
-                                        if (day.dayNumber !== (place.day || 1)) return null
-                                        
-                                        const fromId = globalPlaceIndex === 0 ? 'home' : (places[globalPlaceIndex - 1]?.id ?? 'home')
-                                        const legs = (globalPlaceIndex === 0 ? place : places[globalPlaceIndex - 1]).transport?.filter(t => t.to === place.id && t.from === fromId)
-                                          .sort((a,b) => (a.departureDay || 1) - (b.departureDay || 1) || (a.departure || '').localeCompare(b.departure || '')) || []
-                                        
-                                        if (legs.length === 0 && !isEditMode) return null
-                                        const shouldShowSection = showTransports || isEditMode;
-                                        if (!shouldShowSection && legs.length === 0) return null;
+                                         const fromId = globalPlaceIndex === 0 ? 'home' : (places[globalPlaceIndex - 1]?.id ?? 'home')
+                                         const legs = (globalPlaceIndex === 0 ? place : places[globalPlaceIndex - 1]).transport?.filter(t => t.to === place.id && t.from === fromId && (globalPlaceIndex !== 0 || t.from !== 'home'))
+                                           .sort((a,b) => (a.departureDay ?? 1) - (b.departureDay ?? 1) || (a.departure || '').localeCompare(b.departure || '')) || []
+
+                                         if (day.dayNumber !== (place.day || 1)) return null
+
+                                         if (legs.length === 0 && !isEditMode) return null
+                                         const shouldShowSection = showTransports || isEditMode;
+                                         if (!shouldShowSection && legs.length === 0) return null;
 
                                         return (
                                           <div className="space-y-1 mb-2">
                                             {legs.map((leg, lIdx) => {
                                               const modeIcon = transportModeIcon(leg.type)
-                                              const isInboundLive = getTransportLiveStatus(leg)
-                                              const hasDocs = (leg.documents?.length ?? 0) > 0
-
+                                              const isInboundLive = getTransportLiveStatus(leg, day.dayNumber)
+                                              const isFocused = focusedTransportId === leg.id
+                                              const isHighlighted = isInboundLive || isFocused
                                               return (
-                                                <div key={leg.id} className={`flex items-start gap-4 ${isInboundLive ? 'relative' : ''}`}>
-                                                  <div className="relative w-[50px] shrink-0 flex flex-col items-end py-1">
-                                                    <div className={`w-px h-full min-h-[24px] ${isInboundLive ? 'bg-primary/40' : 'bg-white/20'} absolute right-[19px]`}></div>
+                                                <div key={leg.id} id={`leg-${leg.id}`} className="relative flex items-center gap-4 group/leg">
+                                                  <div className="relative flex flex-col items-center w-[50px] shrink-0 h-full">
+                                                    <div className={`w-px h-full ${isHighlighted ? 'bg-primary/40' : 'bg-white/10'} absolute left-1/2 -translate-x-1/2 -z-10`} />
+                                                    <div className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+                                                      isHighlighted ? 'bg-primary border-primary shadow-[0_0_15px_rgba(195,244,0,0.4)]' : 'bg-neutral-900 border-white/10 group-hover/leg:border-primary/40 shadow-sm'
+                                                    }`}>
+                                                      <span className={`material-symbols-outlined text-sm ${isHighlighted ? 'text-slate-950' : 'text-neutral-500 group-hover/leg:text-primary'}`}>{modeIcon}</span>
+                                                    </div>
                                                   </div>
-                                                  <div className="flex-1 flex items-center gap-2">
-                                                    <button
+                                                  <div className="flex-1 py-1">
+                                                    <div 
+                                                      className={`relative group/leg-card p-4 rounded-2xl transition-all duration-500 overflow-hidden border-l-4 ${
+                                                        isHighlighted 
+                                                          ? 'bg-primary/5 border-primary shadow-[0_0_30px_rgba(195,244,0,0.1)] ring-1 ring-primary/20 border-l-primary' 
+                                                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] border-l-white/20 hover:border-l-primary/40'
+                                                      } border-y border-r backdrop-blur-sm cursor-pointer shadow-lg`}
                                                       onClick={() => openTransportModal(globalPlaceIndex, 'before', leg.id, day.dayNumber)}
-                                                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg transition text-xs font-medium ${hasDocs ? 'py-2 px-3' : 'py-1'} ${
-                                                        isInboundLive ? 'bg-primary/20 border-primary ring-1 ring-primary/30 shadow-[0_0_15px_rgba(195,244,0,0.15)]' : 'bg-primary/10 border-primary/30'
-                                                      } border text-white hover:bg-primary/20 cursor-pointer`}
-                                                      title="Edit transport leg"
                                                     >
-                                                       <div className="flex items-center gap-2">
-                                                         {(leg.departure || (leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay)) && (
-                                                           <span className="text-neutral-400 font-mono text-[10px] flex items-center gap-0.5">
-                                                             {leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay && (
-                                                               <span className="text-primary/70 font-bold mr-0.5">D{leg.departureDay}</span>
-                                                              )}
-                                                             {leg.departure || '—'}
-                                                           </span>
-                                                          )}
-                                                         <span className="material-symbols-outlined text-sm text-primary">{modeIcon}</span>
-                                                         <span className="text-white text-[11px] font-medium truncate max-w-[120px]">{leg.title || transportModeLabel(leg.type)}</span>
-                                                         {(leg.arrival || (leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay)) && (
-                                                           <span className="text-neutral-400 font-mono text-[10px] flex items-center gap-0.5">
-                                                             {leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay && (
-                                                               <span className="text-primary/70 font-bold mr-0.5">D{leg.arrivalDay}</span>
-                                                              )}
-                                                             {leg.arrival || '—'}
-                                                           </span>
-                                                          )}
-                                                       </div>
-                                                    </button>
-                                                    {isEditMode && lIdx === legs.length - 1 && (
-                                                      <button 
-                                                        onClick={() => openTransportModal(globalPlaceIndex, 'before', undefined, day.dayNumber)}
-                                                        className="w-8 h-8 rounded-full bg-white/5 border border-dashed border-white/20 flex items-center justify-center text-neutral-500 hover:text-primary hover:border-primary/50 transition-all active:scale-90"
-                                                        title="Add another leg"
-                                                      >
-                                                        <span className="material-symbols-outlined text-sm">add</span>
-                                                      </button>
-                                                    )}
+                                                      <div className="flex items-center gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                          <h4 className="text-base font-bold text-white group-hover/leg-card:text-primary transition-colors line-clamp-1 leading-tight">
+                                                            {leg.title || transportModeLabel(leg.type)}
+                                                          </h4>
+                                                          <div className="flex items-center gap-2 text-white/50 text-[10px] font-mono mt-0.5 leading-none">
+                                                            {(() => {
+                                                              const depDay = leg.departureDay ?? day.dayNumber;
+                                                              const arrDay = leg.arrivalDay ?? depDay;
+                                                              const spansMultiDays = arrDay > depDay;
+                                                              return (
+                                                                <>
+                                                                  <span className="text-primary font-bold">D{depDay}</span>
+                                                                  <span>{leg.departure || '—'}</span>
+                                                                  <span className="opacity-30">→</span>
+                                                                  <span className="text-primary font-bold">D{arrDay}</span>
+                                                                  <span>{leg.arrival || '—'}</span>
+                                                                  {(() => {
+                                                                    const duration = calculateTimeDuration(leg.departure || '', depDay, leg.arrival || '', arrDay);
+                                                                    if (!duration) return null;
+                                                                    return (
+                                                                      <span className="text-[8px] font-black text-primary bg-primary/10 border border-primary/20 rounded-md px-1 py-0.5 ml-1">
+                                                                        {duration}
+                                                                      </span>
+                                                                    );
+                                                                  })()}
+                                                                </>
+                                                              )
+                                                            })()}
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {/* Documents for this leg - Integrated Design */}
+                                                      {leg.documents && showDocuments && leg.documents.length > 0 && (
+                                                        <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
+                                                          {leg.documents.map((doc, docIdx) => {
+                                                            const ext = doc.name.split('.').pop()?.toLowerCase();
+                                                            const isPDF = ext === 'pdf';
+                                                            const isDoc = ['doc', 'docx'].includes(ext || '');
+                                                            const isSheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
+                                                            const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || '');
+                                                            const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
+                                                            
+                                                            const getFileIcon = () => {
+                                                              if (isPDF) return 'picture_as_pdf';
+                                                              if (isDoc) return 'description';
+                                                              if (isSheet) return 'table_chart';
+                                                              if (isAudio) return 'audio_file';
+                                                              if (isImg) return 'image';
+                                                              return 'draft';
+                                                            };
+                                                            
+                                                            return (
+                                                              <div
+                                                                key={doc.id || `leg-doc-${docIdx}`}
+                                                                className="px-3 py-2.5 rounded-xl border border-blue-400/20 bg-blue-400/10 backdrop-blur-md hover:bg-blue-400/20 transition-all group/item shadow-sm cursor-pointer"
+                                                                onClick={(e) => { 
+                                                                  e.stopPropagation(); 
+                                                                  setAttachmentDetail({ 
+                                                                    data: { type: 'document', document: doc }, 
+                                                                    placeId: place.id,
+                                                                    transportLegId: leg.id
+                                                                  }) 
+                                                                }}
+                                                              >
+                                                                <div className="flex items-center gap-3">
+                                                                  <div className="w-9 h-9 rounded-xl bg-blue-400/20 border border-blue-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-blue-400/30 transition-colors">
+                                                                    <span className="material-symbols-outlined text-blue-400 text-lg">{getFileIcon()}</span>
+                                                                  </div>
+                                                                  <div className="flex-1 min-w-0">
+                                                                    <div className="text-blue-100 text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
+                                                                    <div className="text-blue-400/60 text-[10px] font-mono leading-none flex items-center gap-2">
+                                                                      <span>{isImg ? 'PHOTO' : isPDF ? 'PDF' : isAudio ? 'AUDIO' : isDoc ? 'DOCUMENT' : isSheet ? 'SHEET' : 'FILE'}</span>
+                                                                      {doc.file && (
+                                                                         <>
+                                                                           <span className="opacity-30">|</span>
+                                                                           <span className="flex items-center gap-1 opacity-60">
+                                                                             <span className="material-symbols-outlined text-[10px]">attach_file</span>
+                                                                             <span>UPLOADED</span>
+                                                                           </span>
+                                                                         </>
+                                                                      )}
+                                                                    </div>
+                                                                  </div>
+                                                                  <span className="material-symbols-outlined text-neutral-500 group-hover/item:text-blue-400 transition-colors">open_in_new</span>
+                                                                </div>
+                                                              </div>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </div>
                                                 </div>
                                               )
                                             })}
-                                            {legs.length === 0 && isEditMode && (
-                                              <div className="flex items-start gap-4">
-                                                <div className="relative w-[50px] shrink-0 flex flex-col items-end py-1">
-                                                  <div className="w-px h-full min-h-[24px] bg-white/20 absolute right-[19px]"></div>
-                                                </div>
-                                                <div className="flex-1">
-                                                  <button
-                                                    onClick={() => openTransportModal(globalPlaceIndex, 'before', undefined, day.dayNumber)}
-                                                    className="w-full flex items-center justify-center gap-2 py-1 rounded-lg transition text-xs font-medium bg-white/5 border border-dashed border-white/15 hover:bg-white/10 text-neutral-500 hover:text-white"
-                                                    title="Add transport before"
-                                                  >
-                                                    <span className="material-symbols-outlined text-sm">add</span>
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            )}
+                                            {(() => {
+                                              const prevPlace = globalPlaceIndex > 0 ? places[globalPlaceIndex - 1] : null;
+                                              const isSameLocation = prevPlace && (prevPlace.location === place.location || prevPlace.name === place.name);
+                                              const isFirstDayOfStay = day.dayNumber === (place.day || 1);
+                                              
+                                              if (isEditMode && isFirstDayOfStay && globalPlaceIndex !== 0 && !isSameLocation) {
+                                                return (
+                                                  <div className="relative flex items-center gap-4 py-2 group/add">
+                                                    <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                                      <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
+                                                      <button
+                                                        onClick={() => openTransportModal(globalPlaceIndex, 'before', undefined, day.dayNumber)}
+                                                        className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
+                                                      >
+                                                        <span className="material-symbols-outlined text-sm">commute</span>
+                                                        <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
+                                                      </button>
+                                                    </div>
+                                                    <button 
+                                                      onClick={() => openTransportModal(globalPlaceIndex, 'before', undefined, day.dayNumber)}
+                                                      className="flex items-center gap-2 group/btn"
+                                                    >
+                                                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Add Transport</span>
+                                                    </button>
+                                                  </div>
+                                                );
+                                              }
+                                              return null;
+                                            })()}
                                           </div>
                                         )
                                       })()}
 
                                       {/* Place Row */}
-                                      <div className="relative flex items-start gap-4">
+                                      <div className="relative flex items-start gap-4 group/row">
                                         {/* Timeline Section with Times */}
                                         <div className="relative flex flex-col items-center w-[50px] shrink-0 z-10">
                                           {/* Continuous connector line */}
-                                          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/15 -z-10" />
+                                          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-white/10 -z-10" />
 
                                           {/* Dot */}
-                                          <div className="relative w-9 h-9 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30 mt-1 shrink-0">
-                                            <span className="material-symbols-outlined text-primary text-sm">location_on</span>
+                                          <div className={`relative w-9 h-9 rounded-full flex items-center justify-center border mt-1 shrink-0 transition-all duration-300 ${
+                                            isLiveHighlight ? 'bg-primary border-primary shadow-[0_0_15px_rgba(195,244,0,0.4)]' : 'bg-primary/20 border-primary/30 group-hover/row:bg-primary/40 group-hover/row:border-primary/60'
+                                          }`}>
+                                            <span className={`material-symbols-outlined text-sm transition-colors ${isLiveHighlight ? 'text-slate-950' : 'text-primary group-hover/row:text-white'}`}>location_on</span>
                                           </div>
 
                                           {/* Arr / Dep badge — only if times exist and it's the correct day */}
-                                          {((place.arrival && day.dayNumber === (place.day || 1)) || (place.departure && day.dayNumber === (place.endDay || place.day || 1))) && (
+                                          {((place.arrival && day.dayNumber === (place.day ?? 1)) || (place.departure && day.dayNumber === ((place.endDay || place.day) ?? 1))) && (
                                             <div className="mt-1.5 flex flex-col items-center gap-0.5">
-                                              {(place.arrival && day.dayNumber === (place.day || 1)) && (
+                                              {(place.arrival && day.dayNumber === (place.day ?? 1)) && (
                                                 <div className="flex items-center gap-0.5">
                                                   <span className="text-[8px] text-neutral-500 uppercase font-bold tracking-tighter leading-none">↓</span>
                                                   <span className="text-[10px] font-bold text-white font-mono leading-none">{formatTime(place.arrival || '', timeFormat)}</span>
                                                 </div>
                                               )}
-                                              {(place.departure && day.dayNumber === (place.endDay || place.day || 1)) && (
+                                              {(place.departure && day.dayNumber === ((place.endDay || place.day) ?? 1)) && (
                                                 <div className="flex items-center gap-0.5">
                                                   <span className="text-[8px] text-neutral-500 uppercase font-bold tracking-tighter leading-none">↑</span>
                                                   <span className="text-[10px] font-bold text-neutral-400 font-mono leading-none">{formatTime(place.departure || '', timeFormat)}</span>
@@ -1887,7 +2157,13 @@ export default function TripDetail() {
                                         <div className="flex-1 flex flex-col gap-1 min-w-0">
                                           {/* Place Card */}
                                           {showPlaces && (
-                                            <div className={`w-full backdrop-blur-xl border rounded-xl p-4 transition-all duration-300 group cursor-pointer shadow-lg relative overflow-hidden min-w-0 ${isLiveHighlight ? 'bg-primary/10 border-primary ring-2 ring-primary/40 shadow-[0_0_50px_rgba(195,244,0,0.25)] animate-pulse-subtle' : (isEditMode && isLiveBase) ? 'bg-primary/5 border-primary/50 ring-1 ring-primary/20 shadow-[0_0_30px_rgba(195,244,0,0.15)]' : focusedPlaceId === place.id ? 'bg-neutral-800/40 border-primary ring-1 ring-primary/30' : 'bg-neutral-900/20 border-white/10 hover:bg-neutral-800/30'}`}
+                                            <div className={`relative group/place-card p-4 rounded-3xl transition-all duration-500 overflow-hidden backdrop-blur-md cursor-pointer border min-w-0 ${
+                                              isLiveHighlight 
+                                                ? 'bg-primary/5 border-primary shadow-[0_0_30px_rgba(143,244,255,0.1)] ring-1 ring-primary/20' 
+                                                : focusedPlaceId === place.id 
+                                                  ? 'bg-white/[0.08] border-primary ring-1 ring-primary/30 shadow-[0_0_20px_rgba(143,244,255,0.1)]' 
+                                                  : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.05] hover:border-white/10'
+                                            }`}
                                                onClick={() => {
                                                  setFocusedPlaceId(place.id)
                                                  setEditingPlaceForDetail(place)
@@ -1905,7 +2181,7 @@ export default function TripDetail() {
                                               )}
                                               <div className="flex items-center justify-between gap-2">
                                                 <div className="flex items-center gap-2">
-                                                  <h4 className="text-base font-bold text-white group-hover:text-primary transition-colors line-clamp-1 leading-tight">{place.name}</h4>
+                                                  <h4 className="text-base font-bold text-white group-hover/place-card:text-primary transition-colors line-clamp-1 leading-tight">{place.name}</h4>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                   {isLiveBase && isEditMode && (
@@ -1943,22 +2219,29 @@ export default function TripDetail() {
                                               </div>
                                               <div className="flex items-center gap-2">
                                                 <p className="text-neutral-500 text-xs line-clamp-1">{place.location}</p>
-                                                {(place.endDay && place.endDay > (place.day || 1)) && (
+                                                {(place.endDay && place.endDay > (place.day ?? 1)) && (
                                                   <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[8px] font-black uppercase tracking-tighter">
-                                                    DAY {day.dayNumber - (place.day || 1) + 1} OF {(place.endDay - (place.day || 1) + 1)}
+                                                    DAY {day.dayNumber - (place.day ?? 1) + 1} OF {(place.endDay - (place.day ?? 1) + 1)}
                                                   </span>
                                                 )}
                                               </div>
-                                                  {Array.isArray(place.notes) && place.notes.find(n => n.day === day.dayNumber && n.text) && (
-                                                    <div className="mt-3 pt-3 border-t border-white/5">
-                                                      {renderNoteText(place.notes.find(n => n.day === day.dayNumber)?.text || '', place, day.dayNumber)}
+                                                  {Array.isArray(place.notes) && place.notes.some(n => n.day === day.dayNumber && n.text) && (
+                                                    <div className="mt-2.5 pt-2.5 border-t border-white/5 space-y-2.5">
+                                                      {place.notes
+                                                        .filter(n => n.day === day.dayNumber && n.text)
+                                                        .map((note, noteIdx) => (
+                                                          <div key={note.id || noteIdx}>
+                                                            {renderNoteText(note.text, place, day.dayNumber)}
+                                                          </div>
+                                                        ))
+                                                      }
                                                     </div>
                                                   )}
 
                                                   {/* Place main photos (Gallery) */}
-                                                  {place.photos && place.photos.length > 0 && (day.dayNumber === (place.day || 1)) && (
-                                                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1 custom-scrollbar scroll-smooth no-scrollbar w-full">
-                                                      {place.photos.map((photo, idx) => (
+                                                  {place.photos && place.photos.length > 0 && (day.dayNumber === (place.day ?? 1)) && (
+                                                    <div className="mt-2.5 pt-2.5 border-t border-white/5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar scroll-smooth no-scrollbar w-full">
+                                                      {place.photos.slice(0, place.photos.length === 6 ? 6 : 5).map((photo, idx) => (
                                                         <div 
                                                           key={idx} 
                                                           className="relative w-24 h-16 rounded-lg border border-white/10 overflow-hidden shrink-0 group/photo cursor-zoom-in"
@@ -1967,7 +2250,13 @@ export default function TripDetail() {
                                                             openViewer(place.photos!, idx);
                                                           }}
                                                         >
-                                                          <img src={typeof photo === 'string' ? photo : (photo as any)?.src?.large || (photo as any)?.src?.medium} className="w-full h-full object-cover transition-transform duration-500 group-hover/photo:scale-110" alt="" />
+                                                          <img src={typeof photo === 'string' ? photo : (photo as any)?.src?.large || (photo as any)?.src?.medium} className="w-full h-full object-cover transition-transform duration-500 group/photo:scale-110" alt="" />
+                                                          {idx === 4 && place.photos!.length > 6 && (
+                                                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-[2px]">
+                                                              <span className="text-white text-xs font-black">+{place.photos!.length - 5}</span>
+                                                              <span className="text-white/60 text-[8px] font-bold uppercase tracking-widest mt-0.5">More</span>
+                                                            </div>
+                                                          )}
                                                           {isEditMode && (
                                                             <button 
                                                               onClick={(e) => { 
@@ -1994,14 +2283,14 @@ export default function TripDetail() {
                                                   )}
 
                                               <div className={(place.accommodations?.some(acc => {
-                                                const checkInDay = acc.checkInDay || place.day || 1
-                                                const checkOutDay = acc.checkOutDay || place.endDay || place.day || 1
+                                                const checkInDay = (acc.checkInDay || place.day) ?? 1
+                                                const checkOutDay = (acc.checkOutDay || place.endDay || place.day) ?? 1
                                                 return day.dayNumber >= checkInDay && day.dayNumber <= checkOutDay
-                                              }) && showAccommodations) || (place.events?.length > 0 && showEvents) || (place.documents?.length > 0 && showDocuments) || (place.links?.length > 0 && showLinks) || isEditMode ? "flex flex-col gap-2 mt-3 pt-3 border-t border-white/5" : ""}>
+                                              }) && showAccommodations) || (place.events?.length > 0 && showEvents) || (place.documents?.length > 0 && showDocuments) || (place.links?.length > 0 && showLinks) || isEditMode ? "flex flex-col gap-2.5 mt-2.5 pt-2.5 border-t border-white/5" : ""}>
 
                                                 {place.accommodations?.filter(acc => {
-                                                  const checkInDay = acc.checkInDay || place.day || 1
-                                                  const checkOutDay = acc.checkOutDay || place.endDay || place.day || 1
+                                                  const checkInDay = (acc.checkInDay || place.day) ?? 1
+                                                  const checkOutDay = (acc.checkOutDay || place.endDay || place.day) ?? 1
                                                   return day.dayNumber >= checkInDay && day.dayNumber <= checkOutDay
                                                 }).map(acc => showAccommodations && (
                                                   <div
@@ -2024,8 +2313,8 @@ export default function TripDetail() {
                                                         </div>
                                                         <div className="flex items-center gap-2 flex-wrap text-white/50 text-[10px] font-mono leading-none">
                                                            {(() => {
-                                                             const start = acc.checkInDay || place.day || 1
-                                                             const end = acc.checkOutDay || place.endDay || place.day || 1
+                                                             const start = (acc.checkInDay || place.day) ?? 1
+                                                             const end = (acc.checkOutDay || place.endDay || place.day) ?? 1
                                                              const spansMultiDays = end > start
                                                              return (
                                                                <>
@@ -2055,12 +2344,17 @@ export default function TripDetail() {
                                                       </div>
                                                       {acc.photos && acc.photos.length > 0 && (
                                                         <div className="flex -space-x-4 shrink-0 transition-all group-hover/item:-space-x-2">
-                                                          {acc.photos.slice(0, 2).map((p, i) => (
+                                                          {acc.photos.slice(0, acc.photos.length === 4 ? 4 : 3).map((p, i) => (
                                                             <div 
                                                               key={i} 
-                                                              className="w-12 h-12 rounded-lg border-2 border-slate-900 bg-neutral-800 overflow-hidden shadow-lg rotate-3 group-hover/item:rotate-0 transition-all"
+                                                              className="relative w-12 h-12 rounded-lg border-2 border-slate-900 bg-neutral-800 overflow-hidden shadow-lg rotate-3 group-hover/item:rotate-0 transition-all"
                                                             >
-                                                               <img src={typeof p === 'string' ? p : (p as any)?.src?.medium} className="w-full h-full object-cover" alt="" />
+                                                              <img src={typeof p === 'string' ? p : (p as any)?.src?.medium} className="w-full h-full object-cover" alt="" />
+                                                              {i === 2 && acc.photos!.length > 4 && (
+                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                                  <span className="text-white text-[10px] font-black">+{acc.photos!.length - 3}</span>
+                                                                </div>
+                                                              )}
                                                             </div>
                                                           ))}
                                                         </div>
@@ -2070,173 +2364,168 @@ export default function TripDetail() {
                                                 ))}
 
                                                 {/* Activities for this place */}
-                                                {place.events && place.events.length > 0 && showEvents && (
-                                                  <div className="space-y-1.5">
-                                                    {place.events
-                                                      .filter(event => {
-                                                        const start = event.day || (event.date ? null : (place.day || 1));
-                                                        const end = event.endDay || start!;
-                                                        if (start !== null) return day.dayNumber >= start && day.dayNumber <= end;
-                                                        return new Date(event.date!).toISOString().split('T')[0] === day.date.toISOString().split('T')[0];
-                                                      })
-                                                      .map((event, eventIdx) => (
-                                                      <div
-                                                        key={eventIdx}
-                                                        className="px-3 py-2.5 rounded-xl border border-red-400/20 bg-red-400/10 backdrop-blur-md hover:bg-red-400/20 transition-all group/item shadow-sm cursor-pointer"
-                                                        onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'event', event }, placeId: place.id }) }}
-                                                      >
-                                                        <div className="flex items-center gap-3">
-                                                          <div className="w-9 h-9 rounded-xl bg-red-400/20 border border-red-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-red-400/30 transition-colors">
-                                                            <span className="material-symbols-outlined text-red-400 text-lg">flag</span>
-                                                          </div>
-                                                          <div className="flex-1 min-w-0">
-                                                            <div className="text-red-100 text-xs font-bold truncate tracking-tight mb-0.5">{event.title}</div>
-                                                            <div className="flex items-center gap-2 flex-wrap text-white/50 text-[10px] font-mono leading-none">
-                                                                {(event.time || event.endTime) && (
-                                                                  <>
-                                                                    {(() => {
-                                                                      const start = event.day || place.day || 1
-                                                                      const end = event.endDay || event.day || place.day || 1
-                                                                      const spansMultiDays = end > start
-                                                                      return (
+                                                {place.events && showEvents && place.events
+                                                  .filter(event => {
+                                                    const start = (event.day || (event.date ? null : place.day)) ?? 1;
+                                                    const end = event.endDay || start!;
+                                                    if (start !== null) return day.dayNumber >= start && day.dayNumber <= end;
+                                                    return new Date(event.date!).toISOString().split('T')[0] === day.date.toISOString().split('T')[0];
+                                                  })
+                                                  .map((event, eventIdx) => (
+                                                  <div
+                                                    key={`event-${eventIdx}`}
+                                                    className="px-3 py-2.5 rounded-xl border border-red-400/20 bg-red-400/10 backdrop-blur-md hover:bg-red-400/20 transition-all group/item shadow-sm cursor-pointer"
+                                                    onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'event', event }, placeId: place.id }) }}
+                                                  >
+                                                    <div className="flex items-center gap-3">
+                                                      <div className="w-9 h-9 rounded-xl bg-red-400/20 border border-red-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-red-400/30 transition-colors">
+                                                        <span className="material-symbols-outlined text-red-400 text-lg">flag</span>
+                                                      </div>
+                                                      <div className="flex-1 min-w-0">
+                                                        <div className="text-red-100 text-xs font-bold truncate tracking-tight mb-0.5">{event.title}</div>
+                                                        <div className="flex items-center gap-2 flex-wrap text-white/50 text-[10px] font-mono leading-none">
+                                                            {(event.time || event.endTime) && (
+                                                              <>
+                                                                {(() => {
+                                                                  const start = (event.day || place.day) ?? 1
+                                                                  const end = (event.endDay || event.day || place.day) ?? 1
+                                                                  const spansMultiDays = end > start
+                                                                  return (
+                                                                    <>
+                                                                      {spansMultiDays && <span className="text-primary font-bold">D{start}</span>}
+                                                                      <span>{formatTime12h(event.time || '')}</span>
+                                                                      {event.endTime && (
                                                                         <>
-                                                                          {spansMultiDays && <span className="text-primary font-bold">D{start}</span>}
-                                                                          <span>{formatTime12h(event.time || '')}</span>
-                                                                          {event.endTime && (
-                                                                            <>
-                                                                              <span className="opacity-30">→</span>
-                                                                              {spansMultiDays && <span className="text-primary font-bold">D{end}</span>}
-                                                                              <span>{formatTime12h(event.endTime)}</span>
-                                                                            </>
-                                                                          )}
+                                                                          <span className="opacity-30">→</span>
+                                                                          {spansMultiDays && <span className="text-primary font-bold">D{end}</span>}
+                                                                          <span>{formatTime12h(event.endTime)}</span>
                                                                         </>
-                                                                      )
-                                                                    })()}
-                                                                  </>
-                                                                )}
-                                                                {event.location && (
-                                                                  <>
-                                                                    {(event.time || event.endTime) && <span className="opacity-30">|</span>}
-                                                                    <span className="flex items-center gap-0.5 truncate max-w-[120px]">
-                                                                      <span className="material-symbols-outlined text-[10px] text-red-400/40 leading-none">location_on</span>
-                                                                      <span className="truncate">{event.location}</span>
-                                                                    </span>
-                                                                  </>
-                                                                )}
-                                                            </div>
-                                                          </div>
-                                                          {event.photos && event.photos.length > 0 && (
-                                                            <div className="flex -space-x-4 shrink-0 transition-all group-hover/item:-space-x-2">
-                                                              {event.photos.slice(0, 2).map((p, i) => (
-                                                                <div 
-                                                                  key={i} 
-                                                                  className="w-12 h-12 rounded-lg border-2 border-slate-900 bg-neutral-800 overflow-hidden shadow-lg -rotate-3 group-hover/item:rotate-0 transition-all"
-                                                                >
-                                                                   <img src={typeof p === 'string' ? p : (p as any)?.src?.medium} className="w-full h-full object-cover" alt="" />
-                                                                </div>
-                                                              ))}
-                                                            </div>
-                                                          )}
+                                                                      )}
+                                                                    </>
+                                                                  )
+                                                                })()}
+                                                              </>
+                                                            )}
+                                                            {event.location && (
+                                                              <>
+                                                                {(event.time || event.endTime) && <span className="opacity-30">|</span>}
+                                                                <span className="flex items-center gap-0.5 truncate max-w-[120px]">
+                                                                  <span className="material-symbols-outlined text-[10px] text-red-400/40 leading-none">location_on</span>
+                                                                  <span className="truncate">{event.location}</span>
+                                                                </span>
+                                                              </>
+                                                            )}
                                                         </div>
                                                       </div>
-                                                    ))}
+                                                      {event.photos && event.photos.length > 0 && (
+                                                        <div className="flex -space-x-4 shrink-0 transition-all group-hover/item:-space-x-2">
+                                                          {event.photos.slice(0, event.photos.length === 4 ? 4 : 3).map((p, i) => (
+                                                            <div 
+                                                              key={i} 
+                                                              className="relative w-12 h-12 rounded-lg border-2 border-slate-900 bg-neutral-800 overflow-hidden shadow-lg -rotate-3 group-hover/item:rotate-0 transition-all"
+                                                            >
+                                                              <img src={typeof p === 'string' ? p : (p as any)?.src?.medium} className="w-full h-full object-cover" alt="" />
+                                                              {i === 2 && event.photos!.length > 4 && (
+                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                                                  <span className="text-white text-[10px] font-black">+{event.photos!.length - 3}</span>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </div>
-                                                )}
+                                                ))}
 
                                                 {/* Documents for this place */}
-                                                {place.documents && place.documents.length > 0 && showDocuments && (
-                                                  <div className="space-y-1.5 pt-1">
-                                                    {place.documents
-                                                      .filter(doc => {
-                                                        const start = doc.day || (place.day || 1);
-                                                        const end = doc.endDay || start;
-                                                        return day.dayNumber >= start && day.dayNumber <= end;
-                                                      })
-                                                      .map((doc, docIdx) => {
-                                                        const ext = doc.name.split('.').pop()?.toLowerCase();
-                                                        const isPDF = ext === 'pdf';
-                                                        const isDoc = ['doc', 'docx'].includes(ext || '');
-                                                        const isSheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
-                                                        const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || '');
-                                                        const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
+                                                {place.documents && showDocuments && place.documents
+                                                  .filter(doc => {
+                                                    const start = (doc.day || place.day) ?? 1;
+                                                    const end = doc.endDay || start;
+                                                    return day.dayNumber >= start && day.dayNumber <= end;
+                                                  })
+                                                  .map((doc, docIdx) => {
+                                                    const ext = doc.name.split('.').pop()?.toLowerCase();
+                                                    const isPDF = ext === 'pdf';
+                                                    const isDoc = ['doc', 'docx'].includes(ext || '');
+                                                    const isSheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
+                                                    const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || '');
+                                                    const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
 
-                                                        const getFileIcon = () => {
-                                                          if (isPDF) return 'picture_as_pdf';
-                                                          if (isDoc) return 'description';
-                                                          if (isSheet) return 'table_chart';
-                                                          if (isAudio) return 'audio_file';
-                                                          if (isImg) return 'image';
-                                                          return 'draft';
-                                                        };
-
-                                                        return (
-                                                          <div
-                                                            key={`doc-${docIdx}`}
-                                                            className="px-3 py-2.5 rounded-xl border border-blue-400/20 bg-blue-400/10 backdrop-blur-md hover:bg-blue-400/20 transition-all group/item shadow-sm cursor-pointer"
-                                                            onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'document', document: doc }, placeId: place.id }) }}
-                                                          >
-                                                            <div className="flex items-center gap-3">
-                                                              <div className="w-9 h-9 rounded-xl bg-blue-400/20 border border-blue-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-blue-400/30 transition-colors">
-                                                                <span className="material-symbols-outlined text-blue-400 text-lg">{getFileIcon()}</span>
-                                                              </div>
-                                                              <div className="flex-1 min-w-0">
-                                                                <div className="text-blue-100 text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
-                                                                <div className="text-blue-400/60 text-[10px] font-mono leading-none flex items-center gap-2">
-                                                                  <span>{isImg ? 'PHOTO' : isPDF ? 'PDF' : isAudio ? 'AUDIO' : isDoc ? 'DOCUMENT' : isSheet ? 'SHEET' : 'FILE'}</span>
-                                                                  {doc.file && (
-                                                                     <>
-                                                                       <span className="opacity-30">|</span>
-                                                                       <span className="flex items-center gap-1 opacity-60">
-                                                                         <span className="material-symbols-outlined text-[10px]">attach_file</span>
-                                                                         <span>UPLOADED</span>
-                                                                       </span>
-                                                                     </>
-                                                                  )}
-                                                                </div>
-                                                              </div>
+                                                    const getFileIcon = () => {
+                                                      if (isPDF) return 'picture_as_pdf';
+                                                      if (isDoc) return 'description';
+                                                      if (isSheet) return 'table_chart';
+                                                      if (isAudio) return 'audio_file';
+                                                      if (isImg) return 'image';
+                                                      return 'draft';
+                                                    };
+                                                    return (
+                                                      <div
+                                                        key={`doc-${docIdx}`}
+                                                        className="px-3 py-2.5 rounded-xl border border-blue-400/20 bg-blue-400/10 backdrop-blur-md hover:bg-blue-400/20 transition-all group/item shadow-sm cursor-pointer"
+                                                        onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'document', document: doc }, placeId: place.id }) }}
+                                                      >
+                                                        <div className="flex items-center gap-3">
+                                                          <div className="w-9 h-9 rounded-xl bg-blue-400/20 border border-blue-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-blue-400/30 transition-colors">
+                                                            <span className="material-symbols-outlined text-blue-400 text-lg">{getFileIcon()}</span>
+                                                          </div>
+                                                          <div className="flex-1 min-w-0">
+                                                            <div className="text-blue-100 text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
+                                                            <div className="text-blue-400/60 text-[10px] font-mono leading-none flex items-center gap-2">
+                                                              <span>{isImg ? 'PHOTO' : isPDF ? 'PDF' : isAudio ? 'AUDIO' : isDoc ? 'DOCUMENT' : isSheet ? 'SHEET' : 'FILE'}</span>
+                                                              {doc.file && (
+                                                                 <>
+                                                                   <span className="opacity-30">|</span>
+                                                                   <span className="flex items-center gap-1 opacity-60">
+                                                                     <span className="material-symbols-outlined text-[10px]">attach_file</span>
+                                                                     <span>UPLOADED</span>
+                                                                   </span>
+                                                                 </>
+                                                              )}
                                                             </div>
                                                           </div>
-                                                        )
-                                                      })}
-                                                  </div>
-                                                )}
+                                                          <span className="material-symbols-outlined text-neutral-500 group-hover/item:text-blue-400 transition-colors">open_in_new</span>
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                  })
+                                                }
 
                                                 {/* Links for this place */}
-                                                {place.links && place.links.length > 0 && showLinks && (
-                                                  <div className="space-y-1.5 pt-1">
-                                                    {place.links
-                                                      .filter(link => {
-                                                        const start = link.day || (place.day || 1);
-                                                        const end = link.endDay || start;
-                                                        return day.dayNumber >= start && day.dayNumber <= end;
-                                                      })
-                                                      .map((link, linkIdx) => {
-                                                        const domain = link.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
-                                                        const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
-                                                        
-                                                        return (
-                                                          <div
-                                                            key={`link-${linkIdx}`}
-                                                            className="px-3 py-2.5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 backdrop-blur-md hover:bg-cyan-400/20 transition-all group/item shadow-sm cursor-pointer"
-                                                            onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'link', link }, placeId: place.id }) }}
-                                                          >
-                                                            <div className="flex items-center gap-3">
-                                                              <div className="w-9 h-9 rounded-xl bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-cyan-400/30 transition-colors overflow-hidden p-2">
-                                                                 <img src={favicon} className="w-full h-full object-contain" alt="" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2322d3ee" stroke-width="2" opacity="0.4"><circle cx="12" cy="12" r="10"/></svg>' }} />
-                                                              </div>
-                                                              <div className="flex-1 min-w-0">
-                                                                <div className="text-cyan-100 text-xs font-bold truncate tracking-tight mb-0.5">{link.title || link.url}</div>
-                                                                <div className="text-cyan-400/60 text-[10px] font-mono leading-none truncate uppercase">
-                                                                  {domain}
-                                                                </div>
-                                                              </div>
-                                                              <span className="material-symbols-outlined text-cyan-400/30 text-xs group-hover/item:text-cyan-400 transition-colors">open_in_new</span>
+                                                {place.links && showLinks && place.links
+                                                  .filter(link => {
+                                                    const start = (link.day || place.day) ?? 1;
+                                                    const end = link.endDay || start;
+                                                    return day.dayNumber >= start && day.dayNumber <= end;
+                                                  })
+                                                  .map((link, linkIdx) => {
+                                                    const domain = link.url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
+                                                    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+                                                    
+                                                    return (
+                                                      <div
+                                                        key={`link-${linkIdx}`}
+                                                        className="px-3 py-2.5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 backdrop-blur-md hover:bg-cyan-400/20 transition-all group/item shadow-sm cursor-pointer"
+                                                        onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'link', link }, placeId: place.id }) }}
+                                                      >
+                                                        <div className="flex items-center gap-3">
+                                                          <div className="w-9 h-9 rounded-xl bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-cyan-400/30 transition-colors overflow-hidden p-2">
+                                                             <img src={favicon} className="w-full h-full object-contain" alt="" onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2322d3ee" stroke-width="2" opacity="0.4"><circle cx="12" cy="12" r="10"/></svg>' }} />
+                                                          </div>
+                                                          <div className="flex-1 min-w-0">
+                                                            <div className="text-cyan-100 text-xs font-bold truncate tracking-tight mb-0.5">{link.title || link.url}</div>
+                                                            <div className="text-cyan-400/60 text-[10px] font-mono leading-none truncate uppercase">
+                                                              {domain}
                                                             </div>
                                                           </div>
-                                                        )
-                                                      })}
-                                                  </div>
-                                                )}
+                                                          <span className="material-symbols-outlined text-cyan-400/30 text-xs group-hover/item:text-cyan-400 transition-colors">open_in_new</span>
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                  })
+                                                }
 
                                                 {/* Inline add buttons */}
                                                 {isEditMode && (
@@ -2289,10 +2578,10 @@ export default function TripDetail() {
 
                                         const targetId = 'home'
                                         const legs = place.transport?.filter(t => t.to === targetId && t.from === place.id)
-                                          .sort((a,b) => (a.departureDay || 1) - (b.departureDay || 1) || (a.departure || '').localeCompare(b.departure || '')) || []
+                                          .sort((a,b) => (a.departureDay ?? 1) - (b.departureDay ?? 1) || (a.departure || '').localeCompare(b.departure || '')) || []
                                         
                                         // Pin connector to departureDay of first leg if set, otherwise last day of stay
-                                        const anchorDay = (legs[0]?.departureDay) ?? (place.endDay || place.day || 1)
+                                        const anchorDay = (place.endDay || place.day) || 1
                                         const isAnchorDay = day.dayNumber === anchorDay
 
                                         if (legs.length === 0 && !isEditMode) return null
@@ -2300,76 +2589,7 @@ export default function TripDetail() {
                                         if (!shouldShowSection && legs.length === 0) return null;
 
                                         return (
-                                          <div className="space-y-1 mt-1 mb-2">
-                                            {legs.map((leg, lIdx) => {
-                                              const modeIcon = transportModeIcon(leg.type)
-                                              const isOutboundLive = getTransportLiveStatus(leg)
-                                              const hasDocs = (leg.documents?.length ?? 0) > 0
-
-                                              return (
-                                                <div key={leg.id} className={`flex items-start gap-4 ${isOutboundLive ? 'relative' : ''}`}>
-                                                  <div className="relative w-[50px] shrink-0 flex flex-col items-end py-1">
-                                                    <div className={`w-px h-full min-h-[24px] ${isOutboundLive ? 'bg-primary/40' : 'bg-white/20'} absolute right-[19px]`}></div>
-                                                  </div>
-                                                  <div className="flex-1 flex items-center gap-2">
-                                                    <button
-                                                      onClick={() => openTransportModal(globalPlaceIndex, 'after', leg.id, day.dayNumber)}
-                                                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg transition text-xs font-medium ${hasDocs ? 'py-2 px-3' : 'py-1'} ${
-                                                        isOutboundLive ? 'bg-primary/20 border-primary ring-1 ring-primary/30 shadow-[0_0_15px_rgba(195,244,0,0.15)]' : 'bg-primary/10 border-primary/30'
-                                                      } border text-white hover:bg-primary/20 cursor-pointer`}
-                                                      title="Edit transport leg"
-                                                    >
-                                                       <div className="flex items-center gap-2">
-                                                         {(leg.departure || (leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay)) && (
-                                                           <span className="text-neutral-400 font-mono text-[10px] flex items-center gap-0.5">
-                                                             {leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay && (
-                                                               <span className="text-primary/70 font-bold mr-0.5">D{leg.departureDay}</span>
-                                                              )}
-                                                             {leg.departure || '—'}
-                                                           </span>
-                                                          )}
-                                                         <span className="material-symbols-outlined text-sm text-primary">{modeIcon}</span>
-                                                         <span className="text-white text-[11px] font-medium truncate max-w-[120px]">{leg.title || transportModeLabel(leg.type)}</span>
-                                                         {(leg.arrival || (leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay)) && (
-                                                           <span className="text-neutral-400 font-mono text-[10px] flex items-center gap-0.5">
-                                                             {leg.arrivalDay && leg.departureDay && leg.arrivalDay > leg.departureDay && (
-                                                               <span className="text-primary/70 font-bold mr-0.5">D{leg.arrivalDay}</span>
-                                                              )}
-                                                             {leg.arrival || '—'}
-                                                           </span>
-                                                          )}
-                                                       </div>
-                                                    </button>
-                                                    {isEditMode && lIdx === legs.length - 1 && (
-                                                      <button 
-                                                        onClick={() => openTransportModal(globalPlaceIndex, 'after', undefined, day.dayNumber)}
-                                                        className="w-8 h-8 rounded-full bg-white/5 border border-dashed border-white/20 flex items-center justify-center text-neutral-500 hover:text-primary hover:border-primary/50 transition-all active:scale-90"
-                                                        title="Add another leg"
-                                                      >
-                                                        <span className="material-symbols-outlined text-sm">add</span>
-                                                      </button>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              )
-                                            })}
-                                            {legs.length === 0 && isEditMode && (
-                                              <div className="flex items-start gap-4">
-                                                <div className="relative w-[50px] shrink-0 flex flex-col items-end py-1">
-                                                  <div className="w-px h-full min-h-[24px] bg-white/20 absolute right-[19px]"></div>
-                                                </div>
-                                                <div className="flex-1">
-                                                  <button
-                                                    onClick={() => openTransportModal(globalPlaceIndex, 'after', undefined, day.dayNumber)}
-                                                    className="w-full flex items-center justify-center gap-2 py-1 rounded-lg transition text-xs font-medium bg-white/5 border border-dashed border-white/15 hover:bg-white/10 text-neutral-500 hover:text-white"
-                                                    title="Add transport after"
-                                                  >
-                                                    <span className="material-symbols-outlined text-sm">add</span>
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
+                                          <></>
                                         )
                                       })()}
 
@@ -2377,34 +2597,141 @@ export default function TripDetail() {
                                     )
                                   })}
 
+
                                 {/* Add Place Button at the end of the timeline */}
-                                {isEditMode ? (
-                                  <div className="relative flex items-center gap-4 mb-4">
-                                    <div className="flex flex-col items-end gap-1 w-[50px] shrink-0">
-                                      <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
-                                        <span className="material-symbols-outlined text-primary text-sm">add_circle</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex-1">
+                                {isEditMode && !(allDays[dayIndex + 1]?.places?.[0]?.id === day.places[day.places.length - 1]?.id) ? (
+                                  <div className="relative flex items-center gap-4 py-2 group/add">
+                                    <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                      <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
                                       <button
                                         onClick={() => {
                                           setNewPlaceDay(day.dayNumber)
                                           handleOpenAddPlace()
                                         }}
-                                        className="w-full bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 flex items-center justify-center gap-2 hover:bg-primary/20 hover:border-primary/60 transition-all text-primary font-semibold group active:scale-95 duration-150"
+                                        className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
                                       >
-                                        <span className="text-sm font-bold uppercase tracking-wider">Add Place</span>
+                                        <span className="material-symbols-outlined text-sm transition-transform group-hover:scale-110">add_location</span>
+                                        <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
                                       </button>
                                     </div>
+                                    <button 
+                                      onClick={() => {
+                                        setNewPlaceDay(day.dayNumber)
+                                        handleOpenAddPlace()
+                                      }}
+                                      className="flex items-center gap-2 group/btn"
+                                    >
+                                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Add Place</span>
+                                    </button>
                                   </div>
                                 ) : null}
                               </>
-                            )}
-                          </div>
-                        </div>
+                             )}
+                             </div>
+                          )
+                        })()}
+                      </div>
                       ))}
+                      {/* End of Trip Connection Block */}
+                      {isEditMode && places.length > 0 && (
+                        (() => {
+                          const lastPlace = places[places.length - 1];
+                          const globalPlaceIndex = places.length - 1;
+                          const targetId = 'home';
+                          const legs = lastPlace.transport?.filter(t => t.to === targetId && t.from === lastPlace.id)
+                            .sort((a,b) => (a.departureDay ?? 1) - (b.departureDay ?? 1) || (a.departure || '').localeCompare(b.departure || '')) || []
+                          const lastDay = allDays.length;
 
-                      {/* Last place to home bridge */}
+                          return (
+                            <div className="relative ml-[15px] pb-8">
+                                <div className="space-y-1">
+                                  {/* Render existing legs back home */}
+                                  {legs.map((leg) => {
+                                    const modeIcon = transportModeIcon(leg.type)
+                                    const isInboundLive = getTransportLiveStatus(leg, lastDay)
+                                    const isFocused = focusedTransportId === leg.id
+                                    const isHighlighted = isInboundLive || isFocused
+
+                                    return (
+                                      <div key={leg.id} id={`leg-${leg.id}`} className="relative flex items-center gap-4 group/leg">
+                                        <div className="relative flex flex-col items-center w-[50px] shrink-0 h-full">
+                                          <div className={`w-px h-full ${isHighlighted ? 'bg-primary/40' : 'bg-white/10'} absolute left-1/2 -translate-x-1/2 -z-10`} />
+                                          <div className={`relative w-9 h-9 rounded-full flex items-center justify-center border transition-all ${
+                                            isHighlighted ? 'bg-primary border-primary shadow-[0_0_15px_rgba(195,244,0,0.4)]' : 'bg-neutral-900 border-white/10 group-hover/leg:border-primary/40 shadow-sm'
+                                          }`}>
+                                            <span className={`material-symbols-outlined text-sm ${isHighlighted ? 'text-slate-950' : 'text-neutral-500 group-hover/leg:text-primary'}`}>{modeIcon}</span>
+                                          </div>
+                                        </div>
+                                        <div className="flex-1 py-1">
+                                          <div 
+                                            className={`relative group/leg-card p-4 rounded-2xl transition-all duration-500 overflow-hidden border-l-4 ${
+                                              isHighlighted 
+                                                ? 'bg-primary/5 border-primary shadow-[0_0_30px_rgba(195,244,0,0.1)] ring-1 ring-primary/20 border-l-primary' 
+                                                : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04] border-l-white/20 hover:border-l-primary/40'
+                                            } border-y border-r backdrop-blur-sm cursor-pointer shadow-lg`}
+                                            onClick={() => openTransportModal(globalPlaceIndex, 'after', leg.id, lastDay)}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-white group-hover/leg-card:text-primary transition-colors line-clamp-1 leading-tight">
+                                                  {leg.title || transportModeLabel(leg.type)}
+                                                </h4>
+                                                <div className="flex items-center gap-2 text-white/50 text-[10px] font-mono mt-0.5 leading-none">
+                                                  <span>D{leg.departureDay ?? lastDay}</span>
+                                                  <span className="opacity-30">→</span>
+                                                  <span>D{leg.arrivalDay ?? lastDay}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  <div className="relative flex items-center gap-4 group/add">
+                                    <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                      <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
+                                      <button
+                                        onClick={() => openTransportModal(globalPlaceIndex, 'after', undefined, lastDay)}
+                                        className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
+                                      >
+                                        <span className="material-symbols-outlined text-sm">home_pin</span>
+                                        <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
+                                      </button>
+                                    </div>
+                                    <button 
+                                      onClick={() => openTransportModal(globalPlaceIndex, 'after', undefined, lastDay)}
+                                      className="flex items-center gap-2 group/btn"
+                                    >
+                                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Add Return Transport</span>
+                                    </button>
+                                  </div>
+
+                                  <div className="relative flex items-center gap-4 group/add">
+                                    <div className="relative flex flex-col items-center w-[50px] shrink-0">
+                                      <div className="w-px h-full bg-white/10 absolute left-1/2 -translate-x-1/2 -z-10" />
+                                      <button
+                                        onClick={() => handleAddHome(legs[0]?.toLocation || legs[0]?.to || '', lastDay, 'end')}
+                                        className="w-9 h-9 rounded-full bg-slate-950 border border-dashed border-primary/30 text-primary/60 hover:border-primary/60 hover:text-primary transition-all flex items-center justify-center active:scale-95 shadow-sm group relative z-10"
+                                      >
+                                        <span className="material-symbols-outlined text-sm transition-transform group-hover:scale-110">home</span>
+                                        <span className="material-symbols-outlined text-[10px] absolute -top-1 -right-1 w-3 h-3 flex items-center justify-center font-black text-primary bg-slate-950 rounded-full">add</span>
+                                      </button>
+                                    </div>
+                                    <button 
+                                      onClick={() => handleAddHome(legs[0]?.toLocation || legs[0]?.to || '', lastDay, 'end')}
+                                      className="flex items-center gap-2 group/btn"
+                                    >
+                                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 group-hover/btn:text-primary transition-all">Return to Home</span>
+                                    </button>
+                                  </div>
+                                </div>
+                            </div>
+                          )
+                        })()
+                      )}
+
                       <div className="h-4 w-px bg-white/20 mx-auto"></div>
 
                     </div>
@@ -2412,36 +2739,6 @@ export default function TripDetail() {
                 </div>
               </div>
   
-          {/* Trip Wisdom Section */}
-
-
-          {!isEditMode && places.length > 0 && (() => {
-            const WISDOM = [
-              "The world is a book, and those who do not travel read only one page.",
-              "Not all those who wander are lost. But some are definitely just bad at Google Maps.",
-              "Travel is the only thing you buy that makes you richer — and a little jet-lagged.",
-              "A bad day of travel is still better than a good day in the office.",
-              "Life is short and the world is wide. Start packing.",
-              "Jet lag is for amateurs. Real travellers just call it 'timezone expansion'.",
-              "The best souvenir? The stories no one at home will fully understand.",
-              "Every trip changes you. Some for better, some for blisters.",
-              "You can't buy happiness, but you can buy plane tickets. Same thing.",
-              "Travelling — because adulting is overrated, but boarding passes are not.",
-              "Adventure awaits. So does your overweight baggage fee.",
-              "Getting lost is just discovering a place that wasn't on the itinerary.",
-              "The world is too big to stay in one place. Your comfort zone included.",
-              "Collect moments, not things. Except maybe that one fridge magnet.",
-              "Travelling solo teaches you that you were never really alone.",
-            ];
-            const seed = (trip.id || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-            const quote = WISDOM[seed % WISDOM.length];
-            return (
-              <div className="mt-8 px-4 sm:px-8 py-6 border-t border-white/5 text-center animate-in fade-in duration-700">
-                <p className="text-neutral-600 text-xs uppercase tracking-[0.3em] font-bold mb-2">Trip Wisdom</p>
-                <p className="text-neutral-400 text-sm italic leading-relaxed max-w-xl mx-auto">&ldquo;{quote}&rdquo;</p>
-              </div>
-            )
-          })()}
         </div>
 
             {/* Resize Handle */}
@@ -2665,7 +2962,7 @@ export default function TripDetail() {
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">Start Day</label>
                     <select
-                      value={eventDay || 1}
+                      value={eventDay ?? 1}
                       onChange={(e) => {
                         const d = parseInt(e.target.value)
                         setEventDay(d)
@@ -2675,7 +2972,7 @@ export default function TripDetail() {
                     >
                       {(() => {
                         const place = places.find(p => p.id === eventPlaceId)
-                        const start = place?.day || 1
+                        const start = place?.day ?? 1
                         const end = place?.endDay || start
                         return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(d => (
                           <option key={d} value={d}>Day {d}</option>
@@ -2686,16 +2983,16 @@ export default function TripDetail() {
                   <div>
                     <label className="block text-sm font-medium text-white mb-2">End Day</label>
                     <select
-                      value={eventEndDay || eventDay || 1}
+                      value={(eventEndDay || eventDay) ?? 1}
                       onChange={(e) => setEventEndDay(parseInt(e.target.value))}
                       className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-white focus:border-primary outline-none text-sm cursor-pointer"
                     >
                       {(() => {
                         const place = places.find(p => p.id === eventPlaceId)
-                        const start = place?.day || 1
+                        const start = place?.day ?? 1
                         const end = place?.endDay || start
                         return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(d => (
-                          <option key={d} value={d} disabled={d < (eventDay || 1)}>Day {d}</option>
+                          <option key={d} value={d} disabled={d < (eventDay ?? 1)}>Day {d}</option>
                         ))
                       })()}
                     </select>
@@ -2828,7 +3125,17 @@ export default function TripDetail() {
                             if (!place) return
                             const updatedPlaces = places.map(p =>
                               p.id === attachmentsPlaceId
-                                ? { ...p, notes: attachmentNoteText.trim() }
+                                ? { 
+                                    ...p, 
+                                    notes: [
+                                      ...(p.notes || []), 
+                                      { 
+                                        id: Date.now().toString(), 
+                                        day: p.day || 1, 
+                                        text: attachmentNoteText.trim() 
+                                      }
+                                    ] 
+                                  }
                                 : p
                             )
                             setPlaces(updatedPlaces)
@@ -3178,12 +3485,12 @@ export default function TripDetail() {
                 const newNote: Note = {
                   id: Date.now().toString(),
                   text: payload.note || '',
-                  day: payload.day || p.day || 1
+                  day: (payload.day || p.day) ?? 1
                 }
                 return { ...p, notes: Array.isArray(p.notes) ? [...p.notes, newNote] : [newNote] }
               }
               if (payload.type === 'event' && payload.eventTitle) {
-                const newEvent: Event = {
+                const newEvent: TripEvent = {
                   id: Date.now().toString(),
                   title: payload.eventTitle,
                   description: payload.eventDescription || '',
@@ -3194,8 +3501,8 @@ export default function TripDetail() {
                   type: 'activity',
                   documents: [],
                   photos: payload.photos || [],
-                  day: payload.day || p.day || 1,
-                  endDay: payload.eventEndDay || payload.day || p.endDay || p.day || 1,
+                  day: (payload.day || p.day) ?? 1,
+                  endDay: (payload.eventEndDay || payload.day || p.endDay || p.day) ?? 1,
                 }
                 return { ...p, events: [...(p.events || []), newEvent] }
               }
@@ -3206,7 +3513,7 @@ export default function TripDetail() {
                   type: 'other',
                   ...(payload.docUrl && { url: payload.docUrl }),
                   ...(payload.docFile && { file: payload.docFile }),
-                  day: payload.day || p.day || 1,
+                  day: (payload.day || p.day) ?? 1,
                 }
                 return { ...p, documents: [...(p.documents || []), newDoc] }
               }
@@ -3215,7 +3522,7 @@ export default function TripDetail() {
                   id: Date.now().toString(),
                   title: payload.linkTitle || payload.linkUrl,
                   url: payload.linkUrl,
-                  day: payload.day || p.day || 1,
+                  day: (payload.day || p.day) ?? 1,
                 }
                 return { ...p, links: [...(p.links || []), newLink] }
               }
@@ -3225,10 +3532,10 @@ export default function TripDetail() {
                   name: payload.accName,
                   type: payload.accType || 'hotel',
                   checkIn: payload.accCheckIn || '',
-                  checkInDay: payload.accCheckInDay || p.day || 1,
+                  checkInDay: (payload.accCheckInDay || p.day) ?? 1,
                   checkOut: payload.accCheckOut || '',
-                  checkOutDay: payload.accCheckOutDay || p.endDay || p.day || 1,
-                  address: payload.accAddress || '',
+                  checkOutDay: (payload.accCheckOutDay || p.endDay || p.day) ?? 1,
+                  address: payload.accLocation || '',
                   documents: [],
                   photos: payload.photos || [],
                 }
@@ -3244,28 +3551,23 @@ export default function TripDetail() {
 
       {/* Edit Trip Modal - uses reusable TripForm (standardized modal style) */}
       {isEditModalOpen && trip && (
-        <ModalBackdrop onClick={() => setIsEditModalOpen(false)} className="z-[100] !p-0">
+        <ModalBackdrop onClick={() => setIsEditModalOpen(false)} className="z-[100]">
           <ModalContainer 
-            size="full" 
-            className="h-full max-w-none !rounded-none bg-slate-950"
+            size="lg" 
             tint="rgba(34, 211, 238, 0.05)"
           >
-            <div ref={editModalScrollRef} className="h-full overflow-y-auto">
-              <ParallaxBackground 
-                src={previewWallpaper || trip.wallpaper || ''} 
-                opacity={1} 
-                parallaxFactor={0.15}
-                containerRef={editModalScrollRef}
-              />
-              
-              <AppHeader 
-                center={<span className="text-sm font-bold text-white uppercase tracking-widest">Edit Trip</span>}
-                onBack={() => setIsEditModalOpen(false)}
-                className="!bg-neutral-900/40 backdrop-blur-xl border-b border-white/5"
-              />
-
-              <main className="relative pt-32 pb-40 px-6 md:px-10 z-10 flex flex-col items-center">
-                <div className="w-full max-w-2xl">
+            <ModalHeader 
+              title="Edit Trip Details" 
+              subtitle="Update your trip's identity and schedule"
+              onClose={() => setIsEditModalOpen(false)}
+              leading={
+                <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-lg text-primary">edit_note</span>
+                </div>
+              }
+            />
+            <ModalContent className="!p-0">
+              <div ref={editModalScrollRef} className="relative p-6 md:p-8">
                 <TripForm
                   initialValues={{
                     emoji: trip.emoji,
@@ -3285,15 +3587,42 @@ export default function TripDetail() {
                   onEmojiPickerToggle={setIsEmojiPickerInForm}
                   onWallpaperPickerToggle={setIsWallpaperPickerInForm}
                   hideBackground={true}
+                  hideActions={true}
+                  compact={true}
+                  onValidationChange={setIsEditFormValid}
                   onWallpaperChange={setPreviewWallpaper}
                   onDelete={() => {
                     deleteTrip(trip!.id)
                     window.location.href = '/'
                   }}
                 />
-                </div>
-              </main>
-            </div>
+              </div>
+            </ModalContent>
+            <ModalFooter>
+              <Button 
+                variant="modal-danger" 
+                icon="delete" 
+                onClick={() => {
+                  if (confirm("Are you sure you want to delete this trip?")) {
+                    deleteTrip(trip!.id)
+                    window.location.href = '/'
+                  }
+                }}
+              >
+                Delete
+              </Button>
+              <div className="flex-1" />
+              <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+              <Button 
+                variant="modal-primary" 
+                icon="save" 
+                type="submit" 
+                form="trip-edit-form"
+                disabled={!isEditFormValid || isEditSubmitting}
+              >
+                {isEditSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </ModalFooter>
           </ModalContainer>
         </ModalBackdrop>
       )}
@@ -3610,8 +3939,8 @@ export default function TripDetail() {
             data={attachmentDetail.data}
             isEditMode={isEditMode}
             placeName={place?.name}
-            placeStartDay={place?.day || 1}
-            placeEndDay={place?.endDay || place?.day || 1}
+            placeStartDay={place?.day ?? 1}
+            placeEndDay={(place?.endDay || place?.day) ?? 1}
             tripStartDate={trip?.startDate}
             tripEndDate={trip?.endDate}
             totalDays={allDays.length || 1}
@@ -3622,7 +3951,15 @@ export default function TripDetail() {
             onDelete={async () => {
               if (!place) { setAttachmentDetail(null); return }
               let updatedPlaces = places
-              if (attachmentDetail.data.type === 'event' && attachmentDetail.data.event) {
+              if (attachmentDetail.transportLegId) {
+                updatedPlaces = places.map(p => p.id === placeId ? {
+                  ...p,
+                  transport: (p.transport || []).map(t => t.id === attachmentDetail.transportLegId ? {
+                    ...t,
+                    documents: (t.documents || []).filter(d => d.id !== attachmentDetail.data.document!.id)
+                  } : t)
+                } : p)
+              } else if (attachmentDetail.data.type === 'event' && attachmentDetail.data.event) {
                 updatedPlaces = places.map(p => p.id === placeId ? { ...p, events: p.events.filter(e => e.id !== attachmentDetail.data.event!.id) } : p)
               } else if (attachmentDetail.data.type === 'document' && attachmentDetail.data.document) {
                 updatedPlaces = places.map(p => p.id === placeId ? { ...p, documents: p.documents.filter(d => d.id !== attachmentDetail.data.document!.id) } : p)
@@ -3638,7 +3975,15 @@ export default function TripDetail() {
             onSave={async (updated) => {
               if (!place) { setAttachmentDetail(null); return }
               let updatedPlaces = places
-              if (updated.type === 'event' && updated.event) {
+              if (attachmentDetail.transportLegId) {
+                updatedPlaces = places.map(p => p.id === placeId ? {
+                  ...p,
+                  transport: (p.transport || []).map(t => t.id === attachmentDetail.transportLegId ? {
+                    ...t,
+                    documents: (t.documents || []).map(d => d.id === updated.document!.id ? updated.document! : d)
+                  } : t)
+                } : p)
+              } else if (updated.type === 'event' && updated.event) {
                 updatedPlaces = places.map(p => p.id === placeId ? { ...p, events: p.events.map(e => e.id === updated.event!.id ? updated.event! : e) } : p)
               } else if (updated.type === 'document' && updated.document) {
                 updatedPlaces = places.map(p => p.id === placeId ? { ...p, documents: p.documents.map(d => d.id === updated.document!.id ? updated.document! : d) } : p)

@@ -104,15 +104,34 @@ export default function AttachmentDetailModal({
 
   // --- 2. Derived State ---
   const dayOptions = useMemo(() => {
+    const options = []
     const hasTripDayRange = typeof totalDays === 'number' && totalDays > 0
     const length = hasTripDayRange ? totalDays : (placeEndDay - placeStartDay + 1)
-    return Array.from(
-      { length },
-      (_, i) => {
+    
+    // Add 3 days before
+    for (let i = -2; i <= 0; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    
+    // Standard days
+    for (let i = 0; i < length; i++) {
       const d = hasTripDayRange ? i + 1 : placeStartDay + i
-      return { value: d, label: getDayWithDate(tripStartDate, d) }
-      }
-    )
+      options.push({ value: d, label: getDayWithDate(tripStartDate, d) })
+    }
+    
+    // Add 3 days after
+    const lastDay = hasTripDayRange ? totalDays : placeEndDay
+    for (let i = lastDay + 1; i <= lastDay + 3; i++) {
+      options.push({
+        value: i,
+        label: getDayWithDate(tripStartDate, i)
+      })
+    }
+    
+    return options
   }, [totalDays, placeStartDay, placeEndDay, tripStartDate])
 
   const cfg = CFG[data.type]
@@ -824,18 +843,18 @@ export default function AttachmentDetailModal({
               subtitle={`Finding images for ${draft.type === 'accommodation' ? draft.accommodation?.name : draft.event?.title}`}
               onClose={() => setIsSearchingModalOpen(false)}
             />
-            <div className="p-6 border-b border-white/10">
+            <div className="p-4 border-b border-white/5 bg-white/[0.02]">
               <div className="relative">
                 <input
                   autoFocus
                   placeholder="Search for photos..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white outline-none focus:border-primary transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-white outline-none focus:border-primary/50 text-sm transition-all placeholder-neutral-500"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch(searchQuery)}
                 />
-                <button onClick={() => handleSearch(searchQuery)} className="absolute right-3 top-3 text-white/40 hover:text-white">
-                  <span className="material-symbols-outlined">{isSearching ? 'refresh' : 'search'}</span>
+                <button onClick={() => handleSearch(searchQuery)} className="absolute right-3 top-2.5 text-neutral-500 hover:text-white">
+                  <span className="material-symbols-outlined text-xs">{isSearching ? 'refresh' : 'search'}</span>
                 </button>
               </div>
             </div>

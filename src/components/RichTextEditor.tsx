@@ -1,6 +1,6 @@
 'use client'
 
-import { InputRule } from '@tiptap/core'
+import { Extension, InputRule } from '@tiptap/core'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -55,12 +55,12 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Write
       Placeholder.configure({
         placeholder,
       }),
-      {
+      Extension.create({
         name: 'customShortcuts',
         addInputRules() {
           return [TaskListInputRule]
         },
-      },
+      }),
     ],
     immediatelyRender: false,
     content,
@@ -82,7 +82,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Write
       const currentHTML = editor.getHTML()
       if (content === '' && (currentHTML === '<p></p>' || currentHTML === '')) return
       
-      editor.commands.setContent(content, false)
+      editor.commands.setContent(content, { emitUpdate: false })
     }
   }, [content, editor])
 

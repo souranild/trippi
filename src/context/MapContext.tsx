@@ -15,12 +15,13 @@ interface MapState {
   onMarkerClick?: (place: Place) => void
   onMapClick?: (coords: { lat: number, lng: number }) => void
   onStyleChange?: (style: string) => void
-  onViewportChange?: (viewport: any) => void
+  onViewportChange?: (center: { lat: number, lng: number }, zoom: number, bounds?: any) => void
   isPreview?: boolean
   previewCoords?: { lat: number, lng: number } | null
   isGlobal?: boolean
   showControls?: boolean
   onAddDiscovery?: (discovery: any) => void
+  focusedTransportId?: string | null
 }
 
 interface MapContextType {
@@ -33,7 +34,7 @@ interface MapContextType {
   isExpanded: boolean
   setIsExpanded: (expanded: boolean) => void
   discoveries: any[]
-  setDiscoveries: (discoveries: any[]) => void
+  setDiscoveries: React.Dispatch<React.SetStateAction<any[]>>
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined)

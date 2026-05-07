@@ -38,8 +38,11 @@ interface TripFormProps {
   onEmojiPickerToggle?: (isOpen: boolean) => void
   onWallpaperPickerToggle?: (isOpen: boolean) => void
   hideBackground?: boolean
-  onDelete?: () => void
+  hideActions?: boolean
+  compact?: boolean
   onWallpaperChange?: (url: string) => void
+  onDelete?: () => void
+  onValidationChange?: (isValid: boolean) => void
 }
 
 export default function TripForm({
@@ -51,14 +54,16 @@ export default function TripForm({
   onEmojiPickerToggle,
   onWallpaperPickerToggle,
   hideBackground = false,
+  hideActions = false,
+  compact = false,
+  onWallpaperChange,
   onDelete,
-  onWallpaperChange
+  onValidationChange,
 }: TripFormProps) {
   const { userProfile } = useTrips()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [emoji, setEmoji] = useState(initialValues.emoji || '')
   const [skinTone, setSkinTone] = useState(userProfile?.skinTone || 'medium')
-
   // Set random emoji on mount if none provided
   useEffect(() => {
     if (!initialValues.emoji) {
@@ -66,6 +71,7 @@ export default function TripForm({
       setEmoji(randomEmoji)
     }
   }, [initialValues.emoji])
+
   const [title, setTitle] = useState(initialValues.title || '')
   const [description, setDescription] = useState(initialValues.description || '')
   const [startDate, setStartDate] = useState(initialValues.startDate || '')
@@ -75,6 +81,12 @@ export default function TripForm({
   const [wallpaperOpacity, setWallpaperOpacity] = useState(1)
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false)
   const [isWallpaperPickerOpen, setIsWallpaperPickerOpen] = useState(false)
+
+  const isFormValid = title.trim().length > 0 && startDate.length > 0
+
+  useEffect(() => {
+    onValidationChange?.(isFormValid)
+  }, [isFormValid, onValidationChange])
   const [wallpaperSearchQuery, setWallpaperSearchQuery] = useState('')
   const [wallpaperSearchResults, setWallpaperSearchResults] = useState<string[]>([])
   const [isWallpaperSearching, setIsWallpaperSearching] = useState(false)
@@ -207,7 +219,6 @@ export default function TripForm({
     })
   }
 
-  const isFormValid = Boolean(title.trim() && emoji && startDate)
 
   return (
     <div className="space-y-6">
@@ -259,8 +270,8 @@ export default function TripForm({
                 </div>
               }
               actions={
-                <label className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl text-primary text-xs font-bold cursor-pointer hover:bg-primary/20 transition-all active:scale-95">
-                  <span className="material-symbols-outlined text-sm">upload_file</span>
+                <label className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-xl text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/20 transition-all active:scale-95">
+                  <span className="material-symbols-outlined text-xs">upload_file</span>
                   <span className="hidden sm:inline">Upload</span>
                   <input 
                     type="file" 
@@ -272,7 +283,7 @@ export default function TripForm({
               }
             />
 
-            <div className="p-6 border-b border-neutral-700 flex-shrink-0">
+            <div className="p-4 border-b border-white/5 flex flex-col gap-3 flex-shrink-0 bg-white/[0.02]">
               <div className="relative">
                 <input
                   ref={wallpaperInputRef}
@@ -284,34 +295,28 @@ export default function TripForm({
                       handleWallpaperSearch(wallpaperSearchQuery || 'travel')
                     }
                   }}
-                  placeholder="Search for wallpapers (Wikipedia, Unsplash)..."
-                  className="w-full rounded-xl border border-neutral-700 bg-white/5 px-4 py-3 pr-12 text-white placeholder-neutral-400 focus:border-primary outline-none"
+                  placeholder="Search for wallpapers..."
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 pr-10 text-white placeholder-neutral-500 focus:border-primary/50 outline-none text-sm transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => handleWallpaperSearch(wallpaperSearchQuery || 'travel')}
                   disabled={isWallpaperSearching}
-                  className="absolute right-3 top-3 text-neutral-400 hover:text-white disabled:opacity-50"
+                  className="absolute right-3 top-2.5 text-neutral-500 hover:text-white disabled:opacity-50"
                 >
                   {isWallpaperSearching ? (
-                    <span className="material-symbols-outlined animate-spin text-sm">refresh</span>
+                    <span className="material-symbols-outlined animate-spin text-xs">refresh</span>
                   ) : (
-                    <span className="material-symbols-outlined text-sm">search</span>
+                    <span className="material-symbols-outlined text-xs">search</span>
                   )}
                 </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="h-px bg-neutral-800 flex-1" />
-                <span className="text-xs font-bold text-neutral-600">or paste a link</span>
-                <div className="h-px bg-neutral-800 flex-1" />
               </div>
 
               <div className="relative">
                 <input
                   type="url"
-                  placeholder="Paste direct image URL here..."
-                  className="w-full rounded-xl border border-neutral-700 bg-white/5 px-4 py-3 text-white placeholder-neutral-400 focus:border-primary outline-none text-xs"
+                  placeholder="Or paste direct image URL..."
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-neutral-500 focus:border-primary/50 outline-none text-[10px] transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const val = (e.target as HTMLInputElement).value.trim();
@@ -396,7 +401,7 @@ export default function TripForm({
       )}
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="relative z-10 mx-auto max-w-4xl">
+      <form id="trip-edit-form" onSubmit={handleSubmit} className="relative z-10 mx-auto max-w-4xl">
         <div className="mb-8 rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Emoji */}
@@ -439,8 +444,8 @@ export default function TripForm({
           </div>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-          <h2 className="text-xl font-bold text-white mb-6">Trip Details</h2>
+        <div className={compact ? "" : "mb-8 rounded-2xl border border-white/20 bg-white/10 p-6 shadow-2xl backdrop-blur-xl sm:p-8"}>
+          {!compact && <h2 className="text-xl font-bold text-white mb-6">Trip Details</h2>}
 
           <div className="space-y-4">
             <div>
@@ -473,36 +478,38 @@ export default function TripForm({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-6">
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                >
-                  <span className="material-symbols-outlined text-sm">delete</span>
-                  Delete
-                </button>
-              )}
+            {!hideActions && (
+              <div className="flex flex-col sm:flex-row gap-3 pt-6">
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    Delete
+                  </button>
+                )}
 
-              <div className="flex-1 flex gap-3">
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="flex-1 py-3 px-6 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all active:scale-95 text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!isFormValid || isSubmitting}
-                  className="flex-[2] py-3 px-6 rounded-2xl bg-primary text-slate-950 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all disabled:opacity-50 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2 text-xs"
-                >
-                  <span className="material-symbols-outlined text-sm">rocket_launch</span>
-                  {isSubmitting ? 'Creating...' : submitButtonText}
-                </button>
+                <div className="flex-1 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    className="flex-1 py-3 px-6 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all active:scale-95 text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!isFormValid || isSubmitting}
+                    className="flex-[2] py-3 px-6 rounded-2xl bg-primary text-slate-950 font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all disabled:opacity-50 disabled:scale-100 active:scale-95 flex items-center justify-center gap-2 text-xs"
+                  >
+                    <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                    {isSubmitting ? 'Creating...' : submitButtonText}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <ConfirmationModal
               isOpen={showDeleteConfirm}
