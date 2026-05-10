@@ -39,7 +39,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
   return (
     <div
       onClick={() => router.push(`/trip/${trip.id}`)}
-      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-500 hover:-translate-y-1 hover:scale-[1.03] hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-[#8ff5ff] focus:ring-offset-2 focus:ring-offset-[#0e0e0e] active:scale-95 cursor-pointer ring-2 ring-primary/50 shadow-[0_0_20px_rgba(195,244,0,0.3)] ${className}`}
+      className={`group relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-700 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(143,245,255,0.15)] focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 cursor-pointer border border-white/10 hover:border-primary/40 h-full ${className}`}
     >
       {/* Glass background with gradient - only for current adventure */}
       {isCurrent && <div className="glass absolute inset-0 z-0" />}
@@ -88,10 +88,21 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
           )}
         </div>
 
-        {/* Trip title */}
-        <h3 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2 font-['Space Grotesk'] tracking-tight">
-          {trip.title}
-        </h3>
+        {/* Trip title & Tags - flex-1 pushes bottom content down */}
+        <div className="flex-1 space-y-2 mb-3">
+          <h3 className="text-lg sm:text-xl font-bold text-white line-clamp-2 font-['Space Grotesk'] tracking-tight group-hover:text-primary transition-colors">
+            {trip.title}
+          </h3>
+          {trip.tags && trip.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {trip.tags.map(tag => (
+                <span key={tag} className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-neutral-300 shadow-sm transition-all group-hover:bg-white/20 group-hover:border-white/30">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Live Activity indicator if current */}
         {isCurrent && trip.places && trip.places.length > 0 && (() => {

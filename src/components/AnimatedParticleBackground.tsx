@@ -32,37 +32,54 @@ export default function AnimatedParticleBackground({ trips }: { trips: Trip[] })
 
     trips.forEach((trip) => {
       const tripEmoji = trip.emoji || '📍'
-      trip.places?.forEach((place) => {
+      if (trip.places && trip.places.length > 0) {
+        trip.places.forEach((place) => {
+          pool.push({
+            id: idx++,
+            emoji: tripEmoji,
+            placeName: place.name || 'Place',
+            baseX: Math.random() * 80 + 10,
+            baseY: Math.random() * 60 + 20,
+            duration: 12 + Math.random() * 8,
+            delay: 0,
+            waveAmplitude: 30 + Math.random() * 60,
+            orbitRadius: 20 + Math.random() * 40,
+          })
+        })
+      } else {
+        // Trip with no places - still show the trip emoji
         pool.push({
           id: idx++,
           emoji: tripEmoji,
-          placeName: place.name || 'Place',
+          placeName: trip.title,
           baseX: Math.random() * 80 + 10,
           baseY: Math.random() * 60 + 20,
-          duration: 12 + Math.random() * 8,
+          duration: 15 + Math.random() * 10,
           delay: 0,
-          waveAmplitude: 30 + Math.random() * 60,
-          orbitRadius: 20 + Math.random() * 40,
-        })
-      })
-    })
-
-    if (pool.length === 0) {
-      const defaults = ['✈️', '🏖️', '🏔️', '🌍', '🗼']
-      const names = ['Journey', 'Adventure', 'Escape', 'Explore', 'Wander']
-      for (let i = 0; i < 5; i++) {
-        pool.push({
-          id: idx++,
-          emoji: defaults[i],
-          placeName: names[i],
-          baseX: Math.random() * 70 + 15,
-          baseY: Math.random() * 50 + 25,
-          duration: 10 + Math.random() * 10,
-          delay: 0,
-          waveAmplitude: 40 + Math.random() * 50,
-          orbitRadius: 30 + Math.random() * 50,
+          waveAmplitude: 40 + Math.random() * 40,
+          orbitRadius: 30 + Math.random() * 30,
         })
       }
+    })
+
+    // Always add some default particles to ensure the scene isn't too sparse
+    const defaults = ['✈️', '🏖️', '🏔️', '🌍', '🗼', '🍕', '📸', '🚆']
+    const names = ['Journey', 'Adventure', 'Escape', 'Explore', 'Wander', 'Taste', 'Moment', 'Route']
+    const countToAdd = Math.max(3, 8 - pool.length)
+    
+    for (let i = 0; i < countToAdd; i++) {
+      const dIdx = i % defaults.length
+      pool.push({
+        id: idx++,
+        emoji: defaults[dIdx],
+        placeName: names[dIdx],
+        baseX: Math.random() * 70 + 15,
+        baseY: Math.random() * 50 + 25,
+        duration: 10 + Math.random() * 15,
+        delay: 0,
+        waveAmplitude: 40 + Math.random() * 50,
+        orbitRadius: 30 + Math.random() * 50,
+      })
     }
 
     setAllParticles(pool)

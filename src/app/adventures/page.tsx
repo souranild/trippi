@@ -8,6 +8,7 @@ import type { Trip } from '@/lib/storage'
 import TripCard from '@/components/Dashboard/TripCard'
 import AppHeader from '@/components/AppHeader'
 import { formatDuration } from '@/lib/date-utils'
+import AnimatedParticleBackground from '@/components/AnimatedParticleBackground'
 
 type ViewType = 'list' | 'gallery'
 type SortType = 'newest' | 'oldest' | 'alphabetical' | 'duration'
@@ -117,7 +118,8 @@ export default function AdventuresPage() {
   }, [filteredTrips, sortType])
 
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-white">
+    <div className="min-h-screen text-white relative">
+      <AnimatedParticleBackground trips={trips} />
       {/* Header */}
       <AppHeader
         extraRight={
@@ -145,123 +147,100 @@ export default function AdventuresPage() {
       </Link>
 
       <main className="w-full px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-        {/* Filters & Controls */}
-        <div className="mb-8 sm:mb-12 space-y-4 sm:space-y-6">
-          {/* Filter Toggle Row */}
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-300">Filters & Sort</h3>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="p-1.5 text-neutral-400 hover:text-[#8ff5ff] hover:bg-white/5 rounded-lg transition-all duration-300"
-              title={showFilters ? 'Hide filters' : 'Show filters'}
-            >
-              <span className="material-symbols-outlined text-base transform transition-transform duration-300" style={{ transform: showFilters ? 'rotate(0deg)' : 'rotate(180deg)' }}>
-                {showFilters ? 'expand_less' : 'expand_more'}
-              </span>
-            </button>
-          </div>
+        {/* Enhanced Filters Bar */}
+        <div className="space-y-6 mb-12">
+          <div className="flex flex-col gap-6">
+            {/* Status Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 mr-2 border-r border-white/10 pr-4">
+                <span className="material-symbols-outlined text-sm text-neutral-500">category</span>
+                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Status</span>
+              </div>
+              {(['all', 'active', 'upcoming', 'past'] as const).map(status => (
+                <button
+                  key={status}
+                  onClick={() => setFilters({ ...filters, status })}
+                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
+                    filters.status === status
+                      ? 'bg-primary border-primary text-slate-950 shadow-lg shadow-primary/20'
+                      : 'bg-white/5 border-white/10 text-neutral-400 hover:border-white/30 hover:bg-white/10'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
 
-          {/* Collapsible Filters Section */}
-          {showFilters && (
-            <div className="space-y-4 sm:space-y-6">
-              {/* Filter Row 1: Status & View Toggle */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                {/* Status Filter */}
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-neutral-400">Status:</label>
-                  <div className="flex gap-2">
-                    {(['all', 'active', 'upcoming', 'past'] as const).map(status => (
-                      <button
-                        key={status}
-                        onClick={() => setFilters({ ...filters, status })}
-                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 ${
-                          filters.status === status
-                            ? 'bg-primary text-black'
-                            : 'bg-white/5 text-neutral-300 hover:bg-white/10'
-                        }`}
-                      >
-                        {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* View Toggle */}
-                <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1 border border-white/10">
-                  {(['gallery', 'list'] as const).map(view => (
-                    <button
-                      key={view}
-                      onClick={() => setViewType(view)}
-                      className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-300 flex items-center gap-1 ${
-                        viewType === view
-                          ? 'bg-primary text-black'
-                          : 'text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-base">
-                        {view === 'gallery' ? 'grid_view' : 'list'}
-                      </span>
-                      <span className="hidden sm:inline capitalize">{view}</span>
-                    </button>
+            {/* Other Filters Row */}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Year Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Year</span>
+                <select
+                  value={filters.year || ''}
+                  onChange={(e) => setFilters({ ...filters, year: e.target.value ? parseInt(e.target.value) : undefined })}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
+                >
+                  <option value="">All Years</option>
+                  {uniqueYears.map(year => (
+                    <option key={year} value={year} className="bg-neutral-900">{year}</option>
                   ))}
-                </div>
+                </select>
               </div>
 
-              {/* Filter Row 2: Year, Country & Sort */}
-              <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                {/* Year Filter */}
-                {uniqueYears.length > 0 && (
-                  <select
-                    value={filters.year || ''}
-                    onChange={(e) => setFilters({ ...filters, year: e.target.value ? parseInt(e.target.value) : undefined })}
-                    className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white hover:border-white/20 focus:border-primary focus:outline-none transition-colors"
-                  >
-                    <option value="">All Years</option>
-                    {uniqueYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                )}
-
-                {/* Country Filter */}
-                {uniqueCountries.length > 0 && (
+              {/* Country Selector */}
+              {uniqueCountries.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Country</span>
                   <select
                     value={filters.country || ''}
                     onChange={(e) => setFilters({ ...filters, country: e.target.value || undefined })}
-                    className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white hover:border-white/20 focus:border-primary focus:outline-none transition-colors"
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
                   >
                     <option value="">All Countries</option>
                     {uniqueCountries.map(country => (
-                      <option key={country} value={country}>{country}</option>
+                      <option key={country} value={country} className="bg-neutral-900">{country}</option>
                     ))}
                   </select>
-                )}
+                </div>
+              )}
 
-                {/* Sort */}
+              {/* Sort Selector */}
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Sort</span>
                 <select
                   value={sortType}
                   onChange={(e) => setSortType(e.target.value as SortType)}
-                  className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white hover:border-white/20 focus:border-primary focus:outline-none transition-colors"
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="alphabetical">Alphabetical</option>
-                  <option value="duration">Longest Duration</option>
+                  <option value="newest" className="bg-neutral-900">Newest</option>
+                  <option value="oldest" className="bg-neutral-900">Oldest</option>
+                  <option value="alphabetical" className="bg-neutral-900">A-Z</option>
+                  <option value="duration" className="bg-neutral-900">Duration</option>
                 </select>
+              </div>
 
-                {/* Clear Filters */}
-                {(filters.status !== 'all' || filters.year || filters.country) && (
+              {/* View Toggle */}
+              <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+                {(['gallery', 'list'] as const).map(view => (
                   <button
-                    onClick={() => setFilters({ status: 'all' })}
-                    className="px-3 py-2 text-xs sm:text-sm font-medium text-secondary hover:text-[#c3f400] transition-colors flex items-center gap-1"
+                    key={view}
+                    onClick={() => setViewType(view)}
+                    className={`p-1.5 rounded-full transition-all duration-300 flex items-center justify-center ${
+                      viewType === view
+                        ? 'bg-primary text-black shadow-lg shadow-primary/20'
+                        : 'text-neutral-500 hover:text-white'
+                    }`}
+                    title={`${view} view`}
                   >
-                    <span className="material-symbols-outlined text-base">clear</span>
-                    <span className="hidden sm:inline">Clear</span>
+                    <span className="material-symbols-outlined text-sm">
+                      {view === 'gallery' ? 'grid_view' : 'list'}
+                    </span>
                   </button>
-                )}
+                ))}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Trips Display */}
@@ -289,7 +268,7 @@ export default function AdventuresPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {sortedTrips.map(trip => (
               <div key={trip.id} className="flex flex-col">
-                <TripCard trip={trip} onDelete={deleteTrip} />
+                <TripCard trip={trip} onDelete={deleteTrip} className="flex-1" />
                 <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
                   {new Date(trip.startDate).getFullYear()}
                 </div>
@@ -325,7 +304,12 @@ export default function AdventuresPage() {
                         <p className="text-xs sm:text-sm text-neutral-400 mt-1">
                           {formatDuration(trip.startDate, trip.endDate)}
                         </p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {trip.tags?.map(tag => (
+                            <span key={tag} className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-neutral-300">
+                              {tag}
+                            </span>
+                          ))}
                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                             status === 'active' ? 'bg-primary/20 text-primary' :
                             status === 'upcoming' ? 'bg-secondary/20 text-secondary' :

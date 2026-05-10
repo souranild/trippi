@@ -783,6 +783,8 @@ export default function TripDetail() {
     startDate: string
     endDate: string
     wallpaper: string
+    places?: Place[]
+    tags?: string[]
   }) => {
     if (!trip) return
 
@@ -795,7 +797,13 @@ export default function TripDetail() {
       emoji: data.emoji,
       startDate: data.startDate,
       endDate: data.endDate,
-      wallpaper: data.wallpaper
+      wallpaper: data.wallpaper,
+      tags: data.tags,
+      places: data.places || places
+    }
+
+    if (data.places) {
+      setPlaces(data.places)
     }
 
     // Update context and storage
@@ -3659,7 +3667,9 @@ export default function TripDetail() {
                     description: trip.description,
                     startDate: trip.startDate,
                     endDate: trip.endDate,
-                    wallpaper: trip.wallpaper
+                    wallpaper: trip.wallpaper,
+                    places: places,
+                    tags: trip.tags
                   }}
                   onSubmit={handleEditSubmit}
                   onCancel={() => {

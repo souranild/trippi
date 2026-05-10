@@ -8,6 +8,7 @@ import Link from 'next/link'
 import DashboardGrid from '@/components/Dashboard/DashboardGrid'
 import EmptyState from '@/components/Dashboard/EmptyState'
 import TripCard from '@/components/Dashboard/TripCard'
+import HeroTripCard from '@/components/Dashboard/HeroTripCard'
 import ExploreSection from '@/components/ExploreSection'
 import AppHeader from '@/components/AppHeader'
 
@@ -74,14 +75,6 @@ export default function Home() {
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false)
   const [isMobileMapClosing, setIsMobileMapClosing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-
-  // Get all unique tags from all trips
-  const allTags = useMemo(() => {
-    const tags = new Set<string>()
-    trips.forEach(t => t.tags?.forEach(tag => tags.add(tag)))
-    return Array.from(tags).sort()
-  }, [trips])
 
   // Handle mobile detection (below md breakpoint)
   useEffect(() => {
@@ -105,16 +98,9 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
-  // Filter trips by tags
-  const filteredTrips = useMemo(() => {
-    if (selectedTags.length === 0) return trips
-    return trips.filter(trip => 
-      selectedTags.every(tag => trip.tags?.includes(tag))
-    )
-  }, [trips, selectedTags])
 
   // Categorize trips
-  const currentTrip = filteredTrips.find(trip => {
+  const currentTrip = trips.find(trip => {
     const start = new Date(trip.startDate)
     let endDate = trip.endDate ? new Date(trip.endDate) : null
     
@@ -129,12 +115,12 @@ export default function Home() {
     return start <= now && now <= end
   })
 
-  const upcomingTrips = filteredTrips.filter(trip => {
+  const upcomingTrips = trips.filter(trip => {
     const start = new Date(trip.startDate)
     return start > now && trip.id !== currentTrip?.id
   }).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
 
-  const pastTrips = filteredTrips.filter(trip => {
+  const pastTrips = trips.filter(trip => {
     const end = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
     const isUpcoming = new Date(trip.startDate) > now
     return end < now && trip.id !== currentTrip?.id && !isUpcoming
@@ -166,42 +152,6 @@ export default function Home() {
           <EmptyState />
         ) : (
           <div className="space-y-8">
-            {/* Tag Filter Bar */}
-            {allTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 pb-2 overflow-x-auto no-scrollbar">
-                <div className="flex items-center gap-2 mr-2 border-r border-white/10 pr-4">
-                  <span className="material-symbols-outlined text-sm text-neutral-500">filter_list</span>
-                  <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Filter</span>
-                </div>
-                {allTags.map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      if (selectedTags.includes(tag)) {
-                        setSelectedTags(selectedTags.filter(t => t !== tag))
-                      } else {
-                        setSelectedTags([...selectedTags, tag])
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
-                      selectedTags.includes(tag)
-                        ? 'bg-primary border-primary text-slate-950 shadow-lg shadow-primary/20'
-                        : 'bg-white/5 border-white/10 text-neutral-400 hover:border-white/30 hover:bg-white/10'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-                {selectedTags.length > 0 && (
-                  <button
-                    onClick={() => setSelectedTags([])}
-                    className="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all ml-2"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
             {/* Left Column: Adventures (spans 2/3 on large, full on tablet) */}
@@ -219,7 +169,11 @@ export default function Home() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:gap-6 overflow-visible">
                     <div className="flex flex-col">
-                      <TripCard trip={currentTrip} isCurrent={true} />
+                      {trips.length < 3 ? (
+                        <HeroTripCard trip={currentTrip} />
+                      ) : (
+                        <TripCard trip={currentTrip} isCurrent={true} className="flex-1" />
+                      )}
                       <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
                         {new Date(currentTrip.startDate).getFullYear()}
                       </div>
@@ -229,7 +183,7 @@ export default function Home() {
               )}
 
               {/* Upcoming Adventures */}
-              {upcomingTrips.length > 0 && (
+              {upcomingTrips.length > 0 ? (
                 <div className="animate-fade-in">
                   <div className="flex items-baseline justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -243,7 +197,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
                     {upcomingTrips.slice(0, 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
-                        <TripCard trip={trip} />
+                        <TripCard trip={trip} className="flex-1" />
                         <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
                           {new Date(trip.startDate).getFullYear()}
                         </div>
@@ -260,10 +214,21 @@ export default function Home() {
                     </Link>
                   )}
                 </div>
+              ) : trips.length < 3 && (
+                <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
+                  <span className="material-symbols-outlined text-4xl text-neutral-600">add_location_alt</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Next Destination?</h4>
+                    <p className="text-xs text-neutral-500">Plan your next adventure and see it countdown here.</p>
+                  </div>
+                  <Link href="/trip/new" className="text-[10px] font-black uppercase tracking-widest text-secondary hover:text-white transition-colors">
+                    Plan Now
+                  </Link>
+                </div>
               )}
 
               {/* Past Adventures */}
-              {pastTrips.length > 0 && (
+              {pastTrips.length > 0 ? (
                 <div className="animate-fade-in">
                   <div className="flex items-baseline justify-between mb-4">
                     <div className="flex items-center gap-2">
@@ -283,7 +248,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
                     {pastTrips.slice(0, 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
-                        <TripCard trip={trip} />
+                        <TripCard trip={trip} className="flex-1" />
                         <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
                           {new Date(trip.startDate).getFullYear()}
                         </div>
@@ -299,6 +264,14 @@ export default function Home() {
                       <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform duration-300">arrow_forward</span>
                     </Link>
                   )}
+                </div>
+              ) : trips.length < 3 && (
+                <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
+                  <span className="material-symbols-outlined text-4xl text-neutral-600">history</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Your Travel Legacy</h4>
+                    <p className="text-xs text-neutral-500">Completed trips will appear here to relive your memories.</p>
+                  </div>
                 </div>
               )}
             </div>
