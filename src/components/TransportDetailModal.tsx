@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { Transport, TransportMode, Document } from '@/lib/storage'
+import { Transport, TransportMode, Document, Note, Link } from '@/lib/storage'
 import { DateTimeSelector } from '@/components/DateTimeSelector'
 import { getDayWithDate } from '@/lib/date-utils'
 import {
@@ -18,6 +18,7 @@ import { ModalBackdrop, ModalContainer, ModalHeader, ModalContent } from './Moda
 import { calculateDistance, formatDistance } from '@/lib/discovery'
 import { ensureHtml } from '@/lib/rich-text-utils'
 import { getBoundsError } from '@/lib/itinerary-utils'
+import RichTextEditor from '@/components/RichTextEditor'
 
 interface TransportDetailModalProps {
   leg: Transport | null

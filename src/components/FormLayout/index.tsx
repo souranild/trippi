@@ -85,7 +85,7 @@ export function FormLabel({
 
 interface FormInputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string
+  label?: React.ReactNode
   labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
   containerClassName?: string
   error?: string
@@ -119,7 +119,7 @@ FormInput.displayName = 'FormInput'
 /* ============= Form Input Group (with Actions) ============= */
 
 interface FormInputGroupProps {
-  label?: string
+  label?: React.ReactNode
   labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
   children: React.ReactNode
   action?: React.ReactNode
@@ -152,7 +152,7 @@ export function FormInputGroup({
 
 interface FormTextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string
+  label?: React.ReactNode
   labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
   containerClassName?: string
   error?: string
@@ -187,7 +187,7 @@ FormTextarea.displayName = 'FormTextarea'
 
 interface FormSelectProps
   extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label?: string
+  label?: React.ReactNode
   labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
   containerClassName?: string
   options: Array<{ value: string | number; label: string }>

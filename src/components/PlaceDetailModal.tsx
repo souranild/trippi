@@ -146,6 +146,7 @@ export default function PlaceDetailModal({
     return new Set()
   })
   const [isFetchingInfo, setIsFetchingInfo] = useState(false)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['details', 'activities', 'notes']))
 
   const handleMagicFetch = async () => {
     const name = updatedPlace.name

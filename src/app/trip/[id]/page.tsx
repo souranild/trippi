@@ -324,19 +324,32 @@ export default function TripDetail() {
     });
 
     if (closestPlace) {
-      const newActivity = {
+      const targetPlace = closestPlace as Place;
+      
+      // Calculate date from trip start + place day
+      let eventDate = trip?.startDate || new Date().toISOString().split('T')[0];
+      if (trip?.startDate && targetPlace.day) {
+        const d = new Date(trip.startDate);
+        d.setDate(d.getDate() + (targetPlace.day - 1));
+        eventDate = d.toISOString().split('T')[0];
+      }
+
+      const newActivity: TripEvent = {
         id: Math.random().toString(36).substr(2, 9),
         title: discovery.name,
         time: '12:00',
         location: discovery.name,
         lat: discovery.lat,
         lng: discovery.lng,
-        completed: false
+        date: eventDate,
+        type: 'activity',
+        documents: [],
+        day: targetPlace.day
       };
       
-      const updatedPlace = {
-        ...closestPlace,
-        events: [...(closestPlace.events || []), newActivity]
+      const updatedPlace: Place = {
+        ...targetPlace,
+        events: [...(targetPlace.events || []), newActivity]
       };
       
       const newPlaces = places.map(p => p.id === updatedPlace.id ? updatedPlace : p);
@@ -3476,7 +3489,6 @@ export default function TripDetail() {
           onOpenTransport={onOpenTransportFromMap}
           onEditLocation={() => setIsPlaceSearchOpen(true)}
           initialAttachmentDetail={initialAttachmentDetail || undefined}
-          allPlaces={places}
           mapStyle={trip.mapStyle}
           timeFormat={timeFormat}
         />

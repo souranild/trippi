@@ -1,4 +1,5 @@
 import { fetchPlaceImages } from './image-utils'
+import { Place, Trip } from './storage'
 
 export const ITINERARY_JSON_FORMAT = `
 {
