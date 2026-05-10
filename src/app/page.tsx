@@ -169,11 +169,7 @@ export default function Home() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:gap-6 overflow-visible">
                     <div className="flex flex-col">
-                      {trips.length < 3 ? (
-                        <HeroTripCard trip={currentTrip} />
-                      ) : (
-                        <TripCard trip={currentTrip} isCurrent={true} className="flex-1" />
-                      )}
+                      <HeroTripCard trip={currentTrip} />
                       <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
                         {new Date(currentTrip.startDate).getFullYear()}
                       </div>

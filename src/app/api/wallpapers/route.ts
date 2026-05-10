@@ -81,7 +81,9 @@ export async function GET(request: NextRequest) {
     const imageUrls = data.photos.map(photo => photo.src.large)
 
     console.log(`[Pexels API] ✅ Found ${imageUrls.length} images for query: "${query}"`)
-    return NextResponse.json(imageUrls)
+    return NextResponse.json(imageUrls, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+    })
 
   } catch (error) {
     console.error('[Pexels API] Error:', error)

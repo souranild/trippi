@@ -24,7 +24,9 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+    });
   } catch (error) {
     console.error('[Wiki Proxy Error]:', error);
     return NextResponse.json({ error: 'Failed to proxy request to Wikipedia' }, { status: 500 });

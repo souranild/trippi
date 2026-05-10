@@ -7,14 +7,21 @@ export interface WallpaperResult {
   keywords?: string[]
 }
 
+const searchCache: Record<string, string[]> = {}
+
 // Search wallpapers using the Next.js API route
 export async function searchWikipediaImages(query: string): Promise<string[]> {
+  const cacheKey = `wiki-${query}`
+  if (searchCache[cacheKey]) return searchCache[cacheKey]
+
   try {
     const cleanedQuery = query.trim().replace(/^(Trip to|My|Our|Journey to)\s+/i, '')
     // Use local proxy to avoid CORS
     const response = await fetch(`/api/wiki-images?query=${encodeURIComponent(cleanedQuery)}`)
     if (response.ok) {
-      return await response.json()
+      const results = await response.json()
+      searchCache[cacheKey] = results
+      return results
     }
     return []
   } catch (error) {
@@ -25,6 +32,9 @@ export async function searchWikipediaImages(query: string): Promise<string[]> {
 
 // Search wallpapers using the Next.js API route
 export async function searchWallpapers(query: string): Promise<string[]> {
+  const cacheKey = `wall-${query}`
+  if (searchCache[cacheKey]) return searchCache[cacheKey]
+
   console.log('[Wallpaper API] Searching for:', query)
 
   if (!query.trim()) {
@@ -40,6 +50,7 @@ export async function searchWallpapers(query: string): Promise<string[]> {
 
     const combinedUrls = [...wikiImages, ...unsplashImages]
     console.log(`[Wallpaper API] ✅ Found ${combinedUrls.length} combined images for query: "${query}"`)
+    searchCache[cacheKey] = combinedUrls
     return combinedUrls
 
 

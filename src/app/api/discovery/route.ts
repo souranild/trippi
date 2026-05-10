@@ -62,21 +62,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
     }
 
-    let lastError: any = null;
-    
-    for (const endpoint of OVERPASS_ENDPOINTS) {
+    const mirrorPromises = OVERPASS_ENDPOINTS.map(async (endpoint) => {
       try {
         console.log(`Overpass Proxy: Attempting Native POST ${endpoint}`);
         const data = await fetchOverpassNative(query, endpoint);
         console.log(`Overpass Proxy: Success from ${endpoint}`);
-        return NextResponse.json(data);
+        return data;
       } catch (e: any) {
-        lastError = e;
         console.warn(`Overpass proxy: failed for ${endpoint}`, e.message || e);
+        throw e; // Important for Promise.any
       }
+    });
+
+    try {
+      const fastestData = await Promise.any(mirrorPromises);
+      return NextResponse.json(fastestData);
+    } catch (e) {
+      return NextResponse.json({ error: 'All Overpass mirrors failed', details: 'No server responded successfully' }, { status: 502 });
     }
 
-    return NextResponse.json({ error: 'All Overpass mirrors failed', details: lastError?.message }, { status: 502 });
   } catch (error: any) {
     return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
   }
