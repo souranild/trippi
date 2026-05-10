@@ -26,15 +26,16 @@ interface MapSlotProps {
   onAddDiscovery?: (discovery: any) => void
   onDiscoveriesLoaded?: (discoveries: any[]) => void
   focusedTransportId?: string | null
+  onOpenTransport?: (transport: any, fromName: string, toName: string) => void
 }
 
 export default function MapSlot(props: MapSlotProps) {
   const { setMapState, setIsMapVisible, setPortalTarget, isExpanded, portalTarget } = useMapContext()
   const containerRef = React.useRef<HTMLDivElement>(null)
 
-  // Memoize properties that affect map state to avoid unnecessary updates
-  const placesKey = JSON.stringify(props.places)
-  const searchResultsKey = JSON.stringify(props.searchResults)
+  // Use a stable key for places and search results to avoid expensive stringification on every render
+  const placesKey = useMemo(() => props.places.map(p => p.id).join(','), [props.places])
+  const searchResultsKey = useMemo(() => (props.searchResults?.length || 0).toString(), [props.searchResults])
 
   // logic to determine whether this specific slot should be holding the map
   const shouldBeActive = useMemo(() => {
@@ -61,7 +62,8 @@ export default function MapSlot(props: MapSlotProps) {
     showControls: props.showControls,
     onAddDiscovery: props.onAddDiscovery,
     onDiscoveriesLoaded: props.onDiscoveriesLoaded,
-    focusedTransportId: props.focusedTransportId
+    focusedTransportId: props.focusedTransportId,
+    onOpenTransport: props.onOpenTransport
   }), [
     placesKey,
     searchResultsKey,
@@ -81,7 +83,8 @@ export default function MapSlot(props: MapSlotProps) {
     props.showControls,
     props.onAddDiscovery,
     props.onDiscoveriesLoaded,
-    props.focusedTransportId
+    props.focusedTransportId,
+    props.onOpenTransport
   ]);
 
   const lastStateRef = React.useRef<string>('')
@@ -114,7 +117,8 @@ export default function MapSlot(props: MapSlotProps) {
       onStyleChange: !!currentMapState.onStyleChange,
       onViewportChange: !!currentMapState.onViewportChange,
       onAddDiscovery: !!currentMapState.onAddDiscovery,
-      onDiscoveriesLoaded: !!currentMapState.onDiscoveriesLoaded
+      onDiscoveriesLoaded: !!currentMapState.onDiscoveriesLoaded,
+      onOpenTransport: !!currentMapState.onOpenTransport
     })
 
     if (stateString !== lastStateRef.current) { console.log("MAP_STATE_CHANGE", stateString);

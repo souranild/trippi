@@ -129,6 +129,8 @@ export interface Transport {
   duration?: string
   provider?: string
   documents: Document[]
+  notes?: Note[]
+  links?: Link[]
   ticketNumber?: string
   fromLocation?: string
   toLocation?: string
@@ -158,6 +160,7 @@ export interface Place {
   links: Link[]
   photos?: string[]
   photoDays?: (number | null)[]
+  type?: string
 }
 
 export interface TripSettings {
@@ -181,6 +184,7 @@ export interface Trip {
   startDate: string
   endDate?: string
   description?: string
+  tags?: string[]
   notes?: string
   photos?: string[] // base64 or URLs
   emoji?: string

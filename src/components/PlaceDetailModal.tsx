@@ -14,14 +14,17 @@ import {
   ModalFooter,
   BaseDetailModal
 } from '@/components/ModalLayout'
+import { getBoundsError } from '@/lib/itinerary-utils'
 import { AttachmentDetailData } from '@/components/AttachmentDetailModal'
 import AttachmentDetailModal from '@/components/AttachmentDetailModal'
 import type { AttachmentType } from './AttachmentModal'
 import { useTrips } from '@/context/TripContext'
-import { toggleHtmlCheckbox } from '@/lib/rich-text-utils'
+import { toggleHtmlCheckbox, ensureHtml } from '@/lib/rich-text-utils'
 import { MediaGrid } from '@/components/MediaGrid'
 import { Button } from '@/components/Button'
 import { FormLabel, FormListItem, FormTextarea } from '@/components/FormLayout'
+import { fetchLocationInfo } from '@/lib/image-utils'
+import { isWithinBounds } from '@/lib/itinerary-utils'
 import { ConfirmationModal } from './ConfirmationModal'
 import RichTextEditor from '@/components/RichTextEditor'
 
@@ -59,6 +62,11 @@ interface PlaceDetailModalProps {
   onAddAttachment?: (type: AttachmentType, placeId: string, day?: number) => void
   onAddTransport?: (placeId: string, day?: number) => void
   timeFormat?: '12h' | '24h'
+  minDay?: number
+  minTime?: string
+  maxDay?: number
+  maxTime?: string
+  initialAttachmentDetail?: AttachmentDetailData
 }
 
 export default function PlaceDetailModal({ 
@@ -80,7 +88,12 @@ export default function PlaceDetailModal({
   mapStyle,
   onAddAttachment,
   onAddTransport,
-  timeFormat = '12h'
+  timeFormat = '12h',
+  minDay,
+  minTime,
+  maxDay,
+  maxTime,
+  initialAttachmentDetail
 }: PlaceDetailModalProps) {
   // --- 1. State & Logic ---
   const [isEditMode, setIsEditMode] = useState(initialEditMode)
@@ -119,7 +132,8 @@ export default function PlaceDetailModal({
   const [notes, setNotes] = useState<Note[]>(updatedPlace.notes || [])
   const [arrivalTime, setArrivalTime] = useState(updatedPlace.arrival || '')
   const [departureTime, setDepartureTime] = useState(updatedPlace.departure || '')
-  const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetailData | null>(null)
+  const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetailData | null>(initialAttachmentDetail || null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [mediaViewer, setMediaViewer] = useState<{ items: any[]; index: number } | null>(null)
   const [isImageSearchOpen, setIsImageSearchOpen] = useState(false)
   const [imageSearchQuery, setImageSearchQuery] = useState('')
@@ -131,7 +145,33 @@ export default function PlaceDetailModal({
     // If no initialDay, keep everything expanded (empty set).
     return new Set()
   })
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['notes', 'media']))
+  const [isFetchingInfo, setIsFetchingInfo] = useState(false)
+
+  const handleMagicFetch = async () => {
+    const name = updatedPlace.name
+    if (!name || name.length < 3) return
+
+    setIsFetchingInfo(true)
+    try {
+      const info = await fetchLocationInfo(name)
+      if (info) {
+        const nextPlace = {
+          ...updatedPlace,
+          location: info.address || updatedPlace.location,
+          lat: info.lat || updatedPlace.lat,
+          lng: info.lng || updatedPlace.lng,
+          photos: [...(updatedPlace.photos || []), ...info.images.filter(img => !updatedPlace.photos?.includes(img))],
+          notes: info.description ? [{ id: Math.random().toString(36).substr(2, 9), day: updatedPlace.day || 1, text: info.description }, ...notes] : notes
+        }
+        setNotes(nextPlace.notes || [])
+        commitPlaceUpdate(nextPlace)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsFetchingInfo(false)
+    }
+  }
   const currentMediaDay = Array.from({ length: 1 }, (_, i) => updatedPlace.day || 1)[0] // Placeholder for current active day logic if needed
 
   const toggleSection = (id: string) => {
@@ -206,18 +246,42 @@ export default function PlaceDetailModal({
   // --- 3. Handlers ---
 
 
-  const handleArrivalChange = (time: string) => {
-    setArrivalTime(time)
-    const updated = { ...updatedPlace, arrival: time }
-    setUpdatedPlace(updated)
-    if (!isNew) onSave(updated)
+  const handleArrivalChange = (val: string) => {
+    const error = getBoundsError(
+      updatedPlace.day || 1, val,
+      updatedPlace.endDay || updatedPlace.day || 1, departureTime,
+      minDay || 1, minTime || '',
+      maxDay || 999, maxTime || '',
+      'Place'
+    )
+    if (error) {
+      setValidationError(error)
+    } else {
+      setValidationError(null)
+    }
+    setArrivalTime(val)
+    const next = { ...updatedPlace, arrival: val }
+    setUpdatedPlace(next)
+    if (!isNew) onSave(next)
   }
 
-  const handleDepartureChange = (time: string) => {
-    setDepartureTime(time)
-    const updated = { ...updatedPlace, departure: time }
-    setUpdatedPlace(updated)
-    if (!isNew) onSave(updated)
+  const handleDepartureChange = (val: string) => {
+    const error = getBoundsError(
+      updatedPlace.day || 1, arrivalTime,
+      updatedPlace.endDay || updatedPlace.day || 1, val,
+      minDay || 1, minTime || '',
+      maxDay || 999, maxTime || '',
+      'Place'
+    )
+    if (error) {
+      setValidationError(error)
+    } else {
+      setValidationError(null)
+    }
+    setDepartureTime(val)
+    const next = { ...updatedPlace, departure: val }
+    setUpdatedPlace(next)
+    if (!isNew) onSave(next)
   }
 
   const handleNoteChange = (id: string, text: string) => {
@@ -346,7 +410,7 @@ export default function PlaceDetailModal({
     if (text.trim().startsWith('<')) {
       return (
         <div 
-          className="prose-renderer text-[11px] leading-relaxed text-neutral-300 font-medium"
+          className="prose-renderer text-sm leading-relaxed text-neutral-300 font-medium"
           dangerouslySetInnerHTML={{ __html: text }}
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -677,7 +741,7 @@ export default function PlaceDetailModal({
                     <div className="p-3 border-t border-white/5 bg-black/20 animate-in slide-in-from-top-1 duration-200">
                       {isEditMode ? (
                         <RichTextEditor
-                            content={dayNote?.text || ''}
+                            content={ensureHtml(dayNote?.text || '')}
                             onChange={(newText) => {
                               let newNotes = [...notes]
                               const idx = newNotes.findIndex(n => n.day === d)
@@ -731,6 +795,14 @@ export default function PlaceDetailModal({
         <FormLabel variant="primary" className="mb-2 flex items-center gap-2">
           <span className="material-symbols-outlined text-base">schedule</span> Schedule
         </FormLabel>
+
+        {validationError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+            <span className="material-symbols-outlined text-red-400 text-base shrink-0">error</span>
+            <p className="text-red-200 text-[11px] leading-tight font-medium">{validationError}</p>
+          </div>
+        )}
+
         <div className="space-y-4">
           <DateTimeSelector
             label="Arrival"
@@ -798,14 +870,21 @@ export default function PlaceDetailModal({
                           const start = acc.checkInDay || updatedPlace.day || 1
                           const end = acc.checkOutDay || acc.checkInDay || updatedPlace.day || 1
                           const isMulti = end > start
+                          
+                          const isOutOfBounds = !isWithinBounds(start, acc.checkIn || '', updatedPlace.day || 1, arrivalTime || '', updatedPlace.endDay || updatedPlace.day || 1, departureTime || '') ||
+                                              !isWithinBounds(end, acc.checkOut || acc.checkIn || '', updatedPlace.day || 1, arrivalTime || '', updatedPlace.endDay || updatedPlace.day || 1, departureTime || '')
+
                           return (
-                            <>
+                            <div className="flex items-center gap-2">
                               {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
                               {formatTime(acc.checkIn, timeFormat)}
                               <span className="mx-1 opacity-50">→</span>
                               {isMulti && <span className="text-primary font-bold mr-1">D{end}</span>}
                               {formatTime(acc.checkOut, timeFormat)}
-                            </>
+                              {isOutOfBounds && (
+                                <span className="material-symbols-outlined text-red-400 text-xs ml-1 animate-pulse" title="Time is outside place bounds">warning</span>
+                              )}
+                            </div>
                           )
                         })()}
                       </span>
@@ -853,8 +932,12 @@ export default function PlaceDetailModal({
                           const start = event.day || updatedPlace.day || 1
                           const end = event.endDay || event.day || updatedPlace.day || 1
                           const isMulti = end > start
+                          
+                          const isOutOfBounds = !isWithinBounds(start, event.time || '', updatedPlace.day || 1, arrivalTime || '', updatedPlace.endDay || updatedPlace.day || 1, departureTime || '') ||
+                                              !isWithinBounds(end, event.endTime || event.time || '', updatedPlace.day || 1, arrivalTime || '', updatedPlace.endDay || updatedPlace.day || 1, departureTime || '')
+
                           return (
-                            <>
+                            <div className="flex items-center gap-2">
                               {isMulti && <span className="text-primary font-bold mr-1">D{start}</span>}
                               {formatTime(event.time || '', timeFormat)}
                               {event.endTime && (
@@ -864,7 +947,10 @@ export default function PlaceDetailModal({
                                   {formatTime(event.endTime, timeFormat)}
                                 </>
                               )}
-                            </>
+                              {isOutOfBounds && (
+                                <span className="material-symbols-outlined text-red-400 text-xs ml-1 animate-pulse" title="Time is outside place bounds">warning</span>
+                              )}
+                            </div>
                           )
                         })()}
                       </span>
@@ -1071,8 +1157,33 @@ export default function PlaceDetailModal({
         isOpen={true}
         onClose={onClose}
         isEditMode={isEditMode}
-        title={updatedPlace.name}
-        subtitle={updatedPlace.location || (isNew ? "Set details for your new destination" : "No address set")}
+        title={isEditMode ? (
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={updatedPlace.name}
+              onChange={(e) => commitPlaceUpdate({ ...updatedPlace, name: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-1.5 text-xl font-bold text-white focus:border-primary focus:outline-none transition-all w-full max-w-md"
+              placeholder="Place name..."
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleMagicFetch}
+              disabled={isFetchingInfo || !updatedPlace.name || updatedPlace.name.length < 3}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all disabled:opacity-30 shrink-0"
+              title="Auto-fetch details & images"
+            >
+              {isFetchingInfo ? (
+                <span className="material-symbols-outlined text-xs animate-spin">refresh</span>
+              ) : (
+                <span className="material-symbols-outlined text-xs">auto_awesome</span>
+              )}
+              <span className="hidden sm:inline">Discovery</span>
+            </button>
+          </div>
+        ) : updatedPlace.name}
+        subtitle={updatedPlace.type ? (updatedPlace.type.charAt(0).toUpperCase() + updatedPlace.type.slice(1).replace(/_/g, ' ') + (updatedPlace.location ? ` • ${updatedPlace.location}` : '')) : (updatedPlace.location || (isNew ? "Set details for your new destination" : "No address set"))}
         icon="location_on"
         iconColor="text-primary"
         actions={isEditMode && onEditLocation ? (
@@ -1166,6 +1277,8 @@ export default function PlaceDetailModal({
           totalDays={allDaysCount}
           mapStyle={mapStyle}
           allPlaces={allPlaces}
+          placeArrivalTime={arrivalTime}
+          placeDepartureTime={departureTime}
           onClose={() => setAttachmentDetail(null)}
           onDelete={() => {
             if (attachmentDetail.type === 'event' && attachmentDetail.event) handleDeleteEvent(attachmentDetail.event.id)

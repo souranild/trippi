@@ -74,6 +74,14 @@ export default function Home() {
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false)
   const [isMobileMapClosing, setIsMobileMapClosing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+
+  // Get all unique tags from all trips
+  const allTags = useMemo(() => {
+    const tags = new Set<string>()
+    trips.forEach(t => t.tags?.forEach(tag => tags.add(tag)))
+    return Array.from(tags).sort()
+  }, [trips])
 
   // Handle mobile detection (below md breakpoint)
   useEffect(() => {
@@ -97,11 +105,17 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])
 
+  // Filter trips by tags
+  const filteredTrips = useMemo(() => {
+    if (selectedTags.length === 0) return trips
+    return trips.filter(trip => 
+      selectedTags.every(tag => trip.tags?.includes(tag))
+    )
+  }, [trips, selectedTags])
+
   // Categorize trips
-  const currentTrip = trips.find(trip => {
+  const currentTrip = filteredTrips.find(trip => {
     const start = new Date(trip.startDate)
-    // If there's an endDate, use it. Otherwise, if there are places, use the endDay of the last place.
-    // As a final fallback, default to 10 days for fresh trips.
     let endDate = trip.endDate ? new Date(trip.endDate) : null
     
     if (!endDate && trip.places && trip.places.length > 0) {
@@ -115,15 +129,12 @@ export default function Home() {
     return start <= now && now <= end
   })
 
-  // A trip is upcoming if it starts in the future and isn't the current trip
-  const upcomingTrips = trips.filter(trip => {
+  const upcomingTrips = filteredTrips.filter(trip => {
     const start = new Date(trip.startDate)
     return start > now && trip.id !== currentTrip?.id
   }).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
 
-  // A trip is past if it ended in the past, isn't current, and ISN'T already counted as upcoming
-  // (Prevents duplication if endDate < startDate)
-  const pastTrips = trips.filter(trip => {
+  const pastTrips = filteredTrips.filter(trip => {
     const end = trip.endDate ? new Date(trip.endDate) : new Date(trip.startDate)
     const isUpcoming = new Date(trip.startDate) > now
     return end < now && trip.id !== currentTrip?.id && !isUpcoming
@@ -154,7 +165,45 @@ export default function Home() {
         {trips.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
+          <div className="space-y-8">
+            {/* Tag Filter Bar */}
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 pb-2 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-2 mr-2 border-r border-white/10 pr-4">
+                  <span className="material-symbols-outlined text-sm text-neutral-500">filter_list</span>
+                  <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Filter</span>
+                </div>
+                {allTags.map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      if (selectedTags.includes(tag)) {
+                        setSelectedTags(selectedTags.filter(t => t !== tag))
+                      } else {
+                        setSelectedTags([...selectedTags, tag])
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
+                      selectedTags.includes(tag)
+                        ? 'bg-primary border-primary text-slate-950 shadow-lg shadow-primary/20'
+                        : 'bg-white/5 border-white/10 text-neutral-400 hover:border-white/30 hover:bg-white/10'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {selectedTags.length > 0 && (
+                  <button
+                    onClick={() => setSelectedTags([])}
+                    className="px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all ml-2"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
             {/* Left Column: Adventures (spans 2/3 on large, full on tablet) */}
             <div className="md:col-span-1 lg:col-span-2 space-y-8 sm:space-y-12">
               {/* Current Adventure */}
@@ -261,6 +310,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
         )}
 
         {/* Mobile Map Section - replaced with trigger for Drawer */}

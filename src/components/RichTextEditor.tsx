@@ -69,7 +69,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Write
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-invert prose-sm focus:outline-none max-w-none min-h-[60px] text-white/90 leading-relaxed text-[11px]',
+        class: 'prose prose-invert prose-sm focus:outline-none max-w-none min-h-[60px] text-white/90 leading-relaxed text-sm',
       },
     },
   })
@@ -185,6 +185,12 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Write
         .tiptap-editor .ProseMirror {
           min-height: 100px;
           padding: 8px 0;
+        }
+        .tiptap-editor .ProseMirror p {
+          margin-bottom: 0.75rem;
+        }
+        .tiptap-editor .ProseMirror p:last-child {
+          margin-bottom: 0;
         }
         .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);

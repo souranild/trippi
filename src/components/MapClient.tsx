@@ -7,7 +7,7 @@ import { useEffect, useState, useMemo, useRef, Fragment, useCallback } from 'rea
 import { useRouter } from 'next/navigation'
 import { transportModeIcon } from '@/lib/transport-options'
 import type { Transport, TransportMode, Place as StoragePlace } from '@/lib/storage'
-import { fetchHybridDiscovery, calculateDistance, enrichDiscoveryResult, searchLocations, type DiscoveryResult } from '@/lib/discovery'
+import { fetchHybridDiscovery, calculateDistance, enrichDiscoveryResult, searchLocations, type DiscoveryResult, MAP_ICON, formatDistance } from '@/lib/discovery'
 import { useMapContext } from '@/context/MapContext'
 
 // Fix for default marker icons in Leaflet with Next.js
@@ -53,6 +53,7 @@ interface MapProps {
   defaultDiscovery?: boolean
   onMarkerClick?: (place: Place) => void
   focusedTransportId?: string | null
+  onOpenTransport?: (transport: any, fromName: string, toName: string) => void
 }
 
 function MapLifecycle({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
@@ -278,32 +279,65 @@ function MapEvents({ onZoomChange, onClick, onViewportChange, onMarkerClick, onM
   return null
 }
 
-function createIcon(emoji: string, showDayNumbers: boolean, name?: string, dayLabel?: string, isPreview?: boolean, isFocused?: boolean, isSearchResult?: boolean, zoom: number = 10, isDiscovery?: boolean, isLive: boolean = false) {
+function getIconForType(type?: string) {
+  if (!type) return 'location_on';
+  const t = type.toLowerCase();
+  if (t === 'restaurant' || t === 'fast_food' || t === 'food_court') return 'restaurant';
+  if (t === 'cafe') return 'local_cafe';
+  if (t === 'local_bar' || t === 'pub' || t === 'bar') return 'local_bar';
+  if (t === 'museum' || t === 'gallery') return 'museum';
+  if (t === 'park' || t === 'nature_reserve' || t === 'forest' || t === 'garden') return 'park';
+  if (t === 'historic' || t === 'castle' || t === 'monument' || t === 'fort') return 'castle';
+  if (t === 'viewpoint') return 'visibility';
+  if (t === 'attraction') return 'stars';
+  if (t === 'hotel' || t === 'apartment' || t === 'hostel' || t === 'motel') return 'hotel';
+  if (t === 'airport') return 'flight';
+  if (t === 'station' || t === 'subway') return 'train';
+  if (t === 'beach') return 'beach_access';
+  return 'location_on';
+}
+
+function createIcon(emoji: string, showDayNumbers: boolean, name?: string, dayLabel?: string, isPreview?: boolean, isFocused?: boolean, isSearchResult?: boolean, zoom: number = 10, isDiscovery?: boolean, isLive: boolean = false, type?: string) {
+  const markerColor = isLive ? '#8ff5ff' : isFocused ? '#8ff5ff' : isSearchResult ? '#fbbf24' : isDiscovery ? (
+    type === 'restaurant' || type === 'fast_food' ? '#f87171' : // Red
+    type === 'cafe' ? '#fb923c' : // Orange
+    type === 'local_bar' || type === 'pub' ? '#c084fc' : // Purple
+    type === 'museum' ? '#60a5fa' : // Blue
+    type === 'park' || type === 'nature_reserve' ? '#4ade80' : // Green
+    type === 'historic' || type === 'castle' ? '#fbbf24' : // Amber
+    '#818cf8' // Indigo default
+  ) : '#8ff5ff'
+
+  // Icon Selection for Discovery
+  const iconName = isDiscovery ? getIconForType(type) : emoji;
+
   if (isSearchResult) {
     return L.divIcon({
       html: `
-        <div class="flex items-center justify-center w-6 h-6 bg-white/20 hover:bg-primary/40 rounded-full border-2 border-white/40 text-[10px] shadow-lg backdrop-blur-sm transition-all duration-300 transform-gpu cursor-pointer group z-[50]">
-          <div class="w-2 h-2 bg-white rounded-full group-hover:scale-125 transition-transform"></div>
+        <div class="relative group">
+          <div class="w-8 h-8 rounded-full bg-neutral-900 border-2 border-[#fbbf24] flex items-center justify-center shadow-2xl transition-all duration-300 group-hover:scale-125">
+            <span class="material-symbols-outlined text-[16px] text-[#fbbf24]">search</span>
+          </div>
         </div>
       `,
-      className: 'custom-marker search-result-marker',
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      className: '',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
     })
   }
 
   if (isDiscovery) {
-    const discoverySize = zoom < 8 ? 16 : zoom < 12 ? 24 : 32;
-    const isMaterial = emoji.length > 2 && !emoji.includes('\ud83c'); 
-    
+    const discoverySize = zoom < 8 ? 20 : zoom < 12 ? 28 : 36;
     return L.divIcon({
       html: `
-        <div class="flex items-center justify-center bg-neutral-950/80 hover:bg-amber-500/30 rounded-xl border-2 border-amber-500/40 shadow-[0_4px_15px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-300 transform-gpu cursor-pointer group z-[45]" style="width: ${discoverySize}px; height: ${discoverySize}px;">
-          ${isMaterial ? `
-            <span class="material-symbols-outlined text-amber-400 group-hover:text-white transition-colors" style="font-size: ${discoverySize * 0.6}px;">${emoji}</span>
-          ` : `
-            <span class="leading-none text-center" style="font-size: ${discoverySize * 0.5}px;">${emoji || '⭐'}</span>
-          `}
+        <div class="relative group">
+          <div class="flex items-center justify-center bg-neutral-950/80 rounded-xl border-2 shadow-[0_4px_15px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-300 transform-gpu cursor-pointer group-hover:scale-110 group-hover:shadow-[0_0_20px_${markerColor}44]" 
+               style="width: ${discoverySize}px; height: ${discoverySize}px; border-color: ${markerColor}66;">
+            <span class="material-symbols-outlined" style="color: ${markerColor}; font-size: ${discoverySize * 0.55}px;">${iconName}</span>
+          </div>
+          ${zoom >= 14 ? `<div class="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-1.5 py-0.5 bg-neutral-950/90 border border-white/10 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[100]">
+            <span class="text-[9px] font-bold text-white">${name || 'Point of Interest'}</span>
+          </div>` : ''}
         </div>
       `,
       className: 'custom-marker discovery-marker',
@@ -363,7 +397,7 @@ function createIcon(emoji: string, showDayNumbers: boolean, name?: string, dayLa
 }
 
 function createTransportIcon(iconName: string, rotation: number = 0, isTravelIcon: boolean = false, isLive: boolean = false, isFocused: boolean = false) {
-  const highlight = isLive || isFocused;
+  const highlight = (isLive || isFocused) && !!iconName;
   return L.divIcon({
     html: `
       <div class="flex items-center justify-center transition-all duration-300 relative ${
@@ -448,6 +482,7 @@ export default function MapClient({
   isPreview = false,
   onAddDiscovery,
   defaultDiscovery,
+  onOpenTransport,
   focusedTransportId
 }: MapProps) {
   const router = useRouter()
@@ -479,18 +514,17 @@ export default function MapClient({
   }, [focusedPlaceId]); // Only depends on focusedPlaceId for initial mount logic
   const [zoom, setZoom] = useState(10)
   const [activeMap, setActiveMap] = useState<L.Map | null>(null)
-  const [mapStyle, setMapStyle] = useState<MapStyle>((externalMapStyle as MapStyle) || 'midnight')
+  const [mapStyle, setMapStyle] = useState<MapStyle>('voyager')
   const [isStyleModalOpen, setIsStyleModalOpen] = useState(false)
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null)
-  const [hoveredItem, setHoveredItem] = useState<any | null>(null)
+
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [internalSearchResults, setInternalSearchResults] = useState<DiscoveryResult[]>([])
-  const { setMapState, setIsMapVisible, isExpanded, setIsExpanded, discoveries, setDiscoveries } = useMapContext()
-  const [showDiscovery, setShowDiscovery] = useState(defaultDiscovery || false)
+  const { setMapState, setIsMapVisible, isExpanded, setIsExpanded, discoveries, setDiscoveries, selectedDiscovery, setSelectedDiscovery, isDiscoveryDetailModalOpen, setIsDiscoveryDetailModalOpen } = useMapContext()
+  const [showDiscovery, setShowDiscovery] = useState(defaultDiscovery !== undefined ? defaultDiscovery : true)
   const [discoveryCategory, setDiscoveryCategory] = useState<string>('attractions')
   const [isFollowing, setIsFollowing] = useState(false)
-  const [selectedDiscovery, setSelectedDiscovery] = useState<any | null>(null);
   
   // Compact Control UI
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false)
@@ -501,6 +535,12 @@ export default function MapClient({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const discoveryAbortRef = useRef<AbortController | null>(null)
   const discoveryCacheRef = useRef<Record<string, DiscoveryResult[]>>({})
+
+  const tripId = useMemo(() => {
+    // Extract tripId from the first place that has it, or fallback to 'global'
+    const firstWithId = (places as any[]).find(p => p.tripId);
+    return firstWithId?.tripId || 'global';
+  }, [places]);
 
   const DISCOVERY_CATEGORIES = [
     { id: 'famous', label: 'Famous', icon: 'star', emoji: '🌟', search: 'famous popular tourist attraction landmark' },
@@ -554,6 +594,28 @@ export default function MapClient({
     };
   }, [showDiscovery, activeMap]);
 
+  // Load cached discoveries on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && discoveries.length === 0 && tripId) {
+      const saved = sessionStorage.getItem(`trippi-discoveries-${tripId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setDiscoveries(parsed);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [tripId]);
+
+  // Save discoveries to cache
+  useEffect(() => {
+    if (typeof window !== 'undefined' && discoveries.length > 0 && tripId) {
+      sessionStorage.setItem(`trippi-discoveries-${tripId}`, JSON.stringify(discoveries));
+    }
+  }, [discoveries, tripId]);
+
   const validPlaces = places.filter(p => p.lat != null && p.lng != null && !isNaN(Number(p.lat)) && !isNaN(Number(p.lng)))
 
   // Create coordinates for search results - with NaN protection
@@ -595,7 +657,9 @@ export default function MapClient({
       router.push(`/trip/${place.tripId}?place=${place.id}`)
     } else {
       if (activeMap && !isNaN(lat) && !isNaN(lng)) {
-        activeMap.flyTo([lat, lng], 15, { animate: true, duration: 1 })
+        // If already more zoomed in than 15, don't zoom out
+        const targetZoom = Math.max(activeMap.getZoom(), 15);
+        activeMap.flyTo([lat, lng], targetZoom, { animate: true, duration: 1 })
       }
       if (onMarkerClick) onMarkerClick(place);
     }
@@ -605,19 +669,11 @@ export default function MapClient({
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
     
     if (placeId) {
-      // Find the item
-      const item = places.find(p => p.id === placeId) || 
-                   discoveries.find(d => d.id === placeId) || 
-                   internalSearchResults.find(r => r.id === placeId);
-      if (item) {
-        setHoveredPlaceId(placeId)
-        setHoveredItem(item)
-      }
+      setHoveredPlaceId(placeId)
     } else {
       hoverTimeoutRef.current = setTimeout(() => {
         setHoveredPlaceId(null)
-        setHoveredItem(null)
-      }, 100) // Fast dismissal
+      }, 150)
     }
   }
   const performSearch = async (query: string) => {
@@ -703,7 +759,8 @@ export default function MapClient({
         setDiscoveries(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const filteredNew = cachedResults.filter(s => !existingIds.has(s.id));
-          return [...prev, ...filteredNew].slice(-100);
+          // Limit total discoveries to 40 for performance and clarity
+          return [...prev, ...filteredNew].slice(-40);
         });
         setIsSearching(false);
         setIsMapMoved(false);
@@ -742,7 +799,8 @@ export default function MapClient({
       setDiscoveries(prev => {
         const existingIds = new Set(prev.map(p => p.id));
         const filteredNew = newSuggestions.filter(s => !existingIds.has(s.id));
-        return [...prev, ...filteredNew].slice(-250);
+        // Limit total discoveries to 40 for performance and clarity
+        return [...prev, ...filteredNew].slice(-40);
       });
       
       // BACKGROUND ENRICHMENT: Fetch rich details one by one
@@ -798,31 +856,62 @@ export default function MapClient({
   return (
     <div className={`${className || "h-[600px]"} w-full bg-neutral-900 overflow-hidden relative shadow-inner z-10 transition-all duration-300 isolation-isolate map-style-${mapStyle}`}>
       <div className="absolute inset-0 z-10">
-        {/* Unified Map Controls Stack (Top Left) */}
-        <div className="absolute top-6 left-4 z-[20] flex flex-col items-start gap-3 no-print">
-          <div className={`p-1 bg-neutral-950/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-300 overflow-hidden ${isStyleModalOpen ? 'w-[180px]' : 'w-10'}`}>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1">
-                <button
-                   onClick={() => setIsStyleModalOpen(!isStyleModalOpen)}
-                   className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center transition-all ${isStyleModalOpen ? 'bg-primary text-black' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
-                   title="Map Style"
-                >
-                   <span className="material-symbols-outlined text-[16px]">layers</span>
-                </button>
-                
-                {isStyleModalOpen && (
-                   <span className="text-xs font-bold text-primary animate-in fade-in slide-in-from-left-2">Themes</span>
-                )}
-              </div>
+        {/* Minimal Tool Pill (Top Left) */}
+        <div className="absolute top-6 left-4 z-[20] no-print">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center bg-neutral-950/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-1 gap-1">
+              <button
+                onClick={() => setIsStyleModalOpen(!isStyleModalOpen)}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isStyleModalOpen ? 'bg-primary text-black' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
+                title="Map Style"
+              >
+                <span className="material-symbols-outlined text-[16px]">layers</span>
+              </button>
+              
+              {!isStyleModalOpen && (
+                <>
+                  <div className="w-px h-4 bg-white/10 mx-0.5" />
+                  <button
+                    onClick={() => {
+                      if (activeMap && validPlaces.length > 0) {
+                        const coords = validPlaces
+                          .map(p => [Number(p.lat), Number(p.lng)] as [number, number])
+                          .filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng));
+                        if (coords.length > 0) {
+                          const bounds = L.latLngBounds(coords);
+                          activeMap.fitBounds(bounds, { padding: [50, 50], animate: true });
+                        }
+                      }
+                    }}
+                    className="w-8 h-8 text-neutral-400 hover:text-white hover:bg-white/5 rounded-xl flex items-center justify-center transition-all"
+                    title="Fit to Trip"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">zoom_out_map</span>
+                  </button>
+                  
+                  {showDayNumbers && (
+                    <button
+                      onClick={() => setIsFollowing(!isFollowing)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isFollowing ? 'bg-primary text-black' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
+                      title={isFollowing ? "Unfollow active item" : "Follow active item"}
+                    >
+                      <span className={`material-symbols-outlined text-[16px] ${isFollowing ? 'animate-pulse' : ''}`}>
+                        {isFollowing ? 'location_searching' : 'my_location'}
+                      </span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
 
-              {isStyleModalOpen ? (
-                <div className="grid grid-cols-2 gap-1 p-0.5 animate-in fade-in zoom-in-95 duration-200">
+            {isStyleModalOpen && (
+              <div className="bg-neutral-950/90 backdrop-blur-xl border border-white/10 p-2 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 w-40">
+                <div className="grid grid-cols-2 gap-1.5">
                   {(['midnight', 'satellite', 'voyager', 'retro', 'dark', 'cyber', 'mono', 'topo'] as MapStyle[]).map((s) => (
                     <button
                       key={s}
                       onClick={() => { handleStyleChange(s); setIsStyleModalOpen(false); }}
-                      className={`px-1.5 py-1.5 rounded-lg text-[9px] font-bold text-center transition-all ${
+                      className={`px-1 py-1.5 rounded-lg text-[9px] font-bold text-center transition-all ${
                         mapStyle === s 
                           ? 'bg-primary/20 text-primary border border-primary/20' 
                           : 'text-neutral-400 hover:text-white hover:bg-white/5'
@@ -832,57 +921,8 @@ export default function MapClient({
                     </button>
                   ))}
                 </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <button
-                    onClick={() => {
-                      if (activeMap && validPlaces.length > 0) {
-                        if (!showDayNumbers && !showControls) {
-                          activeMap.setView([20, 0], 2, { animate: true });
-                        } else {
-                          const coords = validPlaces
-                            .map(p => [Number(p.lat), Number(p.lng)] as [number, number])
-                            .filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng));
-                          
-                          if (coords.length > 0) {
-                            const bounds = L.latLngBounds(coords);
-                            activeMap.fitBounds(bounds, { padding: [50, 50], animate: true });
-                          }
-                        }
-                      }
-                    }}
-                    className="w-8 h-8 text-neutral-400 hover:text-white hover:bg-white/5 rounded-xl flex items-center justify-center transition-all"
-                    title={showDayNumbers || showControls ? "Fit to Trip" : "Fit to World"}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">zoom_out_map</span>
-                  </button>
-
-                  {/* Expansion Toggle (Desktop Only) */}
-                  {!isPreview && (
-                    <button 
-                      onClick={() => setIsExpanded(!isExpanded)}
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all text-neutral-400 hover:text-white hover:bg-white/5 hidden lg:flex`}
-                      title={isExpanded ? "Collapse Map" : "Expand Map"}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">{isExpanded ? 'close_fullscreen' : 'open_in_full'}</span>
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {showDayNumbers && (
-                <button
-                  onClick={() => setIsFollowing(!isFollowing)}
-                  className={`hidden sm:flex w-9 h-9 rounded-xl items-center justify-center transition-all ${isFollowing ? 'bg-primary text-black' : 'text-neutral-400 hover:text-white hover:bg-white/5'}`}
-                  title={isFollowing ? "Following active item" : "Follow active item"}
-                >
-                  <span className={`material-symbols-outlined text-[18px] ${isFollowing ? 'animate-pulse' : ''}`}>
-                    {isFollowing ? 'location_searching' : 'my_location'}
-                  </span>
-                </button>
-              )}
-
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -940,7 +980,7 @@ export default function MapClient({
 
           {/* Floating "Search this area" Button */}
           {showDiscovery && (isMapMoved || isSearching || isEnriching) && (
-            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[500] animate-in fade-in slide-in-from-top-2 no-print">
+            <div className="absolute top-24 sm:top-14 left-1/2 -translate-x-1/2 z-[500] animate-in fade-in slide-in-from-top-2 no-print w-full flex justify-center px-4 pointer-events-none">
               <button
                 onClick={() => {
                   if (activeMap) {
@@ -949,16 +989,16 @@ export default function MapClient({
                   }
                 }}
                 disabled={isSearching}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-xs shadow-2xl transition-all active:scale-95 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3 sm:py-1.5 rounded-full font-black text-[10px] sm:text-[11px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 pointer-events-auto border-2 ${
                   (isSearching || isEnriching) 
-                    ? 'bg-neutral-900 border border-white/20 text-primary' 
-                    : 'bg-amber-400 text-black hover:bg-white hover:scale-105'
+                    ? 'bg-neutral-950 border-primary text-primary' 
+                    : 'bg-amber-400 border-black/10 text-black hover:bg-white hover:scale-105'
                 }`}
               >
                 <span className={`material-symbols-outlined text-[14px] ${(isSearching || isEnriching) ? 'animate-spin' : ''}`}>
                   refresh
                 </span>
-                {(isSearching || isEnriching) ? 'Populating map...' : 'Search this area'}
+                {(isSearching || isEnriching) ? 'Searching...' : 'Search this area'}
               </button>
             </div>
           )}
@@ -990,7 +1030,7 @@ export default function MapClient({
                 offset={[0, -10]} 
                 className="interactive-discovery-tooltip"
                 interactive={true}
-                sticky={false}
+                permanent={true}
               >
                 <div 
                   onMouseEnter={() => handleHover(hit.id)}
@@ -999,7 +1039,7 @@ export default function MapClient({
                     if (onSearchResultClick) onSearchResultClick(hit);
                     else if (activeMap) activeMap.setView([hit.lat, hit.lng], 15);
                   }}
-                  className="bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt cursor-pointer"
+                  className={`bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt cursor-pointer ${hoveredPlaceId === hit.id || selectedSearchResultId === hit.id ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
                 >
                   {hit.image ? (
                     <div className="relative w-full h-24">
@@ -1010,113 +1050,30 @@ export default function MapClient({
                     <div className="w-full h-2 bg-gradient-to-r from-primary/30 to-amber-400/30" />
                   )}
                   
-                  <div className="p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">{hit.name}</p>
-                      <span className="material-symbols-outlined text-primary text-[14px] shrink-0">
-                        search
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <span className="text-[10px] font-bold text-primary">{(hit.type || 'Result').charAt(0).toUpperCase() + (hit.type || 'Result').slice(1)}</span>
-                      <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="text-[10px] font-bold text-neutral-400">Search Result</span>
-                    </div>
-
-                    <div className="w-full py-1.5 bg-primary rounded-lg text-xs font-bold text-slate-950 hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-1.5">
-                      <span className="material-symbols-outlined text-[12px]">add</span>
-                      Add to Trip
-                    </div>
-                  </div>
-                </div>
-              </Tooltip>
-            </Marker>
-          ))}
-
-          {/* Render Discoveries / Top Places */}
-          {showDiscovery && discoveries.filter(d => d && !isNaN(Number(d.lat)) && !isNaN(Number(d.lng))).map((hit) => (
-            <Marker
-              key={hit.id}
-              position={[hit.lat, hit.lng]}
-              icon={createIcon(
-                hit.type === 'restaurant' || hit.type === 'fast_food' ? 'restaurant' : 
-                hit.type === 'cafe' ? 'local_cafe' :
-                hit.type === 'local_bar' || hit.type === 'pub' ? 'local_bar' :
-                hit.type === 'museum' ? 'museum' :
-                hit.type === 'park' || hit.type === 'nature_reserve' ? 'park' : 
-                hit.type === 'historic' || hit.type === 'castle' || hit.type === 'monument' ? 'castle' : 'star', 
-                false, '', undefined, false, false, false, zoom, true
-              )}
-              eventHandlers={{
-                click: (e) => {
-                  L.DomEvent.stopPropagation(e as any);
-                  if (onSearchResultClick) {
-                    onSearchResultClick(hit);
-                  } else if (activeMap && !isNaN(hit.lat) && !isNaN(hit.lng)) {
-                    activeMap.flyTo([hit.lat, hit.lng], 15);
-                  }
-                },
-                mouseover: () => handleHover(hit.id),
-                mouseout: () => handleHover(null)
-              }}
-            >
-               {(zoom > 10) && (
-                <Tooltip 
-                  direction="top" 
-                  offset={[0, -5]} 
-                  permanent={false}
-                  className="interactive-discovery-tooltip"
-                  interactive={true}
-                  sticky={false}
-                >
-                  <div 
-                    onMouseEnter={() => handleHover(hit.id)}
-                    onMouseLeave={() => handleHover(null)}
-                    className="bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt"
-                  >
-                    {(hit as any).image ? (
-                      <div className="relative w-full h-24">
-                        <img src={(hit as any).image} className="w-full h-full object-cover" alt="" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent" />
-                      </div>
-                    ) : (
-                      <div className="w-full h-2 bg-gradient-to-r from-primary/30 to-amber-400/30" />
-                    )}
-                    
                     <div className="p-3">
                       <div className="flex items-start justify-between gap-2 mb-1.5">
                         <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">{hit.name}</p>
                         <span className="material-symbols-outlined text-primary text-[14px] shrink-0">
-                          {hit.type === 'restaurant' || hit.type === 'fast_food' ? 'restaurant' : 
-                           hit.type === 'cafe' ? 'local_cafe' :
-                           hit.type === 'museum' ? 'museum' :
-                           hit.type === 'park' || hit.type === 'nature_reserve' ? 'park' : 'location_on'}
+                          search
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <span className="text-[10px] font-bold text-primary">{hit.type.replace(/_/g, ' ')}</span>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[10px] font-bold text-primary">{(hit.type || 'Result').charAt(0).toUpperCase() + (hit.type || 'Result').slice(1)}</span>
                         <div className="w-1 h-1 rounded-full bg-white/20" />
-                        <span className="text-[10px] font-bold text-neutral-400">Discovery</span>
+                        <span className="text-[10px] font-bold text-neutral-400">Search Result</span>
                       </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onSearchResultClick) onSearchResultClick(hit);
-                        }}
-                        className="w-full py-1.5 bg-primary rounded-lg text-xs font-bold text-slate-950 hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-1.5"
-                      >
-                        <span className="material-symbols-outlined text-[12px]">add</span>
-                        Add to Trip
-                      </button>
+                      <div className="w-full py-1.5 bg-white/10 rounded-lg text-[10px] font-black text-white uppercase tracking-widest hover:bg-primary hover:text-black transition-all flex items-center justify-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">visibility</span>
+                        View Details
+                      </div>
                     </div>
                   </div>
                 </Tooltip>
-              )}
             </Marker>
           ))}
+
 
           {previewCoords && !isNaN(Number(previewCoords.lat)) && !isNaN(Number(previewCoords.lng)) && (
             <Marker
@@ -1126,8 +1083,8 @@ export default function MapClient({
           )}
 
           {validPlaces.map((place) => {
-            const startDay = place.day ?? 1
-            const endDay = place.endDay || startDay
+            const startDay = Math.max(1, place.day ?? 1)
+            const endDay = Math.max(startDay, place.endDay || startDay)
             const isMultiDay = endDay > startDay
             const dayLabel = isMultiDay 
               ? Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i).join('-')
@@ -1139,7 +1096,7 @@ export default function MapClient({
               <Marker
                 key={place.id}
                 position={[Number(place.lat), Number(place.lng)]}
-                icon={createIcon(place.emoji || emoji, showDayNumbers, place.name, dayLabel, false, (isFocused || hoveredPlaceId === place.id), false, zoom, false, isLive)}
+                icon={createIcon(place.emoji || emoji, showDayNumbers, place.name, dayLabel, false, (isFocused || hoveredPlaceId === place.id), false, zoom, false, isLive, place.type)}
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stopPropagation(e as any);
@@ -1156,7 +1113,7 @@ export default function MapClient({
                   className="interactive-discovery-tooltip"
                   interactive={true}
                   sticky={false}
-                  permanent={false}
+                  permanent={true}
                 >
                   <div 
                     onMouseEnter={() => handleHover(place.id)}
@@ -1181,14 +1138,27 @@ export default function MapClient({
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 mb-3">
-                        <span className="text-[10px] font-bold text-primary">{place.location || 'Location'}</span>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[10px] font-bold text-primary line-clamp-1">{place.location || 'Location'}</span>
                         <div className="w-1 h-1 rounded-full bg-white/20" />
-                        <span className="text-[10px] font-bold text-neutral-400">Day {startDay}</span>
+                        <span className="text-[10px] font-bold text-neutral-400 shrink-0">Day {startDay}</span>
                       </div>
 
-                      <div className="w-full py-1.5 bg-white/10 rounded-lg text-xs font-bold text-white group-hover/tt:bg-primary group-hover/tt:text-black transition-all flex items-center justify-center gap-1.5">
-                        <span className="material-symbols-outlined text-[12px]">visibility</span>
+                      {/* Improved Description (from first note) */}
+                      {place.notes && place.notes.length > 0 && (
+                        <p className="text-[9px] text-neutral-400 line-clamp-2 mb-3 leading-relaxed opacity-80">
+                          {place.notes[0].text.replace(/<[^>]*>/g, '').replace(/\[[ xX]\]/g, '').trim()}
+                        </p>
+                      )}
+
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkerClick(place, {});
+                        }}
+                        className="w-full py-1.5 bg-white/10 rounded-lg text-[10px] font-black text-white uppercase tracking-widest hover:bg-primary hover:text-black transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">visibility</span>
                         View Details
                       </div>
                     </div>
@@ -1203,11 +1173,19 @@ export default function MapClient({
               <Polyline
                 positions={polylineCoords}
                 color="#8ff5ff"
-                weight={2}
-                opacity={0.3}
-                dashArray="4, 12"
+                weight={3}
+                opacity={0.6}
+                dashArray="2, 10"
                 lineCap="round"
-                className="animated-polyline"
+                className={`animated-polyline transition-all duration-300 ${hoveredPlaceId ? 'opacity-30' : 'opacity-60'}`}
+              />
+              {/* Added a secondary glow polyline for better visibility in all themes */}
+              <Polyline
+                positions={polylineCoords}
+                color="#8ff5ff"
+                weight={8}
+                opacity={0.15}
+                lineCap="round"
               />
               {/* Added a secondary glow polyline for overall path but thinner */}
               {(() => {
@@ -1236,8 +1214,8 @@ export default function MapClient({
                   );
                   
                   const icon = transport ? transportModeIcon(transport.type) : null
-                  const isLiveTransport = transport?.id === liveTransportId;
-                  const isFocusedTransport = transport?.id === focusedTransportId;
+                  const isLiveTransport = transport?.id && liveTransportId && transport.id === liveTransportId;
+                  const isFocusedTransport = transport?.id && focusedTransportId && transport.id === focusedTransportId;
                   
                   // Use persisted distance if available, otherwise calculate it
                   let distance = transport?.distance;
@@ -1254,7 +1232,10 @@ export default function MapClient({
                     transportTitle: transport?.title, 
                     isLive: isLiveTransport,
                     isFocused: isFocusedTransport,
-                    distance
+                    distance,
+                    transport,
+                    fromName: p1.name,
+                    toName: p2.name
                   })
                 }
                 
@@ -1267,12 +1248,17 @@ export default function MapClient({
                       key={seg.id}
                       position={seg.mid} 
                       icon={seg.icon 
-                        ? createTransportIcon(seg.icon, iconRotation, true, seg.isLive, seg.isFocused) 
-                        : createTransportIcon('navigation', iconRotation, false, seg.isLive, seg.isFocused)
+                        ? createTransportIcon(seg.icon, 0, true, !!seg.isLive, !!seg.isFocused) 
+                        : createTransportIcon('near_me', iconRotation, false, !!seg.isLive, !!seg.isFocused)
                       } 
                       interactive={true}
                       eventHandlers={{
-                        click: (e) => L.DomEvent.stopPropagation(e as any)
+                        click: (e) => {
+                          L.DomEvent.stopPropagation(e as any);
+                          if (seg.transport && onOpenTransport) {
+                            onOpenTransport(seg.transport, seg.fromName, seg.toName);
+                          }
+                        }
                       }}
                       zIndexOffset={seg.icon || seg.isLive || seg.isFocused ? 1000 : 500}
                     >
@@ -1297,11 +1283,11 @@ export default function MapClient({
             </Fragment>
           )}
           {/* Discovery & Search Result Popups */}
-          {(internalSearchResults || discoveries).map(hit => (
+          {[...(internalSearchResults || []), ...(discoveries || [])].map(hit => (
             <Marker
               key={`marker-${hit.id}`}
               position={[hit.lat, hit.lng]}
-              icon={createIcon('location_on', false, hit.name, '', false, (selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id), false, zoom, true, false)}
+              icon={createIcon('location_on', false, hit.name, '', false, (selectedDiscovery?.id === hit.id || hoveredPlaceId === hit.id), false, zoom, true, false, hit.type)}
               eventHandlers={{
                 click: (e) => {
                   L.DomEvent.stopPropagation(e as any);
@@ -1317,10 +1303,13 @@ export default function MapClient({
                 offset={[0, -10]} 
                 className="interactive-discovery-tooltip"
                 interactive={true}
+                permanent={true}
               >
                 <div 
+                  onMouseEnter={() => handleHover(hit.id)}
+                  onMouseLeave={() => handleHover(null)}
                   onClick={() => setSelectedDiscovery(hit)}
-                  className="bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt cursor-pointer"
+                  className={`bg-neutral-900 border border-white/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col w-[200px] pointer-events-auto transition-all duration-300 group/tt cursor-pointer ${hoveredPlaceId === hit.id || selectedDiscovery?.id === hit.id ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
                 >
                   {hit.image ? (
                     <div className="relative w-full h-24">
@@ -1328,208 +1317,119 @@ export default function MapClient({
                       <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent" />
                     </div>
                   ) : (
-                    <div className="w-full h-2 bg-gradient-to-r from-amber-400/30 to-amber-600/30" />
+                    <div className="w-full h-2 bg-gradient-to-r from-primary/30 to-blue-400/30" />
                   )}
                   
-                  <div className="p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">{hit.name}</p>
-                      <span className="material-symbols-outlined text-amber-500 text-[14px] shrink-0">
-                        stars
-                      </span>
-                    </div>
-                    
-                    {hit.description && (
-                      <p className="text-[9px] text-neutral-400 line-clamp-2 mb-2 leading-relaxed italic">
-                        "{hit.description}"
-                      </p>
-                    )}
+                    <div className="p-3">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <p className="text-[11px] font-bold text-white leading-tight line-clamp-2">{hit.name}</p>
+                        <span className="material-symbols-outlined text-primary text-[14px] shrink-0">
+                          {getIconForType(hit.type)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-[10px] font-bold text-primary">{(hit.type || 'Landmark').charAt(0).toUpperCase() + (hit.type || 'Landmark').slice(1)}</span>
+                        {hit.distance !== undefined && (
+                          <>
+                            <div className="w-1 h-1 rounded-full bg-white/20" />
+                            <span className="text-[10px] font-bold text-neutral-400">{formatDistance(hit.distance)}</span>
+                          </>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <span className="text-[7px] font-black text-amber-500 uppercase tracking-[0.2em]">{hit.type || 'Landmark'}</span>
-                      <div className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="text-[7px] font-bold text-neutral-500 uppercase tracking-wider">{hit.tags?.['addr:city'] || hit.tags?.['addr:country'] || 'Local Site'}</span>
-                    </div>
+                      {hit.description && (
+                        <p className="text-[9px] text-neutral-400 line-clamp-2 mb-3 leading-relaxed opacity-80">
+                          {hit.description}
+                        </p>
+                      )}
 
-                    <div className="w-full py-1.5 bg-white/10 rounded-lg text-[9px] font-black text-white uppercase tracking-widest group-hover/tt:bg-amber-500 group-hover/tt:text-black transition-all flex items-center justify-center gap-1.5">
-                      <span className="material-symbols-outlined text-[12px]">add_circle</span>
-                      Add to Trip
+                      <div className="flex items-center gap-2">
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDiscovery(hit);
+                            setIsDiscoveryDetailModalOpen(true);
+                          }}
+                          className="flex-1 py-1.5 bg-white/10 rounded-lg text-[10px] font-black text-white uppercase tracking-widest hover:bg-primary hover:text-black transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">visibility</span>
+                          View Details
+                        </div>
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onAddDiscovery) onAddDiscovery(hit);
+                          }}
+                          className="w-10 h-8 bg-primary/20 border border-primary/30 rounded-lg flex items-center justify-center text-primary hover:bg-primary hover:text-black transition-all"
+                          title="Quick Add"
+                        >
+                          <span className="material-symbols-outlined text-lg">add</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Tooltip>
+                </Tooltip>
             </Marker>
           ))}
 
-          {selectedDiscovery && (
-            <Popup
-              position={[selectedDiscovery.lat, selectedDiscovery.lng]}
-              eventHandlers={{
-                remove: () => setSelectedDiscovery(null)
-              }}
-              className="custom-map-popup"
-            >
-              <div className="w-64 bg-neutral-950 text-white rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                {selectedDiscovery.image && (
-                  <div className="w-full aspect-video relative">
-                    <img src={selectedDiscovery.image} className="w-full h-full object-cover" alt="" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  </div>
-                )}
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{selectedDiscovery.emoji || '📍'}</span>
-                    <p className="font-bold text-sm leading-tight">{selectedDiscovery.name}</p>
-                  </div>
-                  {selectedDiscovery.description && (
-                    <p className="text-[10px] text-neutral-400 line-clamp-3 leading-relaxed">{selectedDiscovery.description}</p>
-                  )}
-                  <p className="text-[9px] text-neutral-500 font-mono">{selectedDiscovery.location}</p>
-                  <button
-                    onClick={() => {
-                      if (onAddDiscovery) onAddDiscovery(selectedDiscovery);
-                      setSelectedDiscovery(null);
-                    }}
-                    className="w-full py-2 bg-primary text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-95 transition-all mt-2"
-                  >
-                    Add to Trip
-                  </button>
-                </div>
-              </div>
-            </Popup>
-          )}
         </MapContainer>
       </div>
 
-      {/* Hover Preview Card Overlay (Redesigned for Compactness & Glassmorphism) */}
-      {hoveredItem && (
-        <div 
-          className="absolute top-4 left-4 sm:top-6 sm:left-6 z-[2000] w-[220px] sm:w-[240px] bg-neutral-900/40 backdrop-blur-3xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-left-4 duration-300 ease-out pointer-events-none border border-white/10"
-          onMouseEnter={() => {
-            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
-          }}
-          onMouseLeave={() => handleHover(null)}
-        >
-          {/* Image Section */}
-          <div className="relative aspect-[16/10] w-full">
-            <img 
-              src={hoveredItem.image || (hoveredItem.photos && hoveredItem.photos[0]) || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=800&auto=format&fit=crop'} 
-              className="w-full h-full object-cover" 
-              alt={hoveredItem.name} 
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/80 via-transparent to-transparent" />
-            
-            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[8px] font-black text-white tracking-widest uppercase">
-              Preview
-            </div>
-          </div>
 
-          {/* Content Section */}
-          <div className="p-4 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-xs font-black text-white leading-tight tracking-tight flex-1">
-                {hoveredItem.name}
-              </h3>
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-amber-500 text-xs leading-none">★</span>
-                <span className="text-[10px] font-black text-white">{hoveredItem.tags?.rating || 4.9}</span>
-              </div>
-            </div>
-
-            {/* Description/Notes (Sanitized HTML Rendering) */}
-            {(() => {
-              const content = hoveredItem.description || (hoveredItem.notes && hoveredItem.notes[0]?.text) || hoveredItem.note;
-              if (!content) return null;
-              return (
-                <div 
-                  className="text-[10px] text-neutral-300 leading-relaxed font-medium line-clamp-3 prose-renderer opacity-80"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                />
-              );
-            })()}
-
-            {/* Tags/Badges */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              <div className="px-2 py-0.5 bg-white/5 border border-white/10 rounded-md text-[8px] font-bold text-neutral-400 uppercase tracking-wider">
-                {hoveredItem.type || 'Landmark'}
-              </div>
-              {hoveredItem.day && (
-                <div className="px-2 py-0.5 bg-primary/20 border border-primary/30 rounded-md text-[8px] font-black text-primary uppercase tracking-wider">
-                  Day {hoveredItem.day}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Control Center - Collapsible Floating Overlay */}
       {(showDayNumbers || isGlobal || showControls) && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-2xl z-[1000] no-print">
-          {/* Collapsed Dual-Pill Control */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[calc(100%-1.5rem)] max-w-[500px] no-print transition-all duration-500">
           {!isControlPanelOpen ? (
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => {
-                  const newState = !showDiscovery;
-                  setShowDiscovery(newState);
-                  if (newState && activeMap) {
-                    fetchTopPlaces(activeMap.getCenter());
-                  }
-                }}
-                className={`flex items-center justify-center w-12 h-12 bg-neutral-950/90 backdrop-blur-3xl border border-white/15 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)] ring-1 ring-white/5 transition-all duration-300 active:scale-95 group ${showDiscovery ? 'text-amber-400 border-amber-500/30' : 'text-neutral-400 hover:text-white'}`}
-                title={showDiscovery ? "Hide Discovery Markers" : "Show Discovery Markers"}
-              >
-                <span className={`material-symbols-outlined text-[20px] ${showDiscovery && isSearching ? 'animate-spin' : showDiscovery ? 'animate-pulse' : ''}`}>explore</span>
-              </button>
-
+            <div className="flex items-center justify-center">
               <button
                 onClick={() => setIsControlPanelOpen(true)}
-                className="flex items-center gap-3 px-5 py-3 bg-neutral-950/90 backdrop-blur-3xl border border-white/15 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)] ring-1 ring-white/5 hover:border-primary/40 hover:bg-neutral-900/90 transition-all duration-300 active:scale-95 group"
+                className="flex items-center gap-2.5 px-4 h-10 bg-neutral-950/90 backdrop-blur-3xl border border-white/15 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.5)] ring-1 ring-white/5 hover:border-primary/40 hover:bg-neutral-900/90 transition-all duration-300 active:scale-95 group"
               >
                 <span className="material-symbols-outlined text-neutral-400 text-[18px] group-hover:text-primary transition-colors">search</span>
-                <span className="text-[11px] font-bold text-neutral-400 group-hover:text-white transition-colors tracking-wide">Search</span>
+                <span className="text-[10px] font-bold text-neutral-400 group-hover:text-white transition-colors tracking-widest uppercase">Search</span>
                 <span className="material-symbols-outlined text-neutral-600 text-[16px] group-hover:text-neutral-300 transition-colors">expand_less</span>
               </button>
             </div>
           ) : (
-            /* Expanded panel: Compact and scrollable for mobile usability */
-            <div className="bg-neutral-950/90 backdrop-blur-3xl border border-white/10 p-4 sm:p-5 rounded-[2rem] shadow-[0_30px_70px_rgba(0,0,0,0.6)] transition-all duration-300 ring-1 ring-white/5 animate-in slide-in-from-bottom-2 fade-in max-h-[45vh] sm:max-h-none overflow-y-auto custom-scrollbar">
-              {/* Panel header with collapse button */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary text-[16px]">search</span>
-                    <span className="text-[11px] font-black text-neutral-300 uppercase tracking-widest">Search & Discover</span>
+            <div className="bg-neutral-950/90 backdrop-blur-3xl border border-white/10 p-3 sm:p-5 rounded-[2rem] shadow-[0_30px_70px_rgba(0,0,0,0.6)] transition-all duration-300 ring-1 ring-white/5 animate-in slide-in-from-bottom-2 fade-in max-h-[35vh] sm:max-h-none overflow-y-auto custom-scrollbar">
+              <div className="sticky top-0 bg-neutral-950/90 backdrop-blur-xl pt-1 pb-2 mb-2 sm:mb-3 z-[20] -mx-1 px-1 border-b border-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-[14px] sm:text-[16px]">search</span>
+                      <span className="text-[10px] sm:text-[11px] font-black text-neutral-300 uppercase tracking-widest">Discover</span>
+                    </div>
+
+                    <div className="h-4 w-px bg-white/10" />
+
+                    <button
+                      onClick={() => {
+                        const newState = !showDiscovery;
+                        setShowDiscovery(newState);
+                        if (newState && activeMap) {
+                          fetchTopPlaces(activeMap.getCenter());
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border transition-all ${showDiscovery ? 'bg-amber-400/10 border-amber-500/30 text-amber-400' : 'bg-white/5 border-white/10 text-neutral-500 hover:text-white'}`}
+                    >
+                      <span className="material-symbols-outlined text-[14px] sm:text-[16px] items-center justify-center">explore</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">{showDiscovery ? 'ON' : 'OFF'}</span>
+                    </button>
                   </div>
-
-                  <div className="h-4 w-px bg-white/10" />
-
-                  <button
-                    onClick={() => {
-                      const newState = !showDiscovery;
-                      setShowDiscovery(newState);
-                      if (newState && activeMap) {
-                        fetchTopPlaces(activeMap.getCenter());
-                      }
-                    }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${showDiscovery ? 'bg-amber-400/10 border-amber-500/30 text-amber-400' : 'bg-white/5 border-white/10 text-neutral-500 hover:text-white'}`}
-                  >
-                    <span className="material-symbols-outlined text-[16px] items-center justify-center">explore</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">{showDiscovery ? 'Discovery ON' : 'Discovery OFF'}</span>
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setIsControlPanelOpen(false)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-500 hover:text-white hover:bg-white/5 transition-all"
+                      title="Collapse"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">expand_more</span>
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setIsControlPanelOpen(false)}
-                  className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all active:scale-90"
-                  title="Collapse"
-                >
-                  <span className="material-symbols-outlined text-neutral-400 text-[14px]">expand_more</span>
-                </button>
-              </div>
 
-              <div className="flex flex-col gap-4 min-w-0">
-                <div className="flex items-center justify-between gap-4 min-w-0">
+                <div className="mt-2 sm:mt-3 flex gap-2">
                   <div className="relative flex-1 group">
                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 group-focus-within:text-primary transition-colors text-[18px]">search</span>
                     <input 
@@ -1540,7 +1440,7 @@ export default function MapClient({
                         setLocalSearchQuery(e.target.value)
                         debouncedSearch(e.target.value)
                       }}
-                      className="w-full h-11 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl pl-10 pr-12 text-[13px] text-white placeholder-neutral-500 focus:border-primary/50 outline-none transition-all shadow-inner"
+                      className="flex-1 h-11 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl pl-10 pr-12 text-[13px] text-white placeholder-neutral-500 focus:border-primary/50 outline-none transition-all shadow-inner"
                     />
                     <button 
                       onClick={() => performSearch(localSearchQuery)}
@@ -1550,10 +1450,23 @@ export default function MapClient({
                       <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                     </button>
                   </div>
-                  
-
+                  <button
+                    onClick={() => setShowDiscovery(!showDiscovery)}
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all border shrink-0 ${
+                      showDiscovery 
+                        ? 'bg-amber-400/20 border-amber-400/30 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]' 
+                        : 'bg-white/5 border-white/10 text-neutral-500'
+                    }`}
+                    title={showDiscovery ? 'Discovery ON' : 'Discovery OFF'}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showDiscovery ? 'explore' : 'explore_off'}
+                    </span>
+                  </button>
                 </div>
+              </div>
 
+              <div className="flex flex-col gap-3 sm:gap-4 min-w-0">
                 {/* Search Results List */}
                 {localSearchQuery && activeSearchResults.length > 0 && (
                   <div className="space-y-4 min-w-0">
@@ -1562,7 +1475,7 @@ export default function MapClient({
                        <span className="material-symbols-outlined text-primary text-[14px]">location_on</span>
                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">Search Results</span>
                     </div>
-                    <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 min-w-0 w-full max-w-full touch-pan-x">
+                    <div className="flex gap-2.5 overflow-x-auto pb-4 no-scrollbar -mx-2 px-2 min-w-0 w-full max-w-full touch-pan-x">
                         {activeSearchResults.map((hit) => (
                           <button
                             key={hit.id}
@@ -1626,7 +1539,7 @@ export default function MapClient({
                     
                     <div className="min-h-0">
                       {discoveries.length > 0 ? (
-                        <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 min-w-0 w-full max-w-full touch-pan-x">
+                        <div className="flex gap-2.5 overflow-x-auto pb-4 no-scrollbar -mx-2 px-2 min-w-0 w-full max-w-full touch-pan-x">
                           {discoveries.map((place) => (
                             <button
                               key={place.id}
@@ -1658,7 +1571,7 @@ export default function MapClient({
                        <span className="material-symbols-outlined text-neutral-500 text-[14px]">map</span>
                        <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest text-[9px]">Your Itinerary</span>
                     </div>
-                    <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1 min-w-0">
+                    <div className="flex gap-2.5 overflow-x-auto pb-4 no-scrollbar -mx-1 px-1 min-w-0">
                       {validPlaces.sort((a, b) => (a.day || 0) - (b.day || 0)).map((place) => (
                         <button
                           key={place.id}

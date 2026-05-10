@@ -28,3 +28,27 @@ export function toggleHtmlCheckbox(html: string, index: number): string {
 
   return html;
 }
+
+/**
+ * Checks if a string is likely HTML.
+ */
+export function isHtml(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  return trimmed.startsWith('<') && trimmed.endsWith('>');
+}
+
+/**
+ * Ensures a string is HTML by converting plain text newlines to paragraphs.
+ * If it's already HTML, returns it as-is.
+ */
+export function ensureHtml(text: string): string {
+  if (!text) return '';
+  if (isHtml(text)) return text;
+
+  // Convert plain text newlines to HTML paragraphs
+  return text
+    .split(/\n\n+/)
+    .map(p => `<p>${p.trim().replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}

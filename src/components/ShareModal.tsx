@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/Button'
 import { Trip, Place } from '@/lib/storage'
 import { formatDateShort } from '@/lib/date-utils'
+import { exportTripToJson } from '@/lib/ai-itinerary'
 
 interface ShareModalProps {
   trip: Trip
@@ -89,6 +90,19 @@ export default function ShareModal({ trip, places, onClose }: ShareModalProps) {
       case 'pdf':
         window.print()
         return
+      case 'json':
+        const json = exportTripToJson(trip)
+        const blob = new Blob([json], { type: 'application/json' })
+        const url_blob = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url_blob
+        a.download = `${trip.title.toLowerCase().replace(/\s+/g, '-')}-itinerary.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url_blob)
+        alert('JSON Exported!')
+        return
     }
     
     if (shareUrl) window.open(shareUrl, '_blank')
@@ -145,24 +159,41 @@ export default function ShareModal({ trip, places, onClose }: ShareModalProps) {
             </div>
           </div>
 
-          {/* Professional Export */}
           <div className="space-y-3">
             <p className="text-xs font-bold text-neutral-500">Professional Export</p>
-            <button
-              onClick={() => handleShare('pdf')}
-              className="w-full flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-neutral-800 to-neutral-900 border border-white/10 hover:border-primary/50 transition-all group active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined text-3xl">picture_as_pdf</span>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleShare('pdf')}
+                className="w-full flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-neutral-800 to-neutral-900 border border-white/10 hover:border-primary/50 transition-all group active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <span className="material-symbols-outlined text-3xl">picture_as_pdf</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-white">Save as PDF</p>
+                    <p className="text-xs text-neutral-500 font-bold">Perfect for printing or sending via email</p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-sm font-bold text-white">Save as PDF</p>
-                  <p className="text-xs text-neutral-500 font-bold">Perfect for printing or sending via email</p>
+                <span className="material-symbols-outlined text-neutral-600 group-hover:text-primary transition-colors">download</span>
+              </button>
+
+              <button
+                onClick={() => handleShare('json')}
+                className="w-full flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-neutral-800 to-neutral-900 border border-white/10 hover:border-emerald-500/50 transition-all group active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <span className="material-symbols-outlined text-3xl">data_object</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-white">Export as JSON</p>
+                    <p className="text-xs text-neutral-500 font-bold">Share with other Trippi users or backup data</p>
+                  </div>
                 </div>
-              </div>
-              <span className="material-symbols-outlined text-neutral-600 group-hover:text-primary transition-colors">download</span>
-            </button>
+                <span className="material-symbols-outlined text-neutral-600 group-hover:text-emerald-500 transition-colors">download</span>
+              </button>
+            </div>
           </div>
         </ModalContent>
 

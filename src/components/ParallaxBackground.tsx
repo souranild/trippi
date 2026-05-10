@@ -98,31 +98,16 @@ export default function ParallaxBackground({
   return (
     // fixed when page-level scroll, absolute when inside a scrolling container
     <div className={`${isContained ? 'absolute' : 'fixed'} inset-0 z-0 overflow-hidden pointer-events-none bg-neutral-950`}>
-      {/* Previous Background Layer (Fading Out) */}
-      {prevSrc && (
-        <div
-          ref={prevBgRef}
-          className="absolute inset-x-0 bg-cover bg-center bg-no-repeat will-change-transform"
-          style={{
-            backgroundImage: `url(${prevSrc})`,
-            opacity: isTransitioning ? 0 : opacity,
-            top: overscanTop,
-            height: overscanHeight,
-            transition: 'opacity 1s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        />
-      )}
-
-      {/* Current Background Layer (Fading In) */}
+      {/* Current Background Layer (On bottom, always visible) */}
       <div
         ref={bgRef}
-        className="absolute inset-x-0 bg-cover bg-center bg-no-repeat will-change-transform"
+        className="absolute inset-x-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: (displaySrc.startsWith('data:video') || displaySrc.includes('video') || displaySrc.match(/\.(mp4|webm|ogg)$/i)) ? 'none' : `url(${displaySrc})`,
-          opacity: isTransitioning ? opacity : opacity,
+          opacity: opacity,
           top: overscanTop,
           height: overscanHeight,
-          transition: 'opacity 1s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'transform 0.1s linear', // Parallax smoothing is handled by RAF, but this helps with initial jumps
         }}
       >
         {(displaySrc.startsWith('data:video') || displaySrc.includes('video') || displaySrc.match(/\.(mp4|webm|ogg)$/i)) && (
@@ -136,6 +121,21 @@ export default function ParallaxBackground({
           />
         )}
       </div>
+
+      {/* Previous Background Layer (On top, fading out) */}
+      {prevSrc && (
+        <div
+          ref={prevBgRef}
+          className="absolute inset-x-0 bg-cover bg-center bg-no-repeat z-10"
+          style={{
+            backgroundImage: `url(${prevSrc})`,
+            opacity: isTransitioning ? 0 : opacity,
+            top: overscanTop,
+            height: overscanHeight,
+            transition: 'opacity 1s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        />
+      )}
       
       {/* Vignette Overlay (Top-down shadow for UI visibility) */}
       {topVignette !== false && (
@@ -146,11 +146,10 @@ export default function ParallaxBackground({
       )}
 
       <div 
-        className="absolute inset-0" 
+        className="absolute inset-0 transition-[backdrop-filter] duration-500" 
         style={{ 
           backgroundColor: overlayColor,
-          backdropFilter: `blur(${blur})`,
-          transition: 'backdrop-filter 0.5s ease',
+          backdropFilter: blur && blur !== '0px' ? `blur(${blur})` : 'none',
         }} 
       />
     </div>

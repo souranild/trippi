@@ -173,9 +173,10 @@ export async function fetchHybridDiscovery(lat: number, lng: number, filter?: st
 
   try {
     // Build Area Filter (Bbox or Radius)
+    // Reduce radius from 15km to 5km for default "nearby" to speed up queries
     const area = bounds 
       ? `(${bounds.s},${bounds.w},${bounds.n},${bounds.e})`
-      : `(around:15000, ${lat}, ${lng})`;
+      : `(around:5000, ${lat}, ${lng})`;
 
     let qNearby = `nwr["tourism"~"attraction|museum|viewpoint|zoo|theme_park"]${area};`;
     
@@ -195,22 +196,22 @@ export async function fetchHybridDiscovery(lat: number, lng: number, filter?: st
                  nwr["landmark"="yes"]${area};`;
     } else if (isSearch) {
       // Overpass Search by name
-      const searchArea = bounds ? area : `(around:50000, ${lat}, ${lng})`;
+      const searchArea = bounds ? area : `(around:25000, ${lat}, ${lng})`;
       qNearby = `nwr["name"~"${filter}",i]${searchArea};`;
     }
                  
     // Combine primary discovery with fallback/nearby logic
+    // Simplified query for faster execution
     const query = `
-      [out:json][timeout:15];
+      [out:json][timeout:10];
       (
         ${qNearby}
         ${!isSearch ? `
-          nwr["tourism"~"attraction|museum|viewpoint"](around:2000, ${lat}, ${lng});
-          nwr["amenity"~"cafe|restaurant|bar"](around:2000, ${lat}, ${lng});
-          nwr["historic"~"castle|monument|ruins"](around:2000, ${lat}, ${lng});
+          nwr["tourism"~"attraction|museum"](around:1500, ${lat}, ${lng});
+          nwr["amenity"~"cafe|restaurant"](around:1500, ${lat}, ${lng});
         ` : ''}
       );
-      out center 50;
+      out center 40;
     `;
 
     let data = await fetchOverpass(query, signal);
@@ -375,14 +376,53 @@ export function isLogisticallyStrained(places: any[]): boolean {
 
 /**
  * Enriches a single discovery result with Wikipedia content
+ * Now includes fuzzy search if no direct tag is available.
  */
 export async function enrichDiscoveryResult(res: DiscoveryResult): Promise<DiscoveryResult> {
-  const wikiTag = res.tags.wikipedia || res.tags.wikidata;
-  if (!wikiTag) return res;
+  let wikiTitle = res.tags.wikipedia || res.tags.wikidata;
+  
+  // High-confidence types that are likely to have Wikipedia pages
+  const isHighConfidence = ['museum', 'castle', 'ruins', 'monument', 'park', 'church', 'temple', 'memorial'].includes(res.type);
+  const isFoodDrink = ['restaurant', 'cafe', 'bar', 'pub', 'fast_food', 'food_court'].includes(res.type);
+
+  // Fuzzy Fallback: If no direct wiki tag, try searching by name + category
+  if (!wikiTitle && res.name && res.name.length > 3) {
+    // For food/drink, we are much stricter to avoid showing "Guava Fruit" for "Guava Restaurant"
+    const searchQuery = isFoodDrink 
+      ? `${res.name} ${res.type} establishment` 
+      : `${res.name} ${res.type}`;
+
+    try {
+      const searchUrl = `${WIKI_API_ENDPOINT}?action=query&list=search&srsearch=${encodeURIComponent(searchQuery)}&format=json&origin=*`;
+      const searchRes = await fetch(searchUrl);
+      const searchData = await searchRes.json();
+      
+      if (searchData.query?.search?.[0]) {
+        const topHit = searchData.query.search[0];
+        // Only accept if the name is a very close match to the search result title
+        // or if it's a high confidence type
+        const hitTitle = topHit.title.toLowerCase();
+        const nameLower = res.name.toLowerCase();
+        
+        if (isHighConfidence) {
+          wikiTitle = topHit.title;
+        } else if (isFoodDrink) {
+          // Strict match for food/drink
+          if (hitTitle === nameLower || hitTitle.includes(`${nameLower} (`)) {
+            wikiTitle = topHit.title;
+          }
+        } else if (hitTitle.includes(nameLower) || nameLower.includes(hitTitle)) {
+          wikiTitle = topHit.title;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!wikiTitle) return res;
   
   try {
-    const wikiTitle = wikiTag.includes(':') ? wikiTag.split(':')[1] : wikiTag;
-    const info = await fetchWikiInfo(wikiTitle);
+    const title = wikiTitle.includes(':') ? wikiTitle.split(':')[1] : wikiTitle;
+    const info = await fetchWikiInfo(title);
     return {
       ...res,
       image: info.image || res.image,

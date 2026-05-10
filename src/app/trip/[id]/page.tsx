@@ -14,6 +14,8 @@ import TimePicker from '@/components/TimePicker'
 import PlaceForm from '@/components/PlaceForm'
 import PlaceDetailModal from '@/components/PlaceDetailModal'
 import TransportDetailModal from '@/components/TransportDetailModal'
+import DiscoveryDetailModal from '@/components/DiscoveryDetailModal'
+import { calculateDistance } from '@/lib/discovery'
 import ShareModal from '@/components/ShareModal'
 import ParallaxBackground from '@/components/ParallaxBackground'
 import type { Event as TripEvent, Accommodation, Place, Transport, TransportMode, Note } from '@/lib/storage'
@@ -70,7 +72,15 @@ export default function TripDetail() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { updateTrip: updateTripContext, deleteTrip, userProfile, setIsEditingProfile } = useTrips()
-  const { discoveries, setDiscoveries, setIsExpanded } = useMapContext()
+  const { 
+    discoveries, 
+    setDiscoveries, 
+    setIsExpanded,
+    selectedDiscovery,
+    setSelectedDiscovery,
+    isDiscoveryDetailModalOpen,
+    setIsDiscoveryDetailModalOpen
+  } = useMapContext()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [places, setPlaces] = useState<Place[]>([])
   
@@ -111,6 +121,11 @@ export default function TripDetail() {
   const [selectedSearchResult, setSelectedSearchResult] = useState<PlaceSearchHit | null>(null)
   const [configuringNewPlace, setConfiguringNewPlace] = useState<Place | null>(null)
   const [editingPlaceForDetail, setEditingPlaceForDetail] = useState<Place | null>(null)
+  const [minDay, setMinDay] = useState<number | undefined>(undefined)
+  const [minTime, setMinTime] = useState<string | undefined>(undefined)
+  const [maxDay, setMaxDay] = useState<number | undefined>(undefined)
+  const [maxTime, setMaxTime] = useState<string | undefined>(undefined)
+  const [initialAttachmentDetail, setInitialAttachmentDetail] = useState<AttachmentDetailData | null>(null)
   const [isPlaceDetailModalOpen, setIsPlaceDetailModalOpen] = useState(false)
   const [placeDetailInitialDay, setPlaceDetailInitialDay] = useState<number | undefined>()
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false)
@@ -144,6 +159,13 @@ export default function TripDetail() {
   const [isEditFormValid, setIsEditFormValid] = useState(false)
   const [isEditSubmitting, setIsEditSubmitting] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+
+  const placeDetailBounds = useMemo(() => {
+    if (!isPlaceDetailModalOpen || !editingPlaceForDetail || !trip) return null
+    const queue = getGlobalItinerary({ ...trip, places } as any)
+    const idx = queue.findIndex((item: any) => item.type === 'place' && item.data.id === editingPlaceForDetail.id)
+    return getItemBounds(queue, idx)
+  }, [isPlaceDetailModalOpen, editingPlaceForDetail, trip, places])
   const [leftPanelWidth, setLeftPanelWidth] = useState(65); // Percentage
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -282,8 +304,50 @@ export default function TripDetail() {
   }, [trip]);
 
   const handleAddDiscovery = useCallback((discovery: any) => {
-    selectPlaceFromSearch(discovery);
-  }, [selectPlaceFromSearch]);
+    if (places.length === 0) {
+      selectPlaceFromSearch(discovery);
+      return;
+    }
+
+    const lat = discovery.lat;
+    const lng = discovery.lng;
+    
+    let minDistance = Infinity;
+    let closestPlace: Place | null = null;
+    
+    places.forEach(p => {
+      const d = calculateDistance(lat, lng, Number(p.lat), Number(p.lng));
+      if (d < minDistance) {
+        minDistance = d;
+        closestPlace = p;
+      }
+    });
+
+    if (closestPlace) {
+      const newActivity = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: discovery.name,
+        time: '12:00',
+        location: discovery.name,
+        lat: discovery.lat,
+        lng: discovery.lng,
+        completed: false
+      };
+      
+      const updatedPlace = {
+        ...closestPlace,
+        events: [...(closestPlace.events || []), newActivity]
+      };
+      
+      const newPlaces = places.map(p => p.id === updatedPlace.id ? updatedPlace : p);
+      setPlaces(newPlaces);
+      updateTripContext({ ...trip!, places: newPlaces });
+      
+      setEditingPlaceForDetail(updatedPlace);
+      setInitialAttachmentDetail({ type: 'event', event: newActivity });
+      setIsPlaceDetailModalOpen(true);
+    }
+  }, [places, trip, selectPlaceFromSearch, updateTripContext]);
 
   const handleViewportChange = useCallback((center: { lat: number, lng: number }, zoom: number) => {
     setMapViewport({ center, zoom })
@@ -353,6 +417,7 @@ export default function TripDetail() {
     setManualPlaceName('')
     setManualPlaceLocation(`${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`)
   }, [setIsExpanded]);
+
 
 
   const getMediaType = (url: string): 'image' | 'video' | 'pdf' | 'other' => {
@@ -1112,6 +1177,14 @@ export default function TripDetail() {
     }
     setIsTransportModalOpen(true)
   }
+
+  const onOpenTransportFromMap = useCallback((transport: any, fromName: string, toName: string) => {
+    // Find where this transport is in the places array
+    const fromPlaceIdx = places.findIndex(p => p.transport?.some(t => t.id === transport.id))
+    if (fromPlaceIdx !== -1) {
+      openTransportModal(fromPlaceIdx, 'after', transport.id, transport.departureDay)
+    }
+  }, [places, openTransportModal]);
 
 
   useEffect(() => {
@@ -2863,7 +2936,7 @@ export default function TripDetail() {
                       selectedSearchResultId={selectedSearchResult?.id}
                       onSearchResultClick={selectPlaceFromSearch}
                       mapStyle={trip?.mapStyle}
-                      onMarkerClick={handleMobileMarkerClick}
+                      onMarkerClick={focusPlace}
                       onStyleChange={handleStyleChange}
                       onViewportChange={handleViewportChange}
                     />
@@ -3368,15 +3441,22 @@ export default function TripDetail() {
 
       {isPlaceDetailModalOpen && editingPlaceForDetail && trip && (
         <PlaceDetailModal
+          key={editingPlaceForDetail.id}
           place={editingPlaceForDetail}
           initialDay={placeDetailInitialDay}
           tripStartDate={trip.startDate}
           tripEndDate={trip.endDate || trip.startDate}
           isEditMode={isEditMode}
+          minDay={placeDetailBounds?.minDay}
+          minTime={placeDetailBounds?.minTime}
+          maxDay={placeDetailBounds?.maxDay}
+          maxTime={placeDetailBounds?.maxTime}
+          allPlaces={places}
           onClose={() => {
             setFocusedPlaceId(null)
             setIsPlaceDetailModalOpen(false)
             setEditingPlaceForDetail(null)
+            setInitialAttachmentDetail(null)
           }}
           onDelete={() => {
             setFocusedPlaceId(null)
@@ -3385,7 +3465,7 @@ export default function TripDetail() {
             setEditingPlaceForDetail(null)
           }}
           onSave={async (updatedPlace) => {
-            await updatePlace(trip.id, updatedPlace.id, updatedPlace)
+            await updateTripContext({ ...trip, places: places.map(p => p.id === updatedPlace.id ? updatedPlace : p) })
             const updatedTrips = await loadTrips()
             const found = updatedTrips.find(t => t.id === id)
             if (found) {
@@ -3393,17 +3473,9 @@ export default function TripDetail() {
               setPlaces(found.places || [])
             }
           }}
-          onSearchResultClick={(place) => {
-            setFocusedPlaceId(null)
-            setIsPlaceDetailModalOpen(false)
-            setEditingPlaceForDetail(null)
-            selectPlaceFromSearch(place)
-          }}
-          onMapClick={(coords) => {
-            // Option to relocate or add new?
-            // For now just allow discovery
-          }}
+          onOpenTransport={onOpenTransportFromMap}
           onEditLocation={() => setIsPlaceSearchOpen(true)}
+          initialAttachmentDetail={initialAttachmentDetail || undefined}
           allPlaces={places}
           mapStyle={trip.mapStyle}
           timeFormat={timeFormat}
@@ -4031,6 +4103,16 @@ export default function TripDetail() {
           </p>
         </div>
       </div>
+      <DiscoveryDetailModal
+        isOpen={isDiscoveryDetailModalOpen}
+        onClose={() => setIsDiscoveryDetailModalOpen(false)}
+        discovery={selectedDiscovery}
+        mapStyle={trip?.mapStyle}
+        onAdd={(d) => {
+          handleAddDiscovery(d)
+          setIsDiscoveryDetailModalOpen(false)
+        }}
+      />
     </div>
   )
 }

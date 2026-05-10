@@ -16,6 +16,8 @@ import Map from '@/components/Map'
 import AttachmentDetailModal, { AttachmentDetailData } from './AttachmentDetailModal'
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalContent } from './ModalLayout'
 import { calculateDistance, formatDistance } from '@/lib/discovery'
+import { ensureHtml } from '@/lib/rich-text-utils'
+import { getBoundsError } from '@/lib/itinerary-utils'
 
 interface TransportDetailModalProps {
   leg: Transport | null
@@ -79,8 +81,10 @@ export default function TransportDetailModal({
     leg?.arrivalDay ?? leg?.departureDay ?? (fromId === 'home' && !leg ? 1 : defaultDay ?? 1)
   )
   const [ticketNumber, setTicketNumber] = useState(leg?.ticketNumber || '')
-  const [fromLocation, setFromLocation] = useState(leg?.fromLocation || '')
-  const [toLocation, setToLocation] = useState(leg?.toLocation || '')
+  const [fromLocation, setFromLocation] = useState(leg?.fromLocation || (fromName === 'home' ? 'Home' : fromName))
+  const [toLocation, setToLocation] = useState(leg?.toLocation || (toName === 'home' ? 'Home' : toName))
+  const [notes, setNotes] = useState<Note[]>(leg?.notes || [])
+  const [links, setLinks] = useState<Link[]>(leg?.links || [])
   
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false)
   const [pickingFor, setPickingFor] = useState<'from' | 'to' | null>(null)
@@ -96,6 +100,8 @@ export default function TransportDetailModal({
     }
     return null
   }, [fromCoords, toCoords, distanceUnit])
+
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   const [distance, setDistance] = useState(leg?.distance || autoDistance || '')
 
@@ -157,10 +163,36 @@ export default function TransportDetailModal({
         return [...prev, updated.document!]
       })
     }
+    else if (updated.type === 'link' && updated.link) {
+      setLinks(prev => {
+        const idx = prev.findIndex(l => l.id === updated.link!.id)
+        if (idx !== -1) {
+          const next = [...prev]
+          next[idx] = updated.link!
+          return next
+        }
+        return [...prev, updated.link!]
+      })
+    }
     setAttachmentDetail(null)
   }
   const handleSave = () => {
     if (!mode) return
+    
+    // Time validation
+    const error = getBoundsError(
+      departureDay, departure,
+      arrivalDay, arrival,
+      minDay || 1, minTime || '',
+      maxDay || 999, maxTime || '',
+      'Transport'
+    )
+    
+    if (error) {
+      setValidationError(error)
+      return
+    }
+
     const updated: Transport = {
       id: leg?.id ?? Date.now().toString(),
       ...(title.trim() && { title: title.trim() }),
@@ -177,7 +209,9 @@ export default function TransportDetailModal({
       distance,
       photos: [],
       photoDays: [],
-      documents: documents
+      documents: documents,
+      notes: notes,
+      links: links
     }
     onSave(updated)
     onClose()
@@ -224,6 +258,13 @@ export default function TransportDetailModal({
           onChange={e => setTitle(e.target.value)}
           placeholder="Flight #, Train name..."
         />
+      )}
+
+      {validationError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+          <span className="material-symbols-outlined text-red-400 text-base shrink-0">error</span>
+          <p className="text-red-200 text-[11px] leading-tight font-medium">{validationError}</p>
+        </div>
       )}
 
       {/* Locations Section */}
@@ -361,6 +402,106 @@ export default function TransportDetailModal({
           ))}
           {!documents.length && (
             <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents added</p>
+          )}
+        </div>
+      </div>
+
+      {/* Notes Section */}
+      <div className="space-y-4 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">sticky_note_2</span> Notes
+          </FormLabel>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => {
+                const newNote: Note = { id: Date.now().toString(), day: departureDay, text: '' }
+                setNotes(prev => [...prev, newNote])
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/20 hover:bg-amber-400/20 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span className="material-symbols-outlined text-xs text-amber-400">sticky_note_2</span>
+            </button>
+          )}
+        </div>
+        <div className="space-y-3">
+          {notes.map((note, idx) => (
+            <div key={note.id || `note-${idx}`} className="space-y-2">
+              {isEditMode ? (
+                <div className="bg-black/20 rounded-xl p-3 border border-white/10 relative group">
+                  <RichTextEditor
+                    content={ensureHtml(note.text)}
+                    onChange={val => setNotes(prev => prev.map(n => n.id === note.id ? { ...n, text: val } : n))}
+                    showToolbar={true}
+                  />
+                  <button 
+                    onClick={() => setNotes(prev => prev.filter(n => n.id !== note.id))}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                  >
+                    <span className="material-symbols-outlined text-xs">close</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                  <p className="text-white/80 text-sm whitespace-pre-wrap">{note.text || 'No content'}</p>
+                </div>
+              )}
+            </div>
+          ))}
+          {!notes.length && (
+            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No notes added</p>
+          )}
+        </div>
+      </div>
+
+      {/* Links Section */}
+      <div className="space-y-4 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <FormLabel variant="primary" className="flex items-center gap-2 !mb-0">
+            <span className="material-symbols-outlined text-base">link</span> Links
+          </FormLabel>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setAttachmentDetail({
+                  type: 'link',
+                  link: {
+                    id: Date.now().toString(),
+                    title: 'New Link',
+                    url: '',
+                    day: departureDay
+                  }
+                })
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 hover:bg-cyan-400/20 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs">add</span>
+              <span className="material-symbols-outlined text-xs text-cyan-400">link</span>
+            </button>
+          )}
+        </div>
+        <div className="space-y-2">
+          {links.map((link, idx) => (
+            <FormListItem 
+              key={link.id || `link-${idx}`} 
+              onDelete={isEditMode ? () => setLinks(prev => prev.filter(l => l.id !== link.id)) : undefined} 
+              className="border-cyan-400/20"
+              onClick={() => setAttachmentDetail({ type: 'link', link })}
+            >
+              <div className="flex items-center gap-3 w-full p-1">
+                <span className="text-cyan-400 material-symbols-outlined text-base">link</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-xs font-bold truncate">{link.title || link.url}</p>
+                  <p className="text-cyan-400/60 text-[10px] truncate">{link.url}</p>
+                </div>
+              </div>
+            </FormListItem>
+          ))}
+          {!links.length && (
+            <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No links added</p>
           )}
         </div>
       </div>

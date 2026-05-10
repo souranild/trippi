@@ -35,6 +35,7 @@ interface MapProps {
   isGlobal?: boolean
   mapStyle?: string
   onStyleChange?: (style: string) => void
+  onOpenTransport?: (transport: any, fromName: string, toName: string) => void
 }
 
 export default function TripMap(props: MapProps) {
@@ -56,7 +57,8 @@ export default function TripMap(props: MapProps) {
     showControls = false, 
     onAddDiscovery, 
     defaultDiscovery,
-    isGlobal
+    isGlobal,
+    onOpenTransport
   } = props;
 
   return (
@@ -79,6 +81,7 @@ export default function TripMap(props: MapProps) {
       onAddDiscovery={onAddDiscovery}
       defaultDiscovery={defaultDiscovery}
       isGlobal={isGlobal}
+      onOpenTransport={onOpenTransport}
     />
   )
 }

@@ -11,7 +11,10 @@ import { searchWallpapers } from '@/lib/wallpaper-search'
 import { getDayWithDate } from '@/lib/date-utils'
 import { Button } from '@/components/Button'
 import { ConfirmationModal } from './ConfirmationModal'
-import { FormInput, FormSelect, FormTextarea, FormGrid, FormLabel } from '@/components/FormLayout'
+import { fetchLocationInfo } from '@/lib/image-utils'
+import { FormInput, FormSelect, FormTextarea, FormGrid, FormLabel, FormInputGroup } from '@/components/FormLayout'
+import { getBoundsError } from '@/lib/itinerary-utils'
+
 import Map from '@/components/Map'
 import { MediaGrid } from '@/components/MediaGrid'
 import { toggleHtmlCheckbox } from '@/lib/rich-text-utils'
@@ -55,6 +58,8 @@ interface Props {
   totalDays?: number
   mapStyle?: string
   allPlaces?: any[]
+  placeArrivalTime?: string
+  placeDepartureTime?: string
   onClose: () => void
   onSave?: (updated: AttachmentDetailData) => void
   onDelete?: () => void
@@ -86,6 +91,8 @@ export default function AttachmentDetailModal({
   totalDays,
   mapStyle,
   allPlaces = [],
+  placeArrivalTime,
+  placeDepartureTime,
   onClose,
   onSave,
   onDelete,
@@ -96,11 +103,54 @@ export default function AttachmentDetailModal({
   const [draft, setDraft] = useState<AttachmentDetailData>(() => JSON.parse(JSON.stringify(data)))
   const [mediaViewer, setMediaViewer] = useState<{ items: any[], index: number } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false)
   const [isSearchingModalOpen, setIsSearchingModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isFetchingInfo, setIsFetchingInfo] = useState(false)
+
+  const handleMagicFetch = async () => {
+    const name = draft.type === 'accommodation' ? draft.accommodation?.name : draft.event?.title
+    if (!name || name.length < 3) return
+
+    setIsFetchingInfo(true)
+    try {
+      const info = await fetchLocationInfo(name)
+      if (info) {
+        if (draft.type === 'accommodation' && draft.accommodation) {
+          setDraft({
+            ...draft,
+            accommodation: {
+              ...draft.accommodation,
+              address: info.address || draft.accommodation.address,
+              lat: info.lat || draft.accommodation.lat,
+              lng: info.lng || draft.accommodation.lng,
+              photos: [...(draft.accommodation.photos || []), ...info.images.filter(img => !draft.accommodation!.photos?.includes(img))],
+              description: info.description || draft.accommodation.description
+            }
+          })
+        } else if (draft.type === 'event' && draft.event) {
+          setDraft({
+            ...draft,
+            event: {
+              ...draft.event,
+              location: info.address || draft.event.location,
+              lat: info.lat || draft.event.lat,
+              lng: info.lng || draft.event.lng,
+              photos: [...(draft.event.photos || []), ...info.images.filter(img => !draft.event!.photos?.includes(img))],
+              description: info.description || draft.event.description
+            }
+          })
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsFetchingInfo(false)
+    }
+  }
 
   // --- 2. Derived State ---
   const dayOptions = useMemo(() => {
@@ -168,6 +218,20 @@ export default function AttachmentDetailModal({
     if (draft.type === 'event' && draft.event) {
       const normalizedStart = normalizeDayValue(draft.event.day) ?? placeStartDay
       const normalizedEnd = normalizeDayValue(draft.event.endDay) ?? normalizedStart
+      
+      // Validation
+      const error = getBoundsError(
+        normalizedStart, draft.event.time || '',
+        normalizedEnd, draft.event.endTime || draft.event.time || '',
+        placeStartDay, placeArrivalTime || '',
+        placeEndDay, placeDepartureTime || '',
+        'Activity'
+      )
+      if (error) {
+        setValidationError(error)
+        return
+      }
+
       onSave?.({
         ...draft,
         event: {
@@ -183,6 +247,20 @@ export default function AttachmentDetailModal({
     if (draft.type === 'accommodation' && draft.accommodation) {
       const normalizedStart = normalizeDayValue(draft.accommodation.checkInDay) ?? placeStartDay
       const normalizedEnd = normalizeDayValue(draft.accommodation.checkOutDay) ?? normalizedStart
+      
+      // Validation
+      const error = getBoundsError(
+        normalizedStart, draft.accommodation.checkIn || '',
+        normalizedEnd, draft.accommodation.checkOut || draft.accommodation.checkIn || '',
+        placeStartDay, placeArrivalTime || '',
+        placeEndDay, placeDepartureTime || '',
+        'Accommodation'
+      )
+      if (error) {
+        setValidationError(error)
+        return
+      }
+
       onSave?.({
         ...draft,
         accommodation: {
@@ -285,6 +363,12 @@ export default function AttachmentDetailModal({
   // --- 4. Column Content ---
   const leftColumnContent = (
     <div className="space-y-5">
+      {validationError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+          <span className="material-symbols-outlined text-red-400 text-base shrink-0">error</span>
+          <p className="text-red-200 text-[11px] leading-tight font-medium">{validationError}</p>
+        </div>
+      )}
       {/* Note Section */}
       {draft.type === 'note' && (
         <div className="space-y-4">
@@ -330,13 +414,32 @@ export default function AttachmentDetailModal({
       {/* Event Section */}
       {draft.type === 'event' && draft.event && (
         <div className="space-y-4">
-          <FormInput
+          <FormInputGroup
             label="Event Title"
             labelVariant="primary"
-            disabled={!isEditMode}
-            value={draft.event.title}
-            onChange={e => setDraft({ ...draft, event: { ...draft.event!, title: e.target.value } })}
-          />
+            action={isEditMode && (
+              <button
+                type="button"
+                onClick={handleMagicFetch}
+                disabled={isFetchingInfo || !draft.event?.title || draft.event.title.length < 3}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all disabled:opacity-30"
+              >
+                {isFetchingInfo ? (
+                  <span className="material-symbols-outlined text-xs animate-spin">refresh</span>
+                ) : (
+                  <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                )}
+                Discovery
+              </button>
+            )}
+          >
+            <FormInput
+              disabled={!isEditMode}
+              value={draft.event.title}
+              onChange={e => setDraft({ ...draft, event: { ...draft.event!, title: e.target.value } })}
+              placeholder="What are we doing?"
+            />
+          </FormInputGroup>
           
           {/* Location Section */}
           <div className="space-y-2 pb-1">
@@ -551,13 +654,32 @@ export default function AttachmentDetailModal({
       {draft.type === 'accommodation' && draft.accommodation && (
         <div className="space-y-5">
           <FormGrid columns={2}>
-            <FormInput
+            <FormInputGroup
               label="Name"
               labelVariant="primary"
-              disabled={!isEditMode}
-              value={draft.accommodation.name}
-              onChange={e => setDraft({ ...draft, accommodation: { ...draft.accommodation!, name: e.target.value } })}
-            />
+              action={isEditMode && (
+                <button
+                  type="button"
+                  onClick={handleMagicFetch}
+                  disabled={isFetchingInfo || !draft.accommodation?.name || draft.accommodation.name.length < 3}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 hover:bg-yellow-400/20 transition-all disabled:opacity-30"
+                >
+                  {isFetchingInfo ? (
+                    <span className="material-symbols-outlined text-xs animate-spin">refresh</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                  )}
+                  Discovery
+                </button>
+              )}
+            >
+              <FormInput
+                disabled={!isEditMode}
+                value={draft.accommodation.name}
+                onChange={e => setDraft({ ...draft, accommodation: { ...draft.accommodation!, name: e.target.value } })}
+                placeholder="Hotel name..."
+              />
+            </FormInputGroup>
             <FormSelect
               label="Type"
               labelVariant="primary"

@@ -116,6 +116,38 @@ export const FormInput = React.forwardRef<HTMLInputElement, FormInputProps>(
 
 FormInput.displayName = 'FormInput'
 
+/* ============= Form Input Group (with Actions) ============= */
+
+interface FormInputGroupProps {
+  label?: string
+  labelVariant?: 'primary' | 'secondary' | 'tertiary' | 'default'
+  children: React.ReactNode
+  action?: React.ReactNode
+  containerClassName?: string
+}
+
+export function FormInputGroup({
+  label,
+  labelVariant = 'default',
+  children,
+  action,
+  containerClassName = ''
+}: FormInputGroupProps) {
+  return (
+    <div className={`space-y-1 ${containerClassName}`}>
+      {label && (
+        <div className="flex items-center justify-between">
+          <FormLabel variant={labelVariant}>{label}</FormLabel>
+          {action}
+        </div>
+      )}
+      <div className="relative">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 /* ============= Form Textarea ============= */
 
 interface FormTextareaProps

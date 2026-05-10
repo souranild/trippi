@@ -5,6 +5,36 @@ export type ItineraryItem =
   | { type: 'transport'; data: Transport; fromPlaceIndex: number; transportIndex: number }
 
 /**
+ * Helper to check if a transport leg matches a specific from/to segment.
+ * Supports ID matching, Name matching, and lenient fallbacks for AI data.
+ */
+export function isTransportMatching(
+  leg: Transport, 
+  fromPlace: Place | 'home', 
+  toPlace: Place | 'home'
+): boolean {
+  const fromId = fromPlace === 'home' ? 'home' : fromPlace.id
+  const toId = toPlace === 'home' ? 'home' : toPlace.id
+  
+  // 1. Strict ID match
+  if (leg.from === fromId && leg.to === toId) return true
+
+  // 2. Name-based match (common in AI data)
+  const currentName = fromPlace === 'home' ? 'home' : fromPlace.name.toLowerCase().trim()
+  const targetName = toPlace === 'home' ? 'home' : toPlace.name.toLowerCase().trim()
+  const tFrom = (leg.from || '').toLowerCase().trim()
+  const tTo = (leg.to || '').toLowerCase().trim()
+
+  if (tFrom === currentName && tTo === targetName) return true
+
+  // 3. Lenient match: if no from/to is provided, and it's outbound from the 'fromPlace'
+  // (Assuming AI associates outbound legs with the departure place)
+  if (!leg.from && !leg.to && fromPlace !== 'home') return true
+
+  return false
+}
+
+/**
  * Generates a flat, chronological list of all items in the trip.
  * Interleaves places and transport legs logically.
  */
@@ -16,7 +46,7 @@ export function getGlobalItinerary(trip: Trip): ItineraryItem[] {
     // 1. Check for transport legs starting from 'home' to this first place
     if (idx === 0) {
       const inboundLegs = (place.transport || [])
-        .filter(t => t.from === 'home' && t.to === place.id)
+        .filter(t => isTransportMatching(t, 'home', place))
         .sort(sortTransports)
       
       inboundLegs.forEach((leg) => {
@@ -34,10 +64,10 @@ export function getGlobalItinerary(trip: Trip): ItineraryItem[] {
 
     // 3. Add all outbound transport legs from this place to the next destination (or home)
     const nextPlace = places[idx + 1]
-    const targetId = nextPlace ? nextPlace.id : 'home'
+    const target = nextPlace || 'home'
     
     const outboundLegs = (place.transport || [])
-      .filter(t => t.from === place.id && t.to === targetId)
+      .filter(t => isTransportMatching(t, place, target))
       .sort(sortTransports)
 
     outboundLegs.forEach((leg) => {
@@ -121,4 +151,52 @@ export function isTimeAfter(time1: string, time2: string): boolean {
   }
 
   return toMins(time1) >= toMins(time2)
+}
+
+/**
+ * Checks if a day/time is within specified bounds.
+ */
+export function isWithinBounds(
+  day: number,
+  time: string,
+  minDay: number,
+  minTime: string,
+  maxDay: number,
+  maxTime: string
+): boolean {
+  // Check min bound
+  if (day < minDay) return false
+  if (day === minDay && minTime && !isTimeAfter(time, minTime)) return false
+
+  // Check max bound
+  if (day > maxDay) return false
+  if (day === maxDay && maxTime && !isTimeAfter(maxTime, time)) return false
+
+  return true
+}
+
+/**
+ * Returns a human-readable validation error if a time range is outside bounds.
+ */
+export function getBoundsError(
+  startDay: number,
+  startTime: string,
+  endDay: number,
+  endTime: string,
+  minDay: number,
+  minTime: string,
+  maxDay: number,
+  maxTime: string,
+  label: string = 'Item'
+): string | null {
+  if (!isWithinBounds(startDay, startTime, minDay, minTime, maxDay, maxTime)) {
+    return `${label} start must be after the previous item (${minDay === startDay ? minTime : 'Day ' + minDay})`
+  }
+  if (!isWithinBounds(endDay, endTime || startTime, minDay, minTime, maxDay, maxTime)) {
+    return `${label} end must be before the next item (${maxDay === endDay ? maxTime : 'Day ' + maxDay})`
+  }
+  if (endDay < startDay || (endDay === startDay && endTime && !isTimeAfter(endTime, startTime))) {
+    return `${label} end must be after its start`
+  }
+  return null
 }

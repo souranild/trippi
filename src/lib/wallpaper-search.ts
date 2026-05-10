@@ -93,3 +93,22 @@ export function getRandomPlaceholder(): string {
   const randomIndex = Math.floor(Math.random() * travelImages.length);
   return travelImages[randomIndex] || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&h=1080&fit=crop';
 }
+
+/**
+ * Fetches a few beautiful scenery images from Unsplash to use as defaults
+ */
+export async function getDiscoveryWallpapers(): Promise<string[]> {
+  try {
+    const sceneries = ['nature', 'mountains', 'landscape', 'stars', 'aurora', 'forest']
+    const randomScenery = sceneries[Math.floor(Math.random() * sceneries.length)]
+    const response = await fetch(`/api/wallpapers?query=${encodeURIComponent(randomScenery)}`)
+    if (response.ok) {
+      const urls = await response.json()
+      return urls.slice(0, 5)
+    }
+    return getCuratedFallback('travel').slice(0, 5)
+  } catch (error) {
+    console.error('[Wallpaper API] Discovery error:', error)
+    return getCuratedFallback('travel').slice(0, 5)
+  }
+}

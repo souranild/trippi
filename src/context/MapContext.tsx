@@ -22,6 +22,10 @@ interface MapState {
   showControls?: boolean
   onAddDiscovery?: (discovery: any) => void
   focusedTransportId?: string | null
+  selectedDiscovery?: any | null
+  setSelectedDiscovery?: React.Dispatch<React.SetStateAction<any | null>>
+  isDiscoveryDetailModalOpen?: boolean
+  setIsDiscoveryDetailModalOpen?: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 interface MapContextType {
@@ -35,6 +39,10 @@ interface MapContextType {
   setIsExpanded: (expanded: boolean) => void
   discoveries: any[]
   setDiscoveries: React.Dispatch<React.SetStateAction<any[]>>
+  selectedDiscovery: any | null
+  setSelectedDiscovery: React.Dispatch<React.SetStateAction<any | null>>
+  isDiscoveryDetailModalOpen: boolean
+  setIsDiscoveryDetailModalOpen: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined)
@@ -45,6 +53,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [discoveries, setDiscoveries] = useState<any[]>([])
+  const [selectedDiscovery, setSelectedDiscovery] = useState<any | null>(null)
+  const [isDiscoveryDetailModalOpen, setIsDiscoveryDetailModalOpen] = useState(false)
 
   const value = React.useMemo(() => ({ 
     mapState, 
@@ -56,8 +66,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
     isExpanded,
     setIsExpanded,
     discoveries,
-    setDiscoveries
-  }), [mapState, isMapVisible, portalTarget, isExpanded, discoveries]);
+    setDiscoveries,
+    selectedDiscovery,
+    setSelectedDiscovery,
+    isDiscoveryDetailModalOpen,
+    setIsDiscoveryDetailModalOpen
+  }), [mapState, isMapVisible, portalTarget, isExpanded, discoveries, selectedDiscovery, isDiscoveryDetailModalOpen]);
 
   return (
     <MapContext.Provider value={value}>

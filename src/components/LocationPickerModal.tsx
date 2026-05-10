@@ -11,7 +11,8 @@ import {
 import TripMap from '@/components/Map'
 import { parseGoogleMapsUrl, searchLocations, getIconForType } from '@/lib/discovery'
 import { Button } from '@/components/Button'
-import { FormLabel, FormInput, FormTextarea } from '@/components/FormLayout'
+import { FormLabel, FormInput, FormTextarea, FormInputGroup } from '@/components/FormLayout'
+import { fetchLocationInfo } from '@/lib/image-utils'
 
 interface LocationPickerModalProps {
   isOpen: boolean
@@ -255,12 +256,40 @@ export default function LocationPickerModal({
 
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <FormLabel variant="secondary">Name</FormLabel>
-                    <FormInput 
-                      value={placeName}
-                      onChange={(e) => setPlaceName(e.target.value)}
-                      placeholder="Name of the place"
-                    />
+                    <FormInputGroup
+                      label="Name"
+                      labelVariant="secondary"
+                      action={
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!placeName || placeName.length < 3) return
+                            setIsSearching(true)
+                            const info = await fetchLocationInfo(placeName)
+                            if (info) {
+                              setLat(info.lat)
+                              setLng(info.lng)
+                              setAddress(info.address)
+                              setDescription(info.description || '')
+                              setImages(info.images)
+                              setType(info.type)
+                            }
+                            setIsSearching(false)
+                          }}
+                          disabled={isSearching || !placeName || placeName.length < 3}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all disabled:opacity-30"
+                        >
+                          <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
+                          Discovery
+                        </button>
+                      }
+                    >
+                      <FormInput 
+                        value={placeName}
+                        onChange={(e) => setPlaceName(e.target.value)}
+                        placeholder="Name of the place"
+                      />
+                    </FormInputGroup>
                   </div>
 
                   <div className="space-y-1.5">

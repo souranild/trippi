@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import https from 'https';
 
 const OVERPASS_ENDPOINTS = [
-  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter',
   'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.nchc.org.tw/api/interpreter'
 ];
@@ -44,9 +44,9 @@ function fetchOverpassNative(query: string, endpoint: string): Promise<any> {
     });
 
     req.on('error', (e) => reject(e));
-    req.setTimeout(12000, () => {
+    req.setTimeout(30000, () => {
       req.destroy();
-      reject(new Error('Timeout after 12s'));
+      reject(new Error('Timeout after 30s'));
     });
 
     req.write(postData);
