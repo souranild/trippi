@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,40 +8,69 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Next.js
+/.next/
+/out/
+/build
+
+# Testing
 /coverage
 /playwright-report/
 /test-results/
 /blob-report/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
+# OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-*.pem
-*.log
-*.tmp
+[Dd]esktop.ini
+
+# Editors & IDEs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
 *.swp
 *.swo
+*.swn
+.project
+.classpath
+.settings/
+.factorypath
 
-# debug
+# Environment & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+# Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
+# Misc Artifacts
 .vercel
-
-# typescript
+.turbo
+*.tmp
+.cache/
+.eslintcache
+.stylelintcache
 *.tsbuildinfo
 next-env.d.ts
+
+# Local DB/Storage (if any)
+*.db
+*.sqlite
+*.sqlite-journal
