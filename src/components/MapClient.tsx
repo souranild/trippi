@@ -643,6 +643,18 @@ export default function MapClient({
     return `${itineraryIds}_${discoveryIds}`;
   }, [validPlaces, discoveries]);
 
+  // Track coordinate frequency to jitter overlapping markers
+  const coordinateFrequency = useMemo(() => {
+    const counts: Record<string, number> = {};
+    validPlaces.forEach(p => {
+      const key = `${Number(p.lat).toFixed(6)},${Number(p.lng).toFixed(6)}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [validPlaces]);
+
+  const coordinateInstancesRef = useRef<Record<string, number>>({});
+
   const handleMarkerClick = (place: Place, originalEvent?: any) => {
     if (originalEvent && typeof originalEvent.stopPropagation === 'function') {
       originalEvent.stopPropagation();
@@ -1082,22 +1094,42 @@ export default function MapClient({
             />
           )}
 
-          {validPlaces.map((place) => {
-            const startDay = Math.max(1, place.day ?? 1)
-            const endDay = Math.max(startDay, place.endDay || startDay)
-            const isMultiDay = endDay > startDay
-            const dayLabel = isMultiDay 
-              ? Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i).join('-')
-              : `${startDay}`
-            const isFocused = place.id === focusedPlaceId
-            const isLive = place.id === livePlaceId
+          {(() => {
+            // Reset instances for each render pass
+            const instances: Record<string, number> = {};
+            
+            return validPlaces.map((place, idx) => {
+              const startDay = Math.max(1, place.day ?? 1)
+              const endDay = Math.max(startDay, place.endDay || startDay)
+              const isMultiDay = endDay > startDay
+              const dayLabel = isMultiDay 
+                ? Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i).join('-')
+                : `${startDay}`
+              const isFocused = place.id === focusedPlaceId
+              const isLive = place.id === livePlaceId
 
-            return (
-              <Marker
-                key={place.id}
-                position={[Number(place.lat), Number(place.lng)]}
-                icon={createIcon(place.emoji || emoji, showDayNumbers, place.name, dayLabel, false, (isFocused || hoveredPlaceId === place.id), false, zoom, false, isLive, place.type)}
-                eventHandlers={{
+              // Calculate jitter for overlapping markers
+              const coordKey = `${Number(place.lat).toFixed(6)},${Number(place.lng).toFixed(6)}`;
+              const instanceIdx = instances[coordKey] || 0;
+              instances[coordKey] = instanceIdx + 1;
+
+              let displayLat = Number(place.lat);
+              let displayLng = Number(place.lng);
+
+              // If multiple places share this coordinate, offset them slightly in a spiral or line
+              if (coordinateFrequency[coordKey] > 1) {
+                const angle = (instanceIdx * (2 * Math.PI)) / coordinateFrequency[coordKey];
+                const radius = 0.00015 * instanceIdx; // small offset in degrees
+                displayLat += radius * Math.cos(angle);
+                displayLng += radius * Math.sin(angle);
+              }
+
+              return (
+                <Marker
+                  key={`${place.id}-${idx}`}
+                  position={[displayLat, displayLng]}
+                  icon={createIcon(place.emoji || emoji, showDayNumbers, place.name, dayLabel, false, (isFocused || hoveredPlaceId === place.id), false, zoom, false, isLive, place.type)}
+                  eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stopPropagation(e as any);
                     handleMarkerClick(place, e);
@@ -1166,7 +1198,8 @@ export default function MapClient({
                 </Tooltip>
               </Marker>
             )
-          })}
+          })
+        })()}
 
           {polylineCoords.length > 1 && (
             <Fragment>
@@ -1184,8 +1217,18 @@ export default function MapClient({
                 positions={polylineCoords}
                 color="#8ff5ff"
                 weight={8}
-                opacity={0.15}
+                opacity={0.2}
                 lineCap="round"
+                className="path-glow"
+              />
+              <Polyline
+                positions={polylineCoords}
+                color="#8ff5ff"
+                weight={3}
+                opacity={0.8}
+                dashArray="1, 12"
+                lineCap="round"
+                className="animated-path"
               />
               {/* Added a secondary glow polyline for overall path but thinner */}
               {(() => {

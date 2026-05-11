@@ -12,10 +12,12 @@ import HeroTripCard from '@/components/Dashboard/HeroTripCard'
 import ExploreSection from '@/components/ExploreSection'
 import AppHeader from '@/components/AppHeader'
 
-import TripMap from '@/components/Map'
+import MapSlot from '@/components/Map/MapSlot'
+import { useMapContext } from '@/context/MapContext'
 
 
 function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[] }) {
+  const { setIsExpanded } = useMapContext()
   const uniqueCountries = new Set(places.map(p => p.country).filter(Boolean)).size
   const totalPlaces = places.length
 
@@ -25,10 +27,11 @@ function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[
       <div className="relative overflow-hidden rounded-[2rem] w-full aspect-[4/5] md:aspect-[3/4] lg:aspect-[16/22] bg-surface-container-lowest border border-white/5 shadow-2xl">
         {/* Interactive Leaflet Map Layer */}
         <div className="absolute inset-0 z-10 cursor-move">
-          <TripMap 
+          <MapSlot 
             isGlobal={true} 
             places={places} 
             showDayNumbers={false} 
+            onMapClick={() => setIsExpanded(true)}
             className="absolute inset-0 w-full h-full bg-neutral-900" 
           />
         </div>
@@ -58,6 +61,35 @@ function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[
     </section>
   )
 }
+
+
+function MoreTripsCard({ count, type, href }: { count: number, type: 'upcoming' | 'past', href: string }) {
+  const icon = type === 'upcoming' ? 'flight_takeoff' : 'history'
+  const colorClass = type === 'upcoming' ? 'text-secondary' : 'text-neutral-400'
+  const subtitle = type === 'upcoming' ? 'Explore your future journeys' : 'Relive your travel history'
+
+  return (
+    <Link 
+      href={href}
+      className="group relative flex flex-col items-center justify-center p-8 rounded-[2rem] border border-dashed border-white/10 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.05] transition-all duration-500 text-center space-y-4 h-full min-h-[180px] sm:min-h-[220px]"
+    >
+      <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl">
+        <span className={`material-symbols-outlined text-3xl ${colorClass}`}>{icon}</span>
+      </div>
+      <div>
+        <h4 className="text-sm font-black text-white uppercase tracking-widest">+{count} {type === 'upcoming' ? 'Upcoming' : 'Past'}</h4>
+        <p className="text-[10px] text-neutral-500 font-medium leading-relaxed mt-1 group-hover:text-neutral-400 transition-colors">
+          {subtitle}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary group-hover:gap-3 transition-all pt-2">
+        <span>View Gallery</span>
+        <span className="material-symbols-outlined text-xs">arrow_forward</span>
+      </div>
+    </Link>
+  )
+}
+
 
 export default function Home() {
   const { trips, deleteTrip } = useTrips()
@@ -191,7 +223,7 @@ export default function Home() {
                     <span className="text-caption text-neutral-500">{upcomingTrips.length} {upcomingTrips.length === 1 ? 'trip' : 'trips'}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
-                    {upcomingTrips.slice(0, 3).map((trip) => (
+                    {upcomingTrips.slice(0, hasMoreUpcoming ? 2 : 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
                         <TripCard trip={trip} className="flex-1" />
                         <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
@@ -199,16 +231,17 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
+                    {hasMoreUpcoming && (
+                      <div className="animate-fade-in flex flex-col">
+                        <MoreTripsCard 
+                          count={upcomingTrips.length - 2} 
+                          type="upcoming" 
+                          href="/adventures?status=upcoming&sort=oldest" 
+                        />
+                        <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
+                      </div>
+                    )}
                   </div>
-                  {upcomingTrips.length > 3 && (
-                    <Link
-                      href="/adventures?status=upcoming&sort=oldest"
-                      className="mt-4 group px-4 py-2 text-sm font-medium text-secondary hover:text-[#c3f400] bg-white/5 hover:bg-white/10 rounded-lg border border-secondary/30 hover:border-secondary/60 transition-all duration-300 flex items-center justify-center gap-2 w-full"
-                    >
-                      <span>+{upcomingTrips.length - 3} more upcoming</span>
-                      <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform duration-300">arrow_forward</span>
-                    </Link>
-                  )}
                 </div>
               ) : trips.length < 3 && (
                 <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
@@ -242,7 +275,7 @@ export default function Home() {
                     <span className="text-caption text-neutral-500">{pastTrips.length} {pastTrips.length === 1 ? 'trip' : 'trips'}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
-                    {pastTrips.slice(0, 3).map((trip) => (
+                    {pastTrips.slice(0, hasMorePast ? 2 : 3).map((trip) => (
                       <div key={trip.id} className="animate-fade-in flex flex-col">
                         <TripCard trip={trip} className="flex-1" />
                         <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
@@ -250,16 +283,17 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
+                    {hasMorePast && (
+                      <div className="animate-fade-in flex flex-col">
+                        <MoreTripsCard 
+                          count={pastTrips.length - 2} 
+                          type="past" 
+                          href="/adventures?status=past&sort=newest" 
+                        />
+                        <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
+                      </div>
+                    )}
                   </div>
-                  {pastTrips.length > 3 && (
-                    <Link
-                      href="/adventures?status=past&sort=newest"
-                      className="mt-4 group px-4 py-2 text-sm font-medium text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-300 flex items-center justify-center gap-2 w-full"
-                    >
-                      <span>+{pastTrips.length - 3} more past trips</span>
-                      <span className="material-symbols-outlined text-base group-hover:translate-x-1 transition-transform duration-300">arrow_forward</span>
-                    </Link>
-                  )}
                 </div>
               ) : trips.length < 3 && (
                 <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
@@ -367,7 +401,7 @@ export default function Home() {
               </div>
 
               <div className="flex-1 relative bg-neutral-950 overflow-hidden">
-                <TripMap 
+                <MapSlot 
                   isGlobal={true} 
                   places={allPlacesWithEmojis} 
                   showDayNumbers={false} 

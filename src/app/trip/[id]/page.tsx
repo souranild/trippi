@@ -73,9 +73,10 @@ export default function TripDetail() {
   const searchParams = useSearchParams()
   const { updateTrip: updateTripContext, deleteTrip, userProfile, setIsEditingProfile } = useTrips()
   const { 
+    isExpanded,
+    setIsExpanded,
     discoveries, 
     setDiscoveries, 
-    setIsExpanded,
     selectedDiscovery,
     setSelectedDiscovery,
     isDiscoveryDetailModalOpen,
@@ -423,13 +424,19 @@ export default function TripDetail() {
   }, [closeMobileMap]);
 
   const handleMapClick = useCallback((coords: { lat: number, lng: number }) => {
-    setMapPreviewCoords(coords)
-    setPlaceInputMode('manual')
-    setIsPlaceSearchOpen(true)
-    setIsExpanded(true)
-    setManualPlaceName('')
-    setManualPlaceLocation(`${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`)
-  }, [setIsExpanded]);
+    if (isExpanded) {
+      // If already expanded (Pic 2), clicking the map area opens the location picker (Pic 1)
+      setMapPreviewCoords(coords)
+      setPlaceInputMode('manual')
+      setIsPlaceSearchOpen(true)
+      setManualPlaceName('')
+      setManualPlaceLocation(`${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`)
+    } else {
+      // If not expanded, clicking the map directly opens the full view (Pic 2)
+      setIsExpanded(true)
+      setMapPreviewCoords(coords)
+    }
+  }, [isExpanded, setIsExpanded]);
 
 
 
