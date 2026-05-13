@@ -26,6 +26,8 @@ interface MapSlotProps {
   onAddDiscovery?: (discovery: any) => void
   onDiscoveriesLoaded?: (discoveries: any[]) => void
   focusedTransportId?: string | null
+  livePlaceId?: string | null
+  liveTransportId?: string | null
   onOpenTransport?: (transport: any, fromName: string, toName: string) => void
 }
 
@@ -63,6 +65,8 @@ export default function MapSlot(props: MapSlotProps) {
     onAddDiscovery: props.onAddDiscovery,
     onDiscoveriesLoaded: props.onDiscoveriesLoaded,
     focusedTransportId: props.focusedTransportId,
+    livePlaceId: props.livePlaceId,
+    liveTransportId: props.liveTransportId,
     onOpenTransport: props.onOpenTransport
   }), [
     placesKey,
@@ -84,6 +88,8 @@ export default function MapSlot(props: MapSlotProps) {
     props.onAddDiscovery,
     props.onDiscoveriesLoaded,
     props.focusedTransportId,
+    props.livePlaceId,
+    props.liveTransportId,
     props.onOpenTransport
   ]);
 

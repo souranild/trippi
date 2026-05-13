@@ -22,6 +22,8 @@ interface MapState {
   showControls?: boolean
   onAddDiscovery?: (discovery: any) => void
   focusedTransportId?: string | null
+  livePlaceId?: string | null
+  liveTransportId?: string | null
   selectedDiscovery?: any | null
   setSelectedDiscovery?: React.Dispatch<React.SetStateAction<any | null>>
   isDiscoveryDetailModalOpen?: boolean

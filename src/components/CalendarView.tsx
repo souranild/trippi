@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useEffect } from 'react'
-import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, subDays, addYears, subYears, startOfYear, endOfYear, eachMonthOfInterval } from 'date-fns'
+import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, eachMonthOfInterval, startOfYear, endOfYear, addYears } from 'date-fns'
 import { formatTime } from '@/lib/date-utils'
 
 interface CalendarViewProps {
@@ -14,9 +14,79 @@ interface CalendarViewProps {
 
 type ViewType = 'day' | '3day' | 'week' | 'month' | 'year'
 
+const getTypeStyles = (type: string, isLive?: boolean) => {
+  const baseClasses = 'border transition-all cursor-pointer shadow-sm hover:brightness-110 active:scale-[0.98]'
+  if (isLive) {
+    return `${baseClasses} bg-primary border-primary text-black shadow-[0_0_20px_rgba(195,244,0,0.4)] z-20`
+  }
+  switch (type) {
+    case 'place': return `${baseClasses} bg-primary/20 border-primary/40 text-primary font-bold`
+    case 'transport': return `${baseClasses} bg-primary/20 border-primary/40 text-primary`
+    case 'activity': return `${baseClasses} bg-rose-500/20 border-rose-500/40 text-rose-300`
+    case 'event': return `${baseClasses} bg-rose-500/20 border-rose-500/40 text-rose-300`
+    case 'accommodation': return `${baseClasses} bg-yellow-500/20 border-yellow-500/40 text-yellow-300`
+    default: return `${baseClasses} bg-neutral-800 border-white/10 text-white`
+  }
+}
+
+// Helper to calculate event positions for overlapping events
+const getEventPositions = (events: any[]) => {
+  if (!events.length) return []
+
+  // 1. Sort by start time, then duration
+  const sorted = [...events].sort((a, b) => {
+    const aTime = a.startTime || '00:00'
+    const bTime = b.startTime || '00:00'
+    if (aTime !== bTime) return aTime.localeCompare(bTime)
+    return (b.endTime || '23:59').localeCompare(a.endTime || '23:59')
+  })
+
+  const columns: any[][] = []
+  const results: any[] = []
+
+  sorted.forEach(event => {
+    let placed = false
+    const start = event.startTime || '00:00'
+    
+    for (let i = 0; i < columns.length; i++) {
+      const lastInCol = columns[i][columns[i].length - 1]
+      if ((lastInCol.endTime || '23:59') <= start) {
+        columns[i].push(event)
+        event.colIndex = i
+        placed = true
+        break
+      }
+    }
+
+    if (!placed) {
+      columns.push([event])
+      event.colIndex = columns.length - 1
+    }
+  })
+
+  // Group overlapping events to calculate totalCols
+  sorted.forEach(event => {
+    let group = sorted.filter(e => 
+      (e.startTime < event.endTime && e.endTime > event.startTime)
+    )
+    
+    // Find the max colIndex in this overlapping group
+    let maxCol = 0
+    group.forEach(e => {
+      if (e.colIndex > maxCol) maxCol = e.colIndex
+    })
+    
+    // For GCal style, totalCols should be at least maxCol + 1
+    // But to be simple, we'll use columns.length if they overlap
+    event.totalCols = columns.length
+    results.push(event)
+  })
+
+  return results
+}
+
 export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, timeFormat = '12h' }: CalendarViewProps) {
   const tripStartDate = useMemo(() => new Date(trip?.startDate || new Date()), [trip?.startDate])
-  const tripEndDate = useMemo(() => new Date(trip?.endDate || new Date()), [trip?.endDate])
   
   const [currentDate, setCurrentDate] = useState(() => {
     const today = new Date()
@@ -61,7 +131,6 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
     }
   }
 
-  // Live time indicator logic
   const [now, setNow] = useState(new Date())
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000)
@@ -72,27 +141,109 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
     return (now.getHours() * 48) + (now.getMinutes() / 60 * 48)
   }, [now])
 
+  const allItems = useMemo(() => {
+    const items: any[] = []
+    
+    places.forEach(place => {
+      // 1. Places
+      items.push({
+        id: place.id,
+        type: 'place',
+        name: place.name,
+        emoji: place.emoji || '📍',
+        day: place.day || 1,
+        endDay: place.endDay || place.day || 1,
+        startTime: place.arrival || '00:00',
+        endTime: place.departure || '23:59',
+        allDay: false, // In Pic 1, Places are in the grid
+        data: place
+      })
+
+      // 2. Transport
+      if (place.transport) {
+        place.transport.forEach((t: any) => {
+          items.push({
+            id: t.id,
+            type: 'transport',
+            name: t.title || 'Travel',
+            emoji: 'commute',
+            day: t.departureDay || place.day || 1,
+            endDay: t.arrivalDay || t.departureDay || place.day || 1,
+            startTime: t.departure || '00:00',
+            endTime: t.arrival || '23:59',
+            allDay: false,
+            data: { ...t, parentPlaceId: place.id }
+          })
+        })
+      }
+
+      // 3. Events / Activities
+      if (place.events) {
+        place.events.forEach((e: any) => {
+          items.push({
+            id: e.id,
+            type: 'activity',
+            name: e.title,
+            emoji: 'flag',
+            day: e.day || place.day || 1,
+            endDay: e.endDay || e.day || place.day || 1,
+            startTime: e.time || '00:00',
+            endTime: e.endTime || '23:59',
+            allDay: false,
+            data: { ...e, parentPlaceId: place.id }
+          })
+        })
+      }
+
+      // 4. Accommodations
+      if (place.accommodations) {
+        place.accommodations.forEach((acc: any) => {
+          items.push({
+            id: acc.id,
+            type: 'accommodation',
+            name: acc.name,
+            emoji: 'hotel',
+            day: acc.checkInDay || place.day || 1,
+            endDay: acc.checkOutDay || place.endDay || place.day || 1,
+            startTime: acc.checkIn || '00:00',
+            endTime: acc.checkOut || '23:59',
+            allDay: true, // Multi-day bars
+            data: { ...acc, parentPlaceId: place.id }
+          })
+        })
+      }
+    })
+
+    const nowTimeMins = now.getHours() * 60 + now.getMinutes()
+    return items.map(item => {
+      let isLive = false
+      if (trip.startDate) {
+        const itemDay = item.day || 1
+        const itemEndDay = item.endDay || itemDay
+        const tripStart = new Date(trip.startDate)
+        const itemDate = addDays(tripStart, itemDay - 1)
+        const isToday = isSameDay(itemDate, now)
+        
+        if (isToday && item.startTime && item.endTime) {
+          const [sh, sm] = (item.startTime || '00:00').split(':').map(Number)
+          const [eh, em] = (item.endTime || '23:59').split(':').map(Number);
+          const startMins = sh * 60 + sm
+          const endMins = eh * 60 + em
+          isLive = nowTimeMins >= startMins && nowTimeMins <= endMins
+        }
+      }
+      return { ...item, isLive }
+    })
+  }, [places, trip.startDate, now])
+
   const days = useMemo(() => {
     let start, end
     switch (view) {
-      case 'day':
-        start = currentDate
-        end = currentDate
-        break
-      case '3day':
-        start = currentDate
-        end = addDays(currentDate, 2)
-        break
-      case 'week':
-        start = startOfWeek(currentDate)
-        end = endOfWeek(currentDate)
-        break
-      case 'month':
-        start = startOfWeek(startOfMonth(currentDate))
-        end = endOfWeek(endOfMonth(currentDate))
-        break
-      default:
-        return []
+      case 'day': start = currentDate; end = currentDate; break
+      case '3day': start = currentDate; end = addDays(currentDate, 2); break
+      case 'week': start = startOfWeek(currentDate); end = endOfWeek(currentDate); break
+      case 'month': start = startOfWeek(startOfMonth(currentDate)); end = endOfWeek(endOfMonth(currentDate)); break
+      default: return []
     }
     return eachDayOfInterval({ start, end })
   }, [currentDate, view])
@@ -101,15 +252,12 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
 
   return (
     <div className="flex flex-col h-full bg-neutral-900/20 backdrop-blur-xl border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in fade-in duration-500">
-      {/* Calendar Header (GCal Style) */}
-      <div className="px-6 py-3 border-b border-white/10 flex items-center justify-between bg-black/20">
+      {/* Calendar Header */}
+      <div className="px-6 py-3 border-b border-white/10 flex items-center justify-between bg-black/40">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => {
-                const today = new Date()
-                setCurrentDate(today)
-              }}
+              onClick={() => setCurrentDate(new Date())}
               className="px-4 py-1.5 rounded-lg border border-white/20 text-white text-xs font-bold hover:bg-white/5 transition-all active:scale-95"
             >
               Today
@@ -123,15 +271,13 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
               </button>
             </div>
           </div>
-          
-          <div className="flex flex-col">
-            <h2 className="text-xl font-medium text-white tracking-tight">
-              {view === 'year' ? format(currentDate, 'yyyy') : format(currentDate, 'MMMM yyyy')}
-            </h2>
-          </div>
+          <h2 className="text-xl font-medium text-white tracking-tight">
+            {view === 'year' ? format(currentDate, 'yyyy') : format(currentDate, 'MMMM yyyy')}
+          </h2>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Day Selector */}
           <div className="relative group/day-select">
             <button className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/20 transition-all">
               <span className="text-[10px] font-black text-primary uppercase tracking-widest">
@@ -154,6 +300,7 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
             </div>
           </div>
 
+          {/* View Selector */}
           <div className="relative group/view-select">
             <button className="flex items-center gap-2 px-4 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-white hover:bg-white/10 transition-all">
               {view === 'day' ? 'Day' : view === '3day' ? '3 Days' : view === 'week' ? 'Week' : view === 'month' ? 'Month' : 'Year'}
@@ -171,26 +318,12 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
               ))}
             </div>
           </div>
-
-          <button 
-            onClick={() => (document.getElementById('calendar-jump-date') as HTMLInputElement | null)?.showPicker?.()}
-            className="p-2 hover:bg-white/10 rounded-full text-neutral-400 hover:text-primary transition-all"
-            title="Jump to date"
-          >
-            <span className="material-symbols-outlined text-xl">event</span>
-            <input 
-              type="date"
-              className="w-0 h-0 opacity-0 absolute"
-              id="calendar-jump-date"
-              onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))}
-            />
-          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+      <div className="flex-1 overflow-hidden relative flex flex-col">
         {view === 'year' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 p-6">
+           <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 custom-scrollbar">
             {eachMonthOfInterval({ start: startOfYear(currentDate), end: endOfYear(currentDate) }).map((month) => (
               <div key={month.toString()} className="space-y-3">
                 <h3 className="text-sm font-bold text-primary uppercase tracking-widest">{format(month, 'MMMM')}</h3>
@@ -205,27 +338,8 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
                     const hasPlaces = dayPlaces.length > 0
                     
                     return (
-                      <div 
-                        key={day.toString()} 
-                        className={`aspect-square flex flex-col items-center justify-center rounded-lg relative ${
-                          !isCurrentMonth ? 'opacity-20' : ''
-                        } ${hasPlaces ? 'bg-white/5' : ''}`}
-                      >
-                        <span className={`text-[9px] ${hasPlaces ? 'text-white font-bold' : 'text-neutral-500'}`}>
-                          {format(day, 'd')}
-                        </span>
-                        {hasPlaces && (
-                          <div className="flex gap-0.5 mt-0.5">
-                            {dayPlaces.slice(0, 3).map((p, idx) => (
-                              <div 
-                                key={idx} 
-                                className={`w-1 h-1 rounded-full ${
-                                  p.isTransport ? 'bg-blue-400' : p.isAccommodation ? 'bg-emerald-400' : 'bg-primary'
-                                } shadow-[0_0_4px_currentColor]`} 
-                              />
-                            ))}
-                          </div>
-                        )}
+                      <div key={day.toString()} className={`aspect-square flex flex-col items-center justify-center rounded-lg relative ${!isCurrentMonth ? 'opacity-20' : ''} ${hasPlaces ? 'bg-white/5' : ''}`}>
+                        <span className={`text-[9px] ${hasPlaces ? 'text-white font-bold' : 'text-neutral-500'}`}>{format(day, 'd')}</span>
                       </div>
                     )
                   })}
@@ -234,218 +348,248 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
             ))}
           </div>
         ) : view === 'month' ? (
-          <div className="grid grid-cols-7 h-full min-h-[600px]">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="p-3 text-center border-b border-white/10 text-[10px] font-bold text-neutral-500 uppercase tracking-widest bg-white/5">{d}</div>
-            ))}
-            {days.map((day) => {
-              const dayNum = getDayNumber(day)
-              const dayPlaces = places.filter(p => p.day === dayNum || (dayNum > (p.day || 0) && dayNum <= (p.endDay || p.day || 0)))
-              const isCurrentMonth = isSameMonth(day, currentDate)
-              const isToday = isSameDay(day, new Date())
-
-              return (
-                <div 
-                  key={day.toString()} 
-                  className={`min-h-[140px] border-r border-b border-white/5 p-1 transition-colors hover:bg-white/[0.02] group ${
-                    !isCurrentMonth ? 'bg-black/10 opacity-20' : ''
-                  }`}
-                >
-                  <div className="flex justify-between items-start p-1.5 mb-1">
-                    <span className={`text-xs font-black px-1.5 py-0.5 rounded-full ${isToday ? 'bg-primary text-black shadow-[0_0_15px_rgba(143,245,255,0.5)]' : 'text-neutral-500'}`}>
-                      {format(day, 'd')}
-                    </span>
-                    <button 
-                      onClick={() => onAddPlace(dayNum)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-white/5 hover:bg-primary/20 hover:text-primary transition-all active:scale-90"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">add</span>
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {dayPlaces.slice(0, 4).map(p => {
-                      const isMultiDay = p.endDay && p.endDay > (p.day || 0);
-                      const isStart = p.day === dayNum;
-                      
-                      const baseClass = "px-2 py-1 rounded-md text-[9px] font-bold truncate cursor-pointer transition-all active:scale-[0.98] flex items-center gap-1.5";
-                      const colorClass = p.isTransport 
-                        ? 'bg-blue-600/40 border-l-2 border-blue-400 text-blue-50' 
-                        : p.isAccommodation 
-                        ? 'bg-emerald-600/40 border-l-2 border-emerald-400 text-emerald-50'
-                        : 'bg-primary/20 border-l-2 border-primary text-primary';
-
-                      return (
-                        <div 
-                          key={p.id}
-                          onClick={() => onPlaceClick(p)}
-                          className={`${baseClass} ${colorClass} ${!isStart && isMultiDay ? 'opacity-70 border-dashed' : ''}`}
-                        >
-                          <span className="text-xs leading-none shrink-0">{p.emoji}</span>
-                          <span className="truncate">{p.name}</span>
-                          {p.arrival && !isMultiDay && <span className="text-[7px] ml-auto opacity-60 font-black">{formatTime(p.arrival, timeFormat)}</span>}
-                        </div>
-                      )
-                    })}
-                    {dayPlaces.length > 4 && (
-                      <div className="px-2 py-0.5 text-[8px] font-black text-neutral-500 uppercase tracking-wider">
-                        + {dayPlaces.length - 4} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="flex h-full min-h-[800px] overflow-x-auto no-scrollbar scroll-smooth">
-            {/* Time Indicators */}
-            <div className="w-14 sm:w-16 shrink-0 border-r border-white/10 bg-white/5 sticky left-0 z-30">
-              <div className="h-12 border-b border-white/10" />
-              {hours.map(h => (
-                <div key={h} className="h-12 border-b border-white/5 p-1 sm:p-2 text-right bg-black/20 backdrop-blur-md">
-                  <span className="text-[9px] sm:text-[10px] font-black text-neutral-500 uppercase">
-                    {format(new Date().setHours(h, 0), timeFormat === '12h' ? 'ha' : 'HH:mm')}
-                  </span>
-                </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="grid grid-cols-7 border-b border-white/10 sticky top-0 z-20 bg-black/60 backdrop-blur-xl">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                <div key={d} className="p-3 text-center text-[10px] font-black text-neutral-500 uppercase tracking-widest">{d}</div>
               ))}
             </div>
-
-            {/* Day Columns */}
-            <div 
-              className="flex-1 grid min-w-[300px] sm:min-w-0" 
-              style={{ 
-                gridTemplateColumns: `repeat(${days.length}, minmax(${view === 'day' ? '100%' : '140px'}, 1fr))`,
-                minWidth: view === 'day' ? '100%' : `${days.length * 140}px`
-              }}
-            >
+            <div className="grid grid-cols-7 min-h-full">
               {days.map((day) => {
                 const dayNum = getDayNumber(day)
-                const isToday = isSameDay(day, new Date())
-                // Include places that start today OR are currently active from a previous start
                 const dayPlaces = places.filter(p => p.day === dayNum || (dayNum > (p.day || 0) && dayNum <= (p.endDay || p.day || 0)))
-                const timedPlaces = dayPlaces.filter(p => p.arrival && p.departure)
-                const allDayPlaces = dayPlaces.filter(p => !p.arrival || !p.departure || (p.endDay && p.endDay > (p.day || 0)))
-                
-                // Identify a 'Main Focus' or 'Accommodation' for the day to serve as backdrop
-                const backdropPlace = allDayPlaces.find(p => p.isAccommodation || p.name.toLowerCase().includes('hotel') || p.name.toLowerCase().includes('stay')) || allDayPlaces[0]
-                const otherAllDay = allDayPlaces.filter(p => p.id !== backdropPlace?.id)
+                const isCurrentMonth = isSameMonth(day, currentDate)
+                const isToday = isSameDay(day, new Date())
 
                 return (
-                  <div key={day.toString()} className="border-r border-white/10 relative group">
-                    <div className={`h-14 border-b border-white/10 flex flex-col items-center justify-center bg-black/40 sticky top-0 z-20 backdrop-blur-md ${isToday ? 'after:content-[""] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}>
-                      <span className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? 'text-primary' : 'text-neutral-500'}`}>{format(day, 'EEE')}</span>
-                      <div className={`text-lg font-normal transition-all ${isToday ? 'text-primary' : 'text-white'}`}>
+                  <div key={day.toString()} className={`min-h-[140px] border-r border-b border-white/5 p-1 transition-colors hover:bg-white/[0.02] group ${!isCurrentMonth ? 'bg-black/10 opacity-20' : ''}`}>
+                    <div className="flex justify-between items-start p-1.5 mb-1">
+                      <span className={`text-xs font-black px-1.5 py-0.5 rounded-full ${isToday ? 'bg-primary text-black shadow-[0_0_15px_rgba(143,245,255,0.5)]' : 'text-neutral-500'}`}>
                         {format(day, 'd')}
-                      </div>
+                      </span>
                     </div>
+                    <div className="space-y-1">
+                      {allItems.filter(item => {
+                        const d = getDayNumber(day)
+                        return d >= item.day && d <= item.endDay
+                      }).slice(0, 4).map(item => {
+                        const d = getDayNumber(day)
+                        const isStart = d === item.day
+                        const isEnd = d === item.endDay
+                        const isMultiDay = item.day !== item.endDay
 
-                    {/* All-day Section */}
-                    <div className="min-h-[20px] border-b border-white/10 bg-white/[0.02] p-1 space-y-1">
-                      {otherAllDay.map(p => (
-                        <div 
-                          key={p.id}
-                          onClick={() => onPlaceClick(p)}
-                          className="px-2 py-0.5 rounded bg-primary text-black text-[9px] font-black truncate cursor-pointer hover:opacity-80 transition-all shadow-sm"
-                        >
-                          {p.emoji} {p.name}
-                        </div>
-                      ))}
-                    </div>
+                        let roundingClass = 'rounded-md'
+                        if (isMultiDay) {
+                          if (isStart) roundingClass = 'rounded-l-md rounded-r-none'
+                          else if (isEnd) roundingClass = 'rounded-r-md rounded-l-none'
+                          else roundingClass = 'rounded-none'
+                        }
 
-                    <div className="relative h-full bg-white/[0.01]">
-                      {/* Day Backdrop Place */}
-                      {backdropPlace && (
-                        <div 
-                          className="absolute inset-0 z-0 opacity-[0.15] sm:opacity-[0.18] pointer-events-none p-2 sm:p-4 overflow-hidden flex flex-col justify-center items-center text-center select-none"
-                          onClick={() => onPlaceClick(backdropPlace)}
-                        >
-                           <div className="flex flex-col items-center gap-1 sm:gap-2 max-w-full">
-                             <span className="text-3xl sm:text-6xl drop-shadow-2xl">{backdropPlace.emoji}</span>
-                             <h3 className="text-lg sm:text-3xl font-black uppercase tracking-tight sm:tracking-tighter text-white leading-tight break-words px-2">{backdropPlace.name}</h3>
-                             <div className="h-px w-12 bg-white/20 my-1 hidden sm:block" />
-                             {backdropPlace.location && (
-                               <p className="text-[8px] sm:text-[11px] font-black text-white/60 uppercase tracking-widest hidden sm:line-clamp-2">{backdropPlace.location}</p>
-                             )}
-                           </div>
-                        </div>
-                      )}
-                      {/* Current Time Line */}
-                      {isToday && (
-                        <div 
-                          className="absolute left-0 right-0 z-[15] pointer-events-none flex items-center"
-                          style={{ top: `${nowTop}px` }}
-                        >
-                          <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-                          <div className="flex-1 h-px bg-red-500/60 shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
-                        </div>
-                      )}
-
-                      {/* Hour grids */}
-                      {hours.map(h => (
-                        <div key={h} className="h-12 border-b border-white/[0.03] group/hour relative">
-                          <div className="absolute top-1/2 left-0 right-0 h-[0.5px] border-t border-dashed border-white/[0.01] pointer-events-none" />
-                        </div>
-                      ))}
-
-                      {/* Timed Places */}
-                      {timedPlaces.map(p => {
-                        const [startH, startM] = (p.arrival || '09:00').split(':').map(Number)
-                        const [endH, endM] = (p.departure || '17:00').split(':').map(Number)
-                        const top = (startH * 48) + (startM / 60 * 48)
-                        const height = Math.max(32, ((endH * 48) + (endM / 60 * 48)) - top)
-                        
-                        const colorClass = p.isTransport 
-                          ? 'bg-blue-600/40 border-blue-400/50 text-blue-50' 
-                          : p.isAccommodation 
-                          ? 'bg-emerald-600/40 border-emerald-400/50 text-emerald-50'
-                          : 'bg-primary/40 border-primary/50 text-white'
+                        // Add negative margin to connect across cell gaps
+                        const marginClass = isMultiDay ? (isStart ? 'mr-[-8px] pr-3 z-10' : isEnd ? 'ml-[-8px] pl-3 z-10' : 'mx-[-8px] px-3 z-10') : ''
 
                         return (
                           <div 
-                            key={p.id}
-                            onClick={() => onPlaceClick(p)}
-                            className={`absolute left-[2px] right-[2px] rounded-md border px-2 py-1.5 shadow-md cursor-pointer hover:brightness-125 transition-all z-10 overflow-hidden ${colorClass}`}
-                            style={{ top: `${top}px`, height: `${height}px` }}
+                            key={item.id} 
+                            onClick={() => onPlaceClick(item.data)} 
+                            className={`px-2 py-1 text-[9px] font-bold truncate cursor-pointer transition-all active:scale-[0.98] flex items-center gap-1.5 relative ${roundingClass} ${marginClass} ${getTypeStyles(item.type, item.isLive)}`}
                           >
-                            <div className="flex flex-col h-full overflow-hidden">
-                              <div className="flex items-center gap-1.5 min-w-0 mb-0.5">
-                                <span className="text-xs shrink-0">{p.emoji}</span>
-                                <p className="text-[10px] font-bold truncate leading-none">{p.name}</p>
-                              </div>
-                              
-                              {height > 40 && (
-                                <p className="text-[9px] opacity-80 font-medium truncate leading-none">
-                                  {formatTime(p.arrival, timeFormat)} - {formatTime(p.departure, timeFormat)}
-                                </p>
-                              )}
-                              
-                              {height > 80 && p.location && (
-                                <div className="mt-1.5 flex items-center gap-1 opacity-70">
-                                  <span className="material-symbols-outlined text-[10px]">location_on</span>
-                                  <p className="text-[9px] truncate">{p.location}</p>
-                                </div>
-                              )}
-                            </div>
+                            {(isStart || !isMultiDay) && (
+                              <span className="text-xs shrink-0">{item.emoji.length > 2 ? <span className="material-symbols-outlined text-[12px]">{item.emoji}</span> : item.emoji}</span>
+                            )}
+                            <span className="truncate">{(isStart || !isMultiDay) ? item.name : '\u00A0'}</span>
+                            {item.isLive && isStart && <div className="w-1 h-1 bg-primary rounded-full animate-pulse ml-auto" />}
                           </div>
                         )
                       })}
-
-                      <button 
-                        onClick={() => onAddPlace(dayNum)}
-                        className="absolute inset-x-0 bottom-4 mx-auto w-10 h-10 rounded-full bg-primary text-black opacity-0 group-hover:opacity-100 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                      >
-                        <span className="material-symbols-outlined">add</span>
-                      </button>
                     </div>
                   </div>
                 )
               })}
             </div>
           </div>
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Header / Day Names */}
+            <div className="flex border-b border-white/10 bg-black/40 backdrop-blur-xl z-30">
+              <div className="w-16 shrink-0 border-r border-white/10" />
+              <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
+                {days.map((day) => {
+                  const isToday = isSameDay(day, new Date())
+                  return (
+                    <div key={day.toString()} className="p-3 flex flex-col items-center justify-center border-r border-white/5">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest ${isToday ? 'text-primary' : 'text-neutral-500'}`}>{format(day, 'EEE')}</span>
+                      <span className={`text-xl font-bold mt-1 ${isToday ? 'bg-primary text-black w-10 h-10 flex items-center justify-center rounded-full shadow-[0_0_20px_rgba(143,245,255,0.4)]' : 'text-white'}`}>{format(day, 'd')}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* All-day Events Section */}
+            <div className="flex border-b border-white/10 bg-white/[0.02] min-h-[40px] z-20">
+              <div className="w-16 shrink-0 border-r border-white/10 flex items-center justify-center">
+                <span className="text-[8px] font-black text-neutral-600 uppercase tracking-tighter">All-day</span>
+              </div>
+              <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
+                {days.map((day) => {
+                  const dayNum = getDayNumber(day)
+                  const allDayItems = allItems.filter(item => 
+                    item.allDay && dayNum >= item.day && dayNum <= item.endDay
+                  )
+                  return (
+                    <div key={day.toString()} className="p-1 space-y-1 border-r border-white/5">
+                      {allDayItems.map(item => (
+                        <div key={item.id} onClick={() => onPlaceClick(item.data)} className={`px-2 py-1 rounded border-l-2 text-[9px] font-bold truncate cursor-pointer hover:brightness-125 transition-all flex items-center gap-1.5 ${getTypeStyles(item.type, item.isLive)}`}>
+                          {item.emoji && item.emoji.length > 2 ? (
+                            <span className="material-symbols-outlined text-[12px]">{item.emoji}</span>
+                          ) : (
+                            <span>{item.emoji}</span>
+                          )}
+                          <span className="truncate">{item.name}</span>
+                          {item.isLive && <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse ml-auto" />}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Timed Grid */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative flex bg-black/20">
+              {/* Time Column */}
+              <div className="w-16 shrink-0 border-r border-white/10 sticky left-0 z-10 bg-black/40 backdrop-blur-xl">
+                {hours.map(h => (
+                  <div key={h} className="h-12 border-b border-white/5 px-2 text-right">
+                    <span className="text-[9px] font-black text-neutral-600 uppercase">
+                      {format(new Date().setHours(h, 0), timeFormat === '12h' ? 'ha' : 'HH:mm')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid Content */}
+              <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
+                {days.map((day) => {
+                  const dayNum = getDayNumber(day)
+                  const isToday = isSameDay(day, new Date())
+                  const placeItems = allItems.filter(item => 
+                    item.type === 'place' && !item.allDay && dayNum >= item.day && dayNum <= item.endDay &&
+                    item.startTime && item.endTime
+                  )
+                  const timedItems = allItems.filter(item => 
+                    item.type !== 'place' && !item.allDay && dayNum >= item.day && dayNum <= item.endDay &&
+                    item.startTime && item.endTime
+                  )
+                  
+                  const positionedItems = getEventPositions(timedItems)
+
+                  return (
+                    <div key={day.toString()} className="relative border-r border-white/5 min-h-[1152px]">
+                      {/* Hour lines */}
+                      {hours.map(h => (
+                        <div key={h} className="h-12 border-b border-white/[0.03] w-full" />
+                      ))}
+
+                      {/* Now Indicator */}
+                      {isToday && (
+                        <div className="absolute left-0 right-0 z-30 pointer-events-none flex items-center" style={{ top: `${nowTop}px` }}>
+                          <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-[0_0_10px_#ef4444]" />
+                          <div className="flex-1 h-px bg-red-500/60" />
+                        </div>
+                      )}
+
+                      {/* Places Backgrounds */}
+                      {placeItems.map(item => {
+                        const [startH, startM] = (item.startTime || '00:00').split(':').map(Number)
+                        const [endH, endM] = (item.endTime || '23:59').split(':').map(Number)
+                        const top = (startH * 48) + (startM / 60 * 48)
+                        const height = Math.max(24, ((endH * 48) + (endM / 60 * 48)) - top)
+
+                        return (
+                          <div 
+                            key={`${item.type}-${item.id}-${dayNum}`}
+                            onClick={() => onPlaceClick(item.data)}
+                            className={`absolute rounded-lg border p-2 shadow-xl cursor-pointer hover:brightness-110 transition-all z-0 overflow-hidden ${getTypeStyles(item.type, item.isLive)}`}
+                            style={{ 
+                              top: `${top}px`, 
+                              height: `${height}px`,
+                              left: '0%',
+                              width: '100%' 
+                            }}
+                          >
+                            <div className="flex flex-col h-full">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[10px] font-black truncate leading-none">{item.name}</span>
+                              </div>
+                              {height > 30 && (
+                                <span className="text-[8px] font-bold opacity-60 mt-0.5">
+                                  {formatTime(item.startTime, timeFormat)}
+                                  {height > 45 && item.endTime && ` - ${formatTime(item.endTime, timeFormat)}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* Events */}
+                      {positionedItems.map(item => {
+                        const [startH, startM] = (item.startTime || '09:00').split(':').map(Number)
+                        const [endH, endM] = (item.endTime || '10:00').split(':').map(Number)
+                        const top = (startH * 48) + (startM / 60 * 48)
+                        const height = Math.max(24, ((endH * 48) + (endM / 60 * 48)) - top)
+                        
+                        const left = (item.colIndex / item.totalCols) * 100
+                        const width = (1 / item.totalCols) * 100
+
+                        return (
+                          <div 
+                            key={`${item.type}-${item.id}-${dayNum}`}
+                            onClick={() => onPlaceClick(item.data)}
+                            className={`absolute rounded-lg border p-2 shadow-xl cursor-pointer hover:brightness-125 transition-all z-10 overflow-hidden ${getTypeStyles(item.type, item.isLive)}`}
+                            style={{ 
+                              top: `${top}px`, 
+                              height: `${height}px`,
+                              left: `${left + 2}%`, // Indent slightly so place background is visible
+                              width: `${width - 3}%` 
+                            }}
+                          >
+                            <div className="flex flex-col h-full">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="shrink-0 flex items-center justify-center">
+                                  {item.emoji && item.emoji.length > 2 ? (
+                                    <span className="material-symbols-outlined text-sm leading-none">{item.emoji}</span>
+                                  ) : (
+                                    <span className="text-xs leading-none">{item.emoji}</span>
+                                  )}
+                                </span>
+                                <span className="text-[10px] font-black truncate leading-none">{item.name}</span>
+                                {item.isLive && (
+                                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse ml-auto" />
+                                )}
+                              </div>
+                              {height > 30 && (
+                                <span className="text-[8px] font-bold opacity-60 mt-0.5">
+                                  {formatTime(item.startTime, timeFormat)}
+                                  {height > 45 && item.endTime && ` - ${formatTime(item.endTime, timeFormat)}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Floating Add Button for Calendar Mode */}
+      {/* Floating Add Button */}
       <div className="fixed bottom-10 right-10 z-[100] no-print">
         <button
           onClick={() => onAddPlace(getDayNumber(currentDate))}

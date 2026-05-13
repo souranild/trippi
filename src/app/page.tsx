@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTrips } from '@/context/TripContext'
 import type { Trip } from '@/lib/storage'
 import dynamic from 'next/dynamic'
@@ -14,6 +14,7 @@ import AppHeader from '@/components/AppHeader'
 
 import MapSlot from '@/components/Map/MapSlot'
 import { useMapContext } from '@/context/MapContext'
+import { getLiveStatus } from '@/lib/live-status'
 
 
 function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[] }) {
@@ -111,6 +112,9 @@ export default function Home() {
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false)
   const [isMobileMapClosing, setIsMobileMapClosing] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(66.6); // Percentage, default to ~2/3
+  const [isResizing, setIsResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Handle mobile detection (below md breakpoint)
   useEffect(() => {
@@ -167,6 +171,11 @@ export default function Home() {
   const hasMoreUpcoming = upcomingTrips.length > 3
   const hasMorePast = pastTrips.length > 3
 
+  const liveStatus = useMemo(() => {
+    if (!currentTrip) return null
+    return getLiveStatus(currentTrip)
+  }, [currentTrip, now])
+
   return (
     <div className="min-h-screen text-white">
       <AppHeader
@@ -189,134 +198,170 @@ export default function Home() {
         ) : (
           <div className="space-y-8">
 
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
-            {/* Left Column: Adventures (spans 2/3 on large, full on tablet) */}
-            <div className="md:col-span-1 lg:col-span-2 space-y-8 sm:space-y-12">
-              {/* Current Adventure */}
-              {currentTrip && (
-                <div className="animate-fade-in">
-                  <div className="flex items-baseline justify-between mb-4">
-                    <h2 className="text-label text-primary font-bold">
-                      Current Adventure
-                    </h2>
-                    <span className="material-symbols-outlined text-base text-primary animate-pulse">
-                      circle
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:gap-6 overflow-visible">
-                    <div className="flex flex-col">
-                      <HeroTripCard trip={currentTrip} />
-                      <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
+            <div 
+              ref={containerRef}
+              className={`grid grid-cols-1 lg:grid-cols-[var(--left-width)_minmax(0,1fr)] min-w-0 gap-0 items-start relative transition-all duration-700 ${isResizing ? 'select-none cursor-col-resize' : ''}`}
+              style={{ '--left-width': !isMobile ? `${leftPanelWidth}%` : '100%' } as React.CSSProperties}
+            >
+              {isResizing && (
+                <div 
+                  className="fixed inset-0 z-[1000] cursor-col-resize select-none"
+                  onPointerMove={(e) => {
+                    if (!containerRef.current) return;
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+                    if (newWidth > 20 && newWidth < 80) {
+                      setLeftPanelWidth(newWidth);
+                      window.dispatchEvent(new Event('resize'));
+                    }
+                  }}
+                  onPointerUp={() => setIsResizing(false)}
+                />
+              )}
+
+              {/* Left Column: Adventures */}
+              <div className="lg:pr-6 space-y-8 sm:space-y-12 min-w-0 overflow-hidden">
+                {/* Current Adventure */}
+                {currentTrip && (
+                  <div className="animate-fade-in">
+                    <div className="flex items-baseline justify-between mb-4">
+                      <h2 className="text-label text-primary font-bold">
+                        Current Adventure
+                      </h2>
+                      <span className="material-symbols-outlined text-base text-primary animate-pulse">
+                        circle
+                      </span>
+                    </div>
+                    <div className="flex flex-col space-y-4 overflow-visible">
+                      <HeroTripCard trip={currentTrip} liveStatus={liveStatus} />
+                      <div className="px-2 text-xs font-medium text-neutral-400 text-center">
                         {new Date(currentTrip.startDate).getFullYear()}
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Upcoming Adventures */}
-              {upcomingTrips.length > 0 ? (
-                <div className="animate-fade-in">
-                  <div className="flex items-baseline justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-label text-secondary font-bold">
-                        Upcoming Adventures
-                      </h2>
-                      <span className="material-symbols-outlined text-base text-secondary">flight_takeoff</span>
+                {/* Upcoming Adventures */}
+                {upcomingTrips.length > 0 ? (
+                  <div className="animate-fade-in">
+                    <div className="flex items-baseline justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-label text-secondary font-bold">
+                          Upcoming Adventures
+                        </h2>
+                        <span className="material-symbols-outlined text-base text-secondary">flight_takeoff</span>
+                      </div>
+                      <span className="text-caption text-neutral-500">{upcomingTrips.length} {upcomingTrips.length === 1 ? 'trip' : 'trips'}</span>
                     </div>
-                    <span className="text-caption text-neutral-500">{upcomingTrips.length} {upcomingTrips.length === 1 ? 'trip' : 'trips'}</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
-                    {upcomingTrips.slice(0, hasMoreUpcoming ? 2 : 3).map((trip) => (
-                      <div key={trip.id} className="animate-fade-in flex flex-col">
-                        <TripCard trip={trip} className="flex-1" />
-                        <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
-                          {new Date(trip.startDate).getFullYear()}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
+                      {upcomingTrips.slice(0, hasMoreUpcoming ? 2 : 3).map((trip) => (
+                        <div key={trip.id} className="animate-fade-in flex flex-col">
+                          <TripCard trip={trip} className="flex-1" />
+                          <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
+                            {new Date(trip.startDate).getFullYear()}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {hasMoreUpcoming && (
-                      <div className="animate-fade-in flex flex-col">
-                        <MoreTripsCard 
-                          count={upcomingTrips.length - 2} 
-                          type="upcoming" 
-                          href="/adventures?status=upcoming&sort=oldest" 
-                        />
-                        <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : trips.length < 3 && (
-                <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-4xl text-neutral-600">add_location_alt</span>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Next Destination?</h4>
-                    <p className="text-xs text-neutral-500">Plan your next adventure and see it countdown here.</p>
-                  </div>
-                  <Link href="/trip/new" className="text-[10px] font-black uppercase tracking-widest text-secondary hover:text-white transition-colors">
-                    Plan Now
-                  </Link>
-                </div>
-              )}
-
-              {/* Past Adventures */}
-              {pastTrips.length > 0 ? (
-                <div className="animate-fade-in">
-                  <div className="flex items-baseline justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-label text-neutral-400 font-bold">
-                        Past Adventures
-                      </h2>
-                      <Link
-                        href="/adventures?status=past&sort=newest"
-                        className="p-1.5 text-neutral-500 hover:text-[#c3f400] hover:bg-white/5 rounded-lg transition-all duration-300"
-                        title="View all adventures"
-                      >
-                        <span className="material-symbols-outlined text-base">arrow_forward</span>
-                      </Link>
+                      ))}
+                      {hasMoreUpcoming && (
+                        <div className="animate-fade-in flex flex-col">
+                          <MoreTripsCard 
+                            count={upcomingTrips.length - 2} 
+                            type="upcoming" 
+                            href="/adventures?status=upcoming&sort=oldest" 
+                          />
+                          <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-caption text-neutral-500">{pastTrips.length} {pastTrips.length === 1 ? 'trip' : 'trips'}</span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
-                    {pastTrips.slice(0, hasMorePast ? 2 : 3).map((trip) => (
-                      <div key={trip.id} className="animate-fade-in flex flex-col">
-                        <TripCard trip={trip} className="flex-1" />
-                        <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
-                          {new Date(trip.startDate).getFullYear()}
+                ) : trips.length < 3 && (
+                  <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
+                    <span className="material-symbols-outlined text-4xl text-neutral-600">add_location_alt</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Next Destination?</h4>
+                      <p className="text-xs text-neutral-500">Plan your next adventure and see it countdown here.</p>
+                    </div>
+                    <Link href="/trip/new" className="text-[10px] font-black uppercase tracking-widest text-secondary hover:text-white transition-colors">
+                      Plan Now
+                    </Link>
+                  </div>
+                )}
+
+                {/* Past Adventures */}
+                {pastTrips.length > 0 ? (
+                  <div className="animate-fade-in">
+                    <div className="flex items-baseline justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-label text-neutral-400 font-bold">
+                          Past Adventures
+                        </h2>
+                        <Link
+                          href="/adventures?status=past&sort=newest"
+                          className="p-1.5 text-neutral-500 hover:text-[#c3f400] hover:bg-white/5 rounded-lg transition-all duration-300"
+                          title="View all adventures"
+                        >
+                          <span className="material-symbols-outlined text-base">arrow_forward</span>
+                        </Link>
+                      </div>
+                      <span className="text-caption text-neutral-500">{pastTrips.length} {pastTrips.length === 1 ? 'trip' : 'trips'}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 overflow-visible">
+                      {pastTrips.slice(0, hasMorePast ? 2 : 3).map((trip) => (
+                        <div key={trip.id} className="animate-fade-in flex flex-col">
+                          <TripCard trip={trip} className="flex-1" />
+                          <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
+                            {new Date(trip.startDate).getFullYear()}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {hasMorePast && (
-                      <div className="animate-fade-in flex flex-col">
-                        <MoreTripsCard 
-                          count={pastTrips.length - 2} 
-                          type="past" 
-                          href="/adventures?status=past&sort=newest" 
-                        />
-                        <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
-                      </div>
-                    )}
+                      ))}
+                      {hasMorePast && (
+                        <div className="animate-fade-in flex flex-col">
+                          <MoreTripsCard 
+                            count={pastTrips.length - 2} 
+                            type="past" 
+                            href="/adventures?status=past&sort=newest" 
+                          />
+                          <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : trips.length < 3 && (
-                <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-4xl text-neutral-600">history</span>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Your Travel Legacy</h4>
-                    <p className="text-xs text-neutral-500">Completed trips will appear here to relive your memories.</p>
+                ) : trips.length < 3 && (
+                  <div className="p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center text-center space-y-3 opacity-50 hover:opacity-100 transition-opacity">
+                    <span className="material-symbols-outlined text-4xl text-neutral-600">history</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Your Travel Legacy</h4>
+                      <p className="text-xs text-neutral-500">Completed trips will appear here to relive your memories.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Resize Handle */}
+              {!isMobile && (
+                <div 
+                  className={`hidden lg:flex absolute top-0 bottom-0 z-50 cursor-col-resize group items-center justify-center w-8 -translate-x-1/2 hover:opacity-100 transition-opacity ${isResizing ? 'opacity-100' : 'opacity-0'}`}
+                  style={{ left: `${leftPanelWidth}%` }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setIsResizing(true);
+                  }}
+                >
+                  <div className={`w-0.5 h-full transition-colors ${isResizing ? 'bg-primary' : 'bg-primary/20 group-hover:bg-primary/50'} shadow-[0_0_15px_rgba(143,245,255,0.3)]`} />
+                  <div className="absolute top-1/2 -translate-y-1/2 w-6 h-10 rounded-full bg-neutral-900 border border-white/10 flex flex-col items-center justify-center gap-0.5 shadow-xl">
+                    <div className="w-0.5 h-3 bg-white/20 rounded-full" />
+                    <div className="w-0.5 h-3 bg-white/20 rounded-full" />
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Right Column: Global Footprint (always shown on md+) */}
-            <div className="hidden md:block">
-              <div className="sticky top-28">
-                <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} />
+              {/* Right Column: Global Footprint (Map) */}
+              <div className="hidden lg:block min-w-0 lg:pl-6">
+                <div className="sticky top-28">
+                  <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} />
+                </div>
               </div>
             </div>
-          </div>
         </div>
         )}
 

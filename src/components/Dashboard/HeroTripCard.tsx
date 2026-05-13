@@ -3,14 +3,16 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Trip } from '@/lib/storage'
-import { formatDuration } from '@/lib/date-utils'
+import { formatDuration, formatTime } from '@/lib/date-utils'
+import { LiveStatus, LiveStatusItem } from '@/lib/live-status'
 
 interface HeroTripCardProps {
   trip: Trip
+  liveStatus?: LiveStatus | null
   className?: string
 }
 
-export default function HeroTripCard({ trip, className = '' }: HeroTripCardProps) {
+export default function HeroTripCard({ trip, liveStatus, className = '' }: HeroTripCardProps) {
   const router = useRouter()
   const [isHovered, setIsHovered] = useState(false)
   
@@ -101,8 +103,81 @@ export default function HeroTripCard({ trip, className = '' }: HeroTripCardProps
           </div>
         </div>
 
+        {/* Live Track / Upcoming */}
+        {liveStatus && liveStatus.timeline.length > 0 && (
+          <div className="shrink-0 w-full md:w-[340px] bg-white/[0.03] backdrop-blur-md rounded-[2rem] border border-white/5 p-6 space-y-5 flex flex-col group/live animate-in slide-in-from-right-10 duration-1000">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <span className="material-symbols-outlined text-primary text-xl animate-pulse">radar</span>
+                  <div className="absolute inset-0 bg-primary/20 blur-lg animate-pulse" />
+                </div>
+                <span className="text-[11px] font-black text-white/40 uppercase tracking-[0.2em]">Live Track</span>
+              </div>
+              <div className="px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                <span className="text-[9px] font-black text-primary uppercase">Day {liveStatus.currentDay}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 flex-1 overflow-visible">
+              {liveStatus.timeline.map((item, idx) => (
+                <div 
+                  key={`${item.type}-${idx}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const baseUrl = `/trip/${trip.id}`
+                    let targetUrl = baseUrl
+                    if (item.type === 'place') targetUrl += `?openPlace=${item.data.id}`
+                    else if (item.type === 'event') targetUrl += `?openPlace=${item.data.placeId || item.data.id}&openEvent=${item.data.id}`
+                    else if (item.type === 'accommodation') targetUrl += `?openPlace=${item.data.placeId || item.data.id}&openAccommodation=${item.data.id}`
+                    else if (item.type === 'transport') targetUrl += `?openTransport=${item.data.id}`
+                    router.push(targetUrl)
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-2xl transition-all cursor-pointer border ${
+                    item.status === 'now' 
+                      ? 'bg-primary/10 border-primary/20 shadow-lg shadow-primary/5' 
+                      : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10'
+                  }`}
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-500 group-hover/live:scale-110 ${
+                    item.status === 'now' ? 'bg-primary text-black' : 'bg-white/10 text-white/60'
+                  }`}>
+                    <span className="material-symbols-outlined text-lg">
+                      {item.type === 'place' ? 'location_on' : 
+                       item.type === 'transport' ? 'commute' : 
+                       item.type === 'event' ? 'flag' : 'bed'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-xs font-black truncate leading-none ${item.status === 'now' ? 'text-white' : 'text-white/60'}`}>
+                        {item.type === 'place' ? item.data.name : 
+                         item.type === 'event' ? item.data.title : 
+                         item.type === 'accommodation' ? item.data.name : 
+                         item.type === 'transport' ? (item.data.title || `${item.data.fromLocation || 'Start'} → ${item.data.toLocation || 'End'}`) : 
+                         item.data.type || 'Travel'}
+                      </p>
+                      {item.status === 'now' && (
+                        <div className="flex gap-0.5">
+                          {[1,2,3].map(i => <div key={i} className={`w-1 h-1 bg-primary rounded-full animate-pulse`} style={{ animationDelay: `${i * 0.2}s` }} />)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="material-symbols-outlined text-[10px] text-white/20">schedule</span>
+                      <p className="text-[10px] font-black text-white/30 uppercase tracking-wider">
+                        {formatTime(item.startTime, '12h')} {item.endTime ? `→ ${formatTime(item.endTime, '12h')}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action Button */}
-        <div className="shrink-0 flex items-center md:pb-4">
+        <div className="shrink-0 flex items-center md:pb-4 ml-auto">
           <div className="w-16 h-16 rounded-full bg-primary text-black flex items-center justify-center shadow-[0_0_30px_rgba(143,245,255,0.4)] group-hover:scale-110 transition-transform duration-500">
             <span className="material-symbols-outlined text-3xl font-bold">arrow_forward</span>
           </div>

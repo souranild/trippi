@@ -171,7 +171,7 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Your traveler name"
-                          className="w-full bg-slate-800/10 border-b-2 border-primary focus:border-cyan-400 p-2 text-center text-2xl font-bold text-white focus:outline-none transition-all placeholder:text-neutral-600"
+                          className="w-full bg-transparent border-b-2 border-primary/30 focus:border-cyan-400 px-1 py-2 text-center text-xl font-bold text-white focus:outline-none transition-all placeholder:text-neutral-600"
                           maxLength={25}
                         />
                       </div>

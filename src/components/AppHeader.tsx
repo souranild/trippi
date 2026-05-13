@@ -78,7 +78,7 @@ export default function AppHeader({ left, center, extraRight, onBack, className 
                 className="group-hover:scale-110 transition-transform bg-transparent shadow-none w-6 h-6 sm:w-8 sm:h-8"
               />
             </div>
-            <span className="hidden sm:inline text-xs sm:text-sm font-bold text-white pr-1 group-hover:text-cyan-400 transition-colors truncate max-w-[80px] lg:max-w-[120px]">
+            <span className="hidden sm:inline text-xs sm:text-sm font-bold text-white pr-1 group-hover:text-cyan-400 transition-colors truncate max-w-[120px] lg:max-w-[200px]">
               {userProfile.name}
             </span>
           </button>

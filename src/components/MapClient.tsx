@@ -1204,130 +1204,138 @@ export default function MapClient({
           })
         })()}
 
-          {polylineCoords.length > 1 && (
-            <Fragment>
-              <Polyline
-                positions={polylineCoords}
-                color="#8ff5ff"
-                weight={3}
-                opacity={0.6}
-                dashArray="2, 10"
-                lineCap="round"
-                className={`animated-polyline transition-all duration-300 ${hoveredPlaceId ? 'opacity-30' : 'opacity-60'}`}
-              />
-              {/* Added a secondary glow polyline for better visibility in all themes */}
-              <Polyline
-                positions={polylineCoords}
-                color="#8ff5ff"
-                weight={8}
-                opacity={0.2}
-                lineCap="round"
-                className="path-glow"
-              />
-              <Polyline
-                positions={polylineCoords}
-                color="#8ff5ff"
-                weight={3}
-                opacity={0.8}
-                dashArray="1, 12"
-                lineCap="round"
-                className="animated-path"
-              />
-              {/* Added a secondary glow polyline for overall path but thinner */}
-              {(() => {
-                const segments = []
-                const sorted = [...validPlaces].sort((a, b) => (a.day || 0) - (b.day || 0))
-                for (let i = 0; i < sorted.length - 1; i++) {
-                  const p1 = sorted[i]
-                  const p2 = sorted[i + 1]
-                  const start: [number, number] = [Number(p1.lat), Number(p1.lng)]
-                  const end: [number, number] = [Number(p2.lat), Number(p2.lng)]
-                  
-                  if (isNaN(start[0]) || isNaN(start[1]) || isNaN(end[0]) || isNaN(end[1])) continue;
+          {(() => {
+            const sorted = [...validPlaces].sort((a, b) => (a.day || 0) - (b.day || 0))
+            if (sorted.length < 2) return null;
 
-                  const mid: [number, number] = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
-                  
-                  const angle = getRotation(start, end)
-                  
-                  // Enhanced transport lookup: check both places and allow for partial matches
-                  const transport = p1.transport?.find(t => 
-                    t.to === p2.id || 
-                    t.to?.toLowerCase() === p2.name?.toLowerCase() ||
-                    p2.transport?.some(st => st.from === p1.id && st.to === p2.id)
-                  ) || p2.transport?.find(t => 
-                    t.from === p1.id || 
-                    t.from?.toLowerCase() === p1.name?.toLowerCase()
-                  );
-                  
-                  const icon = transport ? transportModeIcon(transport.type) : null
-                  const isLiveTransport = transport?.id && liveTransportId && transport.id === liveTransportId;
-                  const isFocusedTransport = transport?.id && focusedTransportId && transport.id === focusedTransportId;
-                  
-                  // Use persisted distance if available, otherwise calculate it
-                  let distance = transport?.distance;
-                  if (!distance && !isNaN(start[0]) && !isNaN(start[1]) && !isNaN(end[0]) && !isNaN(end[1])) {
-                    const distKm = calculateDistance(start[0], start[1], end[0], end[1]);
-                    distance = distKm > 0 ? `${distKm.toFixed(1)} km` : undefined;
-                  }
-                  
-                  segments.push({ 
-                    mid, 
-                    angle, 
-                    icon, 
-                    id: `${p1.id}-${p2.id}`, 
-                    transportTitle: transport?.title, 
-                    isLive: isLiveTransport,
-                    isFocused: isFocusedTransport,
-                    distance,
-                    transport,
-                    fromName: p1.name,
-                    toName: p2.name
-                  })
-                }
-                
-                return segments.map(seg => {
+            const segments = []
+            for (let i = 0; i < sorted.length - 1; i++) {
+              const p1 = sorted[i]
+              const p2 = sorted[i + 1]
+              const start: [number, number] = [Number(p1.lat), Number(p1.lng)]
+              const end: [number, number] = [Number(p2.lat), Number(p2.lng)]
+              
+              if (isNaN(start[0]) || isNaN(start[1]) || isNaN(end[0]) || isNaN(end[1])) continue;
+
+              const mid: [number, number] = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]
+              const angle = getRotation(start, end)
+              
+              const transport = p1.transport?.find(t => 
+                t.to === p2.id || 
+                t.to?.toLowerCase() === p2.name?.toLowerCase() ||
+                p2.transport?.some(st => st.from === p1.id && st.to === p2.id)
+              ) || p2.transport?.find(t => 
+                t.from === p1.id || 
+                t.from?.toLowerCase() === p1.name?.toLowerCase()
+              );
+              
+              const icon = transport ? transportModeIcon(transport.type) : null
+              const isLive = transport?.id && liveTransportId && transport.id === liveTransportId;
+              const isFocused = transport?.id && focusedTransportId && transport.id === focusedTransportId;
+              const isAnyHighlighted = isLive || isFocused;
+              
+              let distance = transport?.distance;
+              if (!distance && !isNaN(start[0]) && !isNaN(start[1]) && !isNaN(end[0]) && !isNaN(end[1])) {
+                const distKm = calculateDistance(start[0], start[1], end[0], end[1]);
+                distance = distKm > 0 ? `${distKm.toFixed(1)} km` : undefined;
+              }
+              
+              segments.push({ 
+                start, end, mid, angle, icon, 
+                id: `${p1.id}-${p2.id}`, 
+                transportTitle: transport?.title, 
+                isLive, isFocused, isAnyHighlighted,
+                distance, transport,
+                fromName: p1.name, toName: p2.name
+              })
+            }
+
+            return (
+              <Fragment>
+                {/* 1. Base dashed line for the whole route (slightly faded) */}
+                <Polyline
+                  positions={polylineCoords}
+                  color="#8ff5ff"
+                  weight={2}
+                  opacity={0.3}
+                  dashArray="2, 8"
+                  lineCap="round"
+                  className="transition-all duration-300"
+                />
+
+                {/* 2. Individual segments for highlighting and markers */}
+                {segments.map(seg => {
                   const isNav = !seg.icon;
                   const iconRotation = isNav ? (90 - seg.angle) : (seg.angle - 90);
-                  
+                  const highlight = seg.isAnyHighlighted;
+
                   return (
-                    <Marker 
-                      key={seg.id}
-                      position={seg.mid} 
-                      icon={seg.icon 
-                        ? createTransportIcon(seg.icon, 0, true, !!seg.isLive, !!seg.isFocused) 
-                        : createTransportIcon('near_me', iconRotation, false, !!seg.isLive, !!seg.isFocused)
-                      } 
-                      interactive={true}
-                      eventHandlers={{
-                        click: (e) => {
-                          L.DomEvent.stopPropagation(e as any);
-                          if (seg.transport && onOpenTransport) {
-                            onOpenTransport(seg.transport, seg.fromName, seg.toName);
+                    <Fragment key={seg.id}>
+                      {/* Segment Line (Highlighted or Faded) */}
+                      <Polyline
+                        positions={[seg.start, seg.end]}
+                        color={highlight ? "#8ff5ff" : "#8ff5ff"}
+                        weight={highlight ? 4 : 2}
+                        opacity={highlight ? 0.9 : 0.4}
+                        dashArray={highlight ? undefined : "1, 10"}
+                        lineCap="round"
+                        className={`transition-all duration-500 ${highlight ? 'animate-pulse' : ''}`}
+                      />
+                      
+                      {highlight && (
+                        <Polyline
+                          positions={[seg.start, seg.end]}
+                          color="#8ff5ff"
+                          weight={12}
+                          opacity={0.15}
+                          lineCap="round"
+                          className="path-glow"
+                        />
+                      )}
+
+                      {/* Transport Marker */}
+                      <Marker 
+                        position={seg.mid} 
+                        icon={seg.icon 
+                          ? createTransportIcon(seg.icon, 0, true, !!seg.isLive, !!seg.isFocused) 
+                          : createTransportIcon('near_me', iconRotation, false, !!seg.isLive, !!seg.isFocused)
+                        } 
+                        interactive={true}
+                        eventHandlers={{
+                          click: (e) => {
+                            L.DomEvent.stopPropagation(e as any);
+                            if (seg.transport && onOpenTransport) {
+                              onOpenTransport(seg.transport, seg.fromName, seg.toName);
+                            }
                           }
-                        }
-                      }}
-                      zIndexOffset={seg.icon || seg.isLive || seg.isFocused ? 1000 : 500}
-                    >
-                        <Tooltip direction="top" offset={[0, -10]} className="custom-tooltip-wrapper" permanent={!!seg.distance && zoom >= 12}>
+                        }}
+                        zIndexOffset={highlight ? 2000 : 500}
+                      >
+                        <Tooltip direction="top" offset={[0, -10]} className="custom-tooltip-wrapper" permanent={Boolean(seg.distance && (zoom >= 12 || highlight))}>
                           <div className="flex flex-col items-center gap-1">
-                            {seg.transportTitle && (
-                              <div className="bg-neutral-900 shadow-2xl border border-white/10 px-2 py-1 rounded text-[9px] font-bold text-primary uppercase">
-                                {seg.transportTitle}
+                            {(seg.transportTitle || highlight) && (
+                              <div className={`shadow-2xl border px-2 py-1 rounded text-[9px] font-bold uppercase transition-all duration-300 ${
+                                highlight ? 'bg-primary border-white text-slate-950 scale-110 shadow-[0_0_15px_rgba(143,245,255,0.5)]' : 'bg-neutral-900 border-white/10 text-primary'
+                              }`}>
+                                {seg.transportTitle || 'Active Leg'}
                               </div>
                             )}
                             {seg.distance && (
-                              <div className="bg-primary/20 backdrop-blur-md border border-primary/40 px-1.5 py-0.5 rounded-full text-[8px] font-black text-primary shadow-lg">
+                              <div className={`backdrop-blur-md border px-1.5 py-0.5 rounded-full text-[8px] font-black shadow-lg transition-all duration-300 ${
+                                highlight ? 'bg-white border-primary text-slate-950 scale-105' : 'bg-primary/20 border-primary/40 text-primary'
+                              }`}>
                                 {seg.distance}
                               </div>
                             )}
                           </div>
                         </Tooltip>
-                    </Marker>
+                      </Marker>
+                    </Fragment>
                   )
-                })
-              })()}
-            </Fragment>
-          )}
+                })}
+              </Fragment>
+            )
+          })()}
           {/* Discovery & Search Result Popups */}
           {[...(internalSearchResults || []), ...(discoveries || [])].map(hit => (
             <Marker
