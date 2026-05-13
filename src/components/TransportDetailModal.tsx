@@ -446,7 +446,7 @@ export default function TransportDetailModal({
                 </div>
               ) : (
                 <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                  <p className="text-white/80 text-sm whitespace-pre-wrap">{note.text || 'No content'}</p>
+                  <p className="text-neutral-200 text-sm whitespace-pre-wrap">{note.text || 'No content'}</p>
                 </div>
               )}
             </div>
@@ -640,6 +640,7 @@ export default function TransportDetailModal({
           tripStartDate={tripStartDate}
           totalDays={totalDays}
           mapStyle={mapStyle}
+          timeFormat={timeFormat}
           onClose={() => setAttachmentDetail(null)}
           onSave={handleAttachmentSave}
           onDelete={() => {

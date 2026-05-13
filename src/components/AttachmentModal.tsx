@@ -34,6 +34,7 @@ interface AttachmentModalProps {
   tripStartDate?: string
   placeCoords?: { lat: number; lng: number }
   mapStyle?: string
+  timeFormat?: '12h' | '24h'
   onClose: () => void
   onSave: (payload: AttachmentPayload) => void
 }
@@ -117,6 +118,7 @@ export default function AttachmentModal({
   tripStartDate = '', 
   placeCoords,
   mapStyle, 
+  timeFormat = '12h',
   onClose, 
   onSave 
 }: AttachmentModalProps) {
@@ -310,7 +312,7 @@ export default function AttachmentModal({
                           />
                           <div className="space-y-1">
                             <FormLabel variant="secondary">Start Time</FormLabel>
-                            <TimePicker value={eventTime} onChange={setEventTime} />
+                            <TimePicker value={eventTime} onChange={setEventTime} timeFormat={timeFormat} />
                           </div>
                         </FormGroup>
                         <FormGroup>
@@ -323,7 +325,7 @@ export default function AttachmentModal({
                           />
                           <div className="space-y-1">
                             <FormLabel variant="secondary">End Time</FormLabel>
-                            <TimePicker value={eventEndTime} onChange={setEventEndTime} />
+                            <TimePicker value={eventEndTime} onChange={setEventEndTime} timeFormat={timeFormat} />
                           </div>
                         </FormGroup>
                       </FormGrid>
@@ -409,7 +411,7 @@ export default function AttachmentModal({
                           />
                           <div className="space-y-1">
                             <FormLabel variant="secondary">Check-in Time</FormLabel>
-                            <TimePicker value={accCheckIn} onChange={setAccCheckIn} />
+                            <TimePicker value={accCheckIn} onChange={setAccCheckIn} timeFormat={timeFormat} />
                           </div>
                         </FormGroup>
                         <FormGroup>
@@ -422,7 +424,7 @@ export default function AttachmentModal({
                           />
                           <div className="space-y-1">
                             <FormLabel variant="secondary">Check-out Time</FormLabel>
-                            <TimePicker value={accCheckOut} onChange={setAccCheckOut} />
+                            <TimePicker value={accCheckOut} onChange={setAccCheckOut} timeFormat={timeFormat} />
                           </div>
                         </FormGroup>
                       </FormGrid>

@@ -1116,10 +1116,13 @@ export default function MapClient({
               let displayLat = Number(place.lat);
               let displayLng = Number(place.lng);
 
-              // If multiple places share this coordinate, offset them slightly in a spiral or line
+              // If multiple places share this coordinate, offset them slightly in a spiral
               if (coordinateFrequency[coordKey] > 1) {
-                const angle = (instanceIdx * (2 * Math.PI)) / coordinateFrequency[coordKey];
-                const radius = 0.00015 * instanceIdx; // small offset in degrees
+                // Use golden angle spiral for more natural distribution
+                const goldenAngle = 137.5 * (Math.PI / 180);
+                const angle = instanceIdx * goldenAngle;
+                // Scale radius slightly with instance count to spread them out
+                const radius = 0.00025 * Math.sqrt(instanceIdx); 
                 displayLat += radius * Math.cos(angle);
                 displayLng += radius * Math.sin(angle);
               }

@@ -3,6 +3,7 @@
 import React from 'react'
 import { FormLabel, FormGrid, FormSelect } from '@/components/FormLayout'
 import TimePicker from '@/components/TimePicker'
+import { formatTime } from '@/lib/date-utils'
 
 interface DateTimeSelectorProps {
   label?: string
@@ -51,7 +52,7 @@ export function DateTimeSelector({
           <FormLabel variant="default">Time</FormLabel>
           {disabled ? (
             <div className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white/50 text-sm h-[42px] flex items-center">
-              {timeValue || '--:--'}
+              {timeValue ? formatTime(timeValue, timeFormat) : '--:--'}
             </div>
           ) : (
             <TimePicker 

@@ -8,7 +8,7 @@ import type { Trip } from '@/lib/storage'
 import TripCard from '@/components/Dashboard/TripCard'
 import AppHeader from '@/components/AppHeader'
 import { formatDuration } from '@/lib/date-utils'
-import AnimatedParticleBackground from '@/components/AnimatedParticleBackground'
+// Remove AnimatedParticleBackground import
 
 type ViewType = 'list' | 'gallery'
 type SortType = 'newest' | 'oldest' | 'alphabetical' | 'duration'
@@ -118,8 +118,9 @@ export default function AdventuresPage() {
   }, [filteredTrips, sortType])
 
   return (
-    <div className="min-h-screen text-white relative">
-      <AnimatedParticleBackground trips={trips} />
+    <div className="min-h-screen text-white bg-[#0e0e0e]">
+      {/* Background with subtle gradient to match dashboard */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1a1a1a,transparent)] pointer-events-none" />
       {/* Header */}
       <AppHeader
         extraRight={
@@ -147,98 +148,34 @@ export default function AdventuresPage() {
       </Link>
 
       <main className="w-full px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-        {/* Enhanced Filters Bar */}
-        <div className="space-y-6 mb-12">
-          <div className="flex flex-col gap-6">
-            {/* Status Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 mr-2 border-r border-white/10 pr-4">
-                <span className="material-symbols-outlined text-sm text-neutral-500">category</span>
-                <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Status</span>
-              </div>
-              {(['all', 'active', 'upcoming', 'past'] as const).map(status => (
+        <div className="mb-12 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-black text-white uppercase tracking-tighter">
+              {filters.status === 'all' ? 'All Adventures' : `${filters.status} Adventures`}
+            </h1>
+            <p className="text-neutral-500 text-xs font-bold uppercase tracking-widest mt-2">
+              {sortedTrips.length} {sortedTrips.length === 1 ? 'Trip' : 'Trips'} Found
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+              {(['gallery', 'list'] as const).map(view => (
                 <button
-                  key={status}
-                  onClick={() => setFilters({ ...filters, status })}
-                  className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap ${
-                    filters.status === status
-                      ? 'bg-primary border-primary text-slate-950 shadow-lg shadow-primary/20'
-                      : 'bg-white/5 border-white/10 text-neutral-400 hover:border-white/30 hover:bg-white/10'
+                  key={view}
+                  onClick={() => setViewType(view)}
+                  className={`p-1.5 rounded-full transition-all duration-300 flex items-center justify-center ${
+                    viewType === view
+                      ? 'bg-primary text-black shadow-lg shadow-primary/20'
+                      : 'text-neutral-500 hover:text-white'
                   }`}
+                  title={`${view} view`}
                 >
-                  {status}
+                  <span className="material-symbols-outlined text-sm">
+                    {view === 'gallery' ? 'grid_view' : 'list'}
+                  </span>
                 </button>
               ))}
-            </div>
-
-            {/* Other Filters Row */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Year Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Year</span>
-                <select
-                  value={filters.year || ''}
-                  onChange={(e) => setFilters({ ...filters, year: e.target.value ? parseInt(e.target.value) : undefined })}
-                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
-                >
-                  <option value="">All Years</option>
-                  {uniqueYears.map(year => (
-                    <option key={year} value={year} className="bg-neutral-900">{year}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Country Selector */}
-              {uniqueCountries.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Country</span>
-                  <select
-                    value={filters.country || ''}
-                    onChange={(e) => setFilters({ ...filters, country: e.target.value || undefined })}
-                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
-                  >
-                    <option value="">All Countries</option>
-                    {uniqueCountries.map(country => (
-                      <option key={country} value={country} className="bg-neutral-900">{country}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Sort Selector */}
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Sort</span>
-                <select
-                  value={sortType}
-                  onChange={(e) => setSortType(e.target.value as SortType)}
-                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-white hover:border-white/30 focus:outline-none transition-all cursor-pointer"
-                >
-                  <option value="newest" className="bg-neutral-900">Newest</option>
-                  <option value="oldest" className="bg-neutral-900">Oldest</option>
-                  <option value="alphabetical" className="bg-neutral-900">A-Z</option>
-                  <option value="duration" className="bg-neutral-900">Duration</option>
-                </select>
-              </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
-                {(['gallery', 'list'] as const).map(view => (
-                  <button
-                    key={view}
-                    onClick={() => setViewType(view)}
-                    className={`p-1.5 rounded-full transition-all duration-300 flex items-center justify-center ${
-                      viewType === view
-                        ? 'bg-primary text-black shadow-lg shadow-primary/20'
-                        : 'text-neutral-500 hover:text-white'
-                    }`}
-                    title={`${view} view`}
-                  >
-                    <span className="material-symbols-outlined text-sm">
-                      {view === 'gallery' ? 'grid_view' : 'list'}
-                    </span>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         </div>
@@ -267,12 +204,7 @@ export default function AdventuresPage() {
           // Gallery View
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {sortedTrips.map(trip => (
-              <div key={trip.id} className="flex flex-col">
-                <TripCard trip={trip} onDelete={deleteTrip} className="flex-1" />
-                <div className="mt-2 px-2 text-xs font-medium text-neutral-400 text-center">
-                  {new Date(trip.startDate).getFullYear()}
-                </div>
-              </div>
+              <TripCard key={trip.id} trip={trip} onDelete={deleteTrip} className="h-full" />
             ))}
           </div>
         ) : (

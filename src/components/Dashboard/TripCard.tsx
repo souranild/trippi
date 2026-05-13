@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Trip } from '@/lib/storage'
-import { formatDuration } from '@/lib/date-utils'
+import { formatDuration, formatTime } from '@/lib/date-utils'
 import { ConfirmationModal } from '../ConfirmationModal'
 
 interface TripCardProps {
@@ -14,6 +14,7 @@ interface TripCardProps {
 }
 
 export default function TripCard({ trip, onDelete, className = '', isCurrent = false }: TripCardProps) {
+  const timeFormat = trip.settings?.timeFormat || '12h'
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -89,19 +90,17 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
         </div>
 
         {/* Trip title & Tags - flex-1 pushes bottom content down */}
-        <div className="flex-1 space-y-2 mb-3">
+        <div className="flex-1 space-y-2 mb-3 min-h-[90px]">
           <h3 className="text-lg sm:text-xl font-bold text-white line-clamp-2 font-['Space Grotesk'] tracking-tight group-hover:text-primary transition-colors">
             {trip.title}
           </h3>
-          {trip.tags && trip.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {trip.tags.map(tag => (
-                <span key={tag} className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-neutral-300 shadow-sm transition-all group-hover:bg-white/20 group-hover:border-white/30">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1.5 min-h-[26px]">
+            {trip.tags?.map(tag => (
+              <span key={tag} className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-neutral-300 shadow-sm transition-all group-hover:bg-white/20 group-hover:border-white/30">
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Live Activity indicator if current */}
@@ -209,7 +208,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                         <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-white/10 rounded-md border border-white/10">
                           <span className="material-symbols-outlined text-[10px] text-white/50">schedule</span>
                           <span className="text-[10px] font-bold text-white/80">
-                            {currentPlace.arrival || '??'} - {currentPlace.departure || '??'}
+                            {currentPlace.arrival ? formatTime(currentPlace.arrival, timeFormat) : '??'} - {currentPlace.departure ? formatTime(currentPlace.departure, timeFormat) : '??'}
                           </span>
                         </div>
                       )}
@@ -298,7 +297,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                                <p className="text-[10px] text-white font-bold truncate">{activeTransport.type} to {currentPlace.name}</p>
                                {(activeTransport.departure || activeTransport.arrival) && (
                                  <span className="text-[9px] font-black text-primary/80 shrink-0 whitespace-nowrap">
-                                   {activeTransport.departure || '??'} → {activeTransport.arrival || '??'}
+                                   {activeTransport.departure ? formatTime(activeTransport.departure, timeFormat) : '??'} → {activeTransport.arrival ? formatTime(activeTransport.arrival, timeFormat) : '??'}
                                  </span>
                                )}
                              </div>

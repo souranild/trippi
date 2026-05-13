@@ -71,18 +71,22 @@ function MoreTripsCard({ count, type, href }: { count: number, type: 'upcoming' 
   return (
     <Link 
       href={href}
-      className="group relative flex flex-col items-center justify-center p-8 rounded-[2rem] border border-dashed border-white/10 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.05] transition-all duration-500 text-center space-y-4 h-full min-h-[180px] sm:min-h-[220px]"
+      className="group relative flex flex-col items-center justify-center p-8 rounded-[2rem] border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-primary/40 transition-all duration-500 text-center space-y-4 h-full min-h-[180px] sm:min-h-[220px] shadow-lg hover:shadow-primary/10 hover:-translate-y-1"
     >
-      <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl">
-        <span className={`material-symbols-outlined text-3xl ${colorClass}`}>{icon}</span>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      
+      <div className="relative z-10 w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-xl group-hover:bg-primary/10 group-hover:border-primary/30">
+        <span className={`material-symbols-outlined text-3xl transition-colors duration-500 ${colorClass} group-hover:text-primary`}>{icon}</span>
       </div>
-      <div>
-        <h4 className="text-sm font-black text-white uppercase tracking-widest">+{count} {type === 'upcoming' ? 'Upcoming' : 'Past'}</h4>
+      
+      <div className="relative z-10">
+        <h4 className="text-sm font-black text-white uppercase tracking-widest group-hover:text-primary transition-colors">+{count} {type === 'upcoming' ? 'Upcoming' : 'Past'}</h4>
         <p className="text-[10px] text-neutral-500 font-medium leading-relaxed mt-1 group-hover:text-neutral-400 transition-colors">
           {subtitle}
         </p>
       </div>
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary group-hover:gap-3 transition-all pt-2">
+      
+      <div className="relative z-10 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary group-hover:gap-3 transition-all pt-2 opacity-60 group-hover:opacity-100">
         <span>View Gallery</span>
         <span className="material-symbols-outlined text-xs">arrow_forward</span>
       </div>

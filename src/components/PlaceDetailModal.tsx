@@ -411,7 +411,7 @@ export default function PlaceDetailModal({
     if (text.trim().startsWith('<')) {
       return (
         <div 
-          className="prose-renderer text-sm leading-relaxed text-neutral-300 font-medium"
+          className="prose-renderer text-sm leading-relaxed text-neutral-200 font-medium"
           dangerouslySetInnerHTML={{ __html: text }}
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -468,7 +468,7 @@ export default function PlaceDetailModal({
               </button>
             )
           }
-          return <span key={i} className="whitespace-pre-wrap text-sm leading-relaxed text-white/80">{part}</span>
+          return <span key={i} className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-200">{part}</span>
         })}
       </div>
     )
@@ -895,7 +895,7 @@ export default function PlaceDetailModal({
               </FormListItem>
             ))}
             {isEditMode && !updatedPlace.accommodations?.length && (
-              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No accommodation added</p>
+              <p className="text-neutral-200/40 text-[10px] font-bold text-center py-2">No accommodation added</p>
             )}
           </div>
         </div>
@@ -961,7 +961,7 @@ export default function PlaceDetailModal({
               </FormListItem>
             ))}
             {isEditMode && !updatedPlace.events?.length && (
-              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No activities added</p>
+              <p className="text-neutral-200/40 text-[10px] font-bold text-center py-2">No activities added</p>
             )}
           </div>
         </div>
@@ -1001,7 +1001,7 @@ export default function PlaceDetailModal({
               </FormListItem>
             ))}
             {isEditMode && !updatedPlace.documents?.length && (
-              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No documents added</p>
+              <p className="text-neutral-200/40 text-[10px] font-bold text-center py-2">No documents added</p>
             )}
           </div>
         </div>
@@ -1040,7 +1040,7 @@ export default function PlaceDetailModal({
               </FormListItem>
             ))}
             {isEditMode && !updatedPlace.links?.length && (
-              <p className="text-neutral-500 text-[10px] font-bold text-center py-2 opacity-40">No links added</p>
+              <p className="text-neutral-200/40 text-[10px] font-bold text-center py-2">No links added</p>
             )}
           </div>
         </div>
