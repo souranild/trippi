@@ -6,9 +6,66 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
+  extendDefaultRuntimeCaching: true,
   disable: process.env.NODE_ENV === "development",
   workboxOptions: {
     disableDevLogs: true,
+    runtimeCaching: [
+      {
+        urlPattern: /^https:\/\/(?:[a-z]\.)?basemaps\.cartocdn\.com\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles-carto',
+          expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/server\.arcgisonline\.com\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles-arcgis',
+          expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/(?:[a-z]\.)?tile\.openstreetmap\.fr\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles-osm',
+          expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/(?:[a-z]\.)?tile\.openstreetmap\.org\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'map-tiles-osm-org',
+          expiration: { maxEntries: 500, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/upload\.wikimedia\.org\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'wiki-images',
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      },
+      {
+        urlPattern: /^https:\/\/(?:images\.unsplash\.com|fastly\.picsum\.photos|picsum\.photos)\/.*$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'external-images',
+          expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] }
+        }
+      }
+    ]
   },
 });
 

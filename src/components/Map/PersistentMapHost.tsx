@@ -16,16 +16,14 @@ export default function PersistentMapHost() {
   const { mapState, isMapVisible, portalTarget } = useMapContext()
 
   // We render the map once, and portal it to the slot defined in the page
-  // Memoize it to prevent re-renders when mapState changes slightly
+  // We use a stable reference to the MapClient so it never re-mounts its MapContainer
   const mapElement = React.useMemo(() => {
-    if (!mapState) return null
     return (
       <MapClient 
-        {...mapState}
         className="w-full h-full"
       />
     )
-  }, [mapState])
+  }, [])
 
   if (!isMapVisible || !mapState || !mapElement) return null
 
