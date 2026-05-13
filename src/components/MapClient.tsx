@@ -471,36 +471,31 @@ const TILE_LAYERS: Record<MapStyle, { url: string, attribution: string }> = {
   }
 }
 
-export default function MapClient(props: MapProps) {
-  const { mapState: contextState } = useMapContext()
-  
-  // Merge props with context state, props take precedence
-  const effectiveProps = { ...contextState, ...props }
-  const {
-    places = [], 
-    emoji = '📍', 
-    className, 
-    focusedPlaceId, 
-    showDayNumbers = true, 
-    previewCoords, 
-    onMapClick, 
-    onViewportChange, 
-    onMarkerClick, 
-    searchResults = [], 
-    selectedSearchResultId, 
-    onSearchResultClick, 
-    mapStyle: externalMapStyle, 
-    onStyleChange,
-    isGlobal = false,
-    showControls = false,
-    livePlaceId,
-    liveTransportId,
-    isPreview = false,
-    onAddDiscovery,
-    defaultDiscovery,
-    onOpenTransport,
-    focusedTransportId
-  } = effectiveProps
+export default function MapClient({ 
+  places = [], 
+  emoji = '📍', 
+  className, 
+  focusedPlaceId, 
+  showDayNumbers = true, 
+  previewCoords, 
+  onMapClick, 
+  onViewportChange, 
+  onMarkerClick, 
+  searchResults = [], 
+  selectedSearchResultId, 
+  onSearchResultClick, 
+  mapStyle: externalMapStyle, 
+  onStyleChange,
+  isGlobal = false,
+  showControls = false,
+  livePlaceId,
+  liveTransportId,
+  isPreview = false,
+  onAddDiscovery,
+  defaultDiscovery,
+  onOpenTransport,
+  focusedTransportId
+}: MapProps) {
   const router = useRouter()
   
   // Use memo for initial map state to prevent flickering when props change
