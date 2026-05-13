@@ -63,21 +63,32 @@ function MapLifecycle({ onMapReady }: { onMapReady?: (map: L.Map) => void }) {
     if (onMapReady) {
       onMapReady(map)
     }
+
+    const safeInvalidate = () => {
+      try {
+        if (map && map.getContainer()) {
+          map.invalidateSize();
+        }
+      } catch (e) {
+        // Ignore internal leaflet errors when container is not fully mounted
+      }
+    };
+
     // Initial check
-    map.invalidateSize();
+    safeInvalidate();
     
     // Force a resize check after short delays to handle drawers/animations
     // This is critical for maps that start in hidden or animating containers
     const t1 = setTimeout(() => {
-      map.invalidateSize();
+      safeInvalidate();
     }, 300);
 
     const t2 = setTimeout(() => {
-      map.invalidateSize();
+      safeInvalidate();
     }, 800);
 
     const t3 = setTimeout(() => {
-      map.invalidateSize();
+      safeInvalidate();
     }, 2000);
 
     // Cleanup function
