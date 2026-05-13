@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { ReactNode, useState } from 'react'
 import MobileDrawer from './MobileDrawer'
 import { useTrips } from '@/context/TripContext'
@@ -16,9 +16,8 @@ export default function NavigationLayout({ children }: NavigationLayoutProps) {
   const { getTripById, userProfile, setUserProfile, deleteTrip, isEditingProfile, setIsEditingProfile } = useTrips()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Extract trip ID from pathname (e.g., /trip/123 → 123)
-  const tripMatch = pathname.match(/^\/trip\/(.+)$/)
-  const tripId = tripMatch ? tripMatch[1] : null
+  const searchParams = useSearchParams()
+  const tripId = pathname === '/trip' ? searchParams.get('id') : null
   const trip = tripId ? getTripById(tripId) : null
 
   // Always show mobile drawer with hamburger menu
@@ -26,7 +25,7 @@ export default function NavigationLayout({ children }: NavigationLayoutProps) {
 
   const handleShare = () => {
     if (!trip) return
-    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/trip/${trip.id}`
+    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/trip?id=${trip.id}`
     navigator.clipboard.writeText(shareUrl)
     alert('Trip link copied to clipboard!')
   }

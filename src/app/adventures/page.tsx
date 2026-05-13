@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTrips } from '@/context/TripContext'
@@ -35,7 +35,7 @@ function getTripDuration(trip: Trip): number {
   return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-export default function AdventuresPage() {
+function AdventuresContent() {
   const { trips, deleteTrip } = useTrips()
   const searchParams = useSearchParams()
   
@@ -218,7 +218,7 @@ export default function AdventuresPage() {
               return (
                 <Link
                   key={trip.id}
-                  href={`/trip/${trip.id}`}
+                  href={`/trip?id=${trip.id}`}
                   className="group block p-4 sm:p-6 bg-white/5 border border-white/10 rounded-xl hover:border-primary/50 hover:bg-white/10 transition-all duration-300 overflow-hidden"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -285,5 +285,13 @@ export default function AdventuresPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function AdventuresPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0e0e0e] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <AdventuresContent />
+    </Suspense>
   )
 }

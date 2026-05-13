@@ -22,7 +22,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
 
   // Prefetch the trip page to make navigation feel instant
   useEffect(() => {
-    router.prefetch(`/trip/${trip.id}`)
+    router.prefetch(`/trip?id=${trip.id}`)
   }, [trip.id, router])
 
   // Auto-update time for live indicators
@@ -39,7 +39,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
 
   return (
     <div
-      onClick={() => router.push(`/trip/${trip.id}`)}
+      onClick={() => router.push(`/trip?id=${trip.id}`)}
       className={`group relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-700 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(143,245,255,0.15)] focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 cursor-pointer border border-white/10 hover:border-primary/40 h-full ${className}`}
     >
       {/* Glass background with gradient - only for current adventure */}
@@ -183,7 +183,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                 className={`relative overflow-hidden rounded-2xl border backdrop-blur-2xl transition-all duration-500 cursor-pointer ${isLive || statusText === 'LIVE' ? 'bg-primary/25 border-primary/50 shadow-xl shadow-primary/10 ring-1 ring-primary/30' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  router.push(`/trip/${trip.id}?scrollTo=day-${day}-place-${currentPlace.id}`);
+                  router.push(`/trip?id=${trip.id}&scrollTo=day-${day}-place-${currentPlace.id}`);
                 }}
               >
                 {(isLive || statusText === 'LIVE') && (
@@ -287,7 +287,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                           className="flex items-center gap-2 bg-primary/10 rounded-lg p-2 border border-primary/20 animate-in zoom-in duration-500 hover:bg-primary/20 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            router.push(`/trip/${trip.id}?scrollTo=transport-${activeTransport.id}`);
+                            router.push(`/trip?id=${trip.id}&scrollTo=transport-${activeTransport.id}`);
                           }}
                         >
                            <span className="material-symbols-outlined text-[16px] text-primary animate-bounce">flight</span>
@@ -316,7 +316,7 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                   onClick={(e) => {
                     e.stopPropagation();
                     const nDay = nextPlace.day || day;
-                    router.push(`/trip/${trip.id}?scrollTo=day-${nDay}-place-${nextPlace.id}`);
+                    router.push(`/trip?id=${trip.id}&scrollTo=day-${nDay}-place-${nextPlace.id}`);
                   }}
                 >
                   <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center border border-white/5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">

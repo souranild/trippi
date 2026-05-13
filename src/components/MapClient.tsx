@@ -677,7 +677,7 @@ export default function MapClient({
     const lng = Number(place.lng);
 
     if (place.tripId && !showDayNumbers) {
-      router.push(`/trip/${place.tripId}?place=${place.id}`)
+      router.push(`/trip?id=${place.tripId}&place=${place.id}`)
     } else {
       if (activeMap && !isNaN(lat) && !isNaN(lng)) {
         // If already more zoomed in than 15, don't zoom out

@@ -34,7 +34,7 @@ function DetailedTripCard({ trip, onDelete }: { trip: Trip, onDelete?: (id: stri
 
   return (
     <Link
-      href={`/trip/${trip.id}`}
+      href={`/trip?id=${trip.id}`}
       className="group relative overflow-hidden rounded-xl sm:rounded-2xl transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-[#8ff5ff] focus:ring-offset-2 focus:ring-offset-[#0e0e0e] active:scale-95"
     >
       {/* Glass background with gradient */}

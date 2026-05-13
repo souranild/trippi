@@ -22,7 +22,7 @@ export default function HeroTripCard({ trip, liveStatus, className = '' }: HeroT
 
   return (
     <div
-      onClick={() => router.push(`/trip/${trip.id}`)}
+      onClick={() => router.push(`/trip?id=${trip.id}`)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`group relative overflow-hidden rounded-[2rem] bg-neutral-900 border border-white/10 transition-all duration-700 cursor-pointer shadow-2xl hover:border-primary/50 ${className}`}
@@ -125,7 +125,7 @@ export default function HeroTripCard({ trip, liveStatus, className = '' }: HeroT
                   key={`${item.type}-${idx}`}
                   onClick={(e) => {
                     e.stopPropagation()
-                    const baseUrl = `/trip/${trip.id}`
+                    const baseUrl = `/trip?id=${trip.id}`
                     let targetUrl = baseUrl
                     if (item.type === 'place') targetUrl += `?openPlace=${item.data.id}`
                     else if (item.type === 'event') targetUrl += `?openPlace=${item.data.placeId || item.data.id}&openEvent=${item.data.id}`

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTrips } from '@/context/TripContext'
 import TripForm from '@/components/TripForm'
@@ -9,7 +9,7 @@ import AppHeader from '@/components/AppHeader'
 import ParallaxBackground from '@/components/ParallaxBackground'
 import { ModalContainer, ModalHeader, ModalContent } from '@/components/ModalLayout'
 
-export default function NewTrip() {
+function NewTripContent() {
   const router = useRouter()
   const { addTrip } = useTrips()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -38,7 +38,7 @@ export default function NewTrip() {
       tags: data.tags || []
     }
     await addTrip(newTrip)
-    router.push(`/trip/${newTrip.id}?addFirstPlace=true`)
+    router.push(`/trip?id=${newTrip.id}&addFirstPlace=true`)
   }
 
   return (
@@ -99,5 +99,13 @@ export default function NewTrip() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function NewTrip() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <NewTripContent />
+    </Suspense>
   )
 }

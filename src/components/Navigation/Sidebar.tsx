@@ -15,7 +15,7 @@ interface SidebarProps {
 export default function Sidebar({ trip, isOpen = true, onToggle, onShare, onSettings }: SidebarProps) {
   const router = useRouter()
 
-  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/trip/${trip.id}`
+  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/trip?id=${trip.id}`
 
   return (
     <>

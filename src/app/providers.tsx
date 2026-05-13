@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { TripProvider, useTrips } from '@/context/TripContext'
 import NavigationLayout from '@/components/Navigation/NavigationLayout'
 import OnboardingScreen from '@/components/OnboardingScreen'
@@ -39,7 +40,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <TripProvider>
       <MapProvider>
-        <ProvidersContent>{children}</ProvidersContent>
+        <Suspense fallback={null}>
+          <ProvidersContent>{children}</ProvidersContent>
+        </Suspense>
       </MapProvider>
     </TripProvider>
   )

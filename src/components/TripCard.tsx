@@ -5,7 +5,7 @@ import { formatDuration } from '@/lib/date-utils'
 
 export default function TripCard({ trip }: { trip: Trip }) {
   return (
-    <Link href={`/trip/${trip.id}`}>
+    <Link href={`/trip?id=${trip.id}`}>
       <div
         className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer relative overflow-hidden"
         style={trip.wallpaper ? { backgroundImage: `url(${trip.wallpaper})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}

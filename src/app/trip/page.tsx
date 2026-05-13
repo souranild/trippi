@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -62,10 +62,10 @@ import { fetchHybridDiscovery, searchLocations as trippiSearchLocations, parseGo
 const EMPTY_ARRAY: any[] = []
 const EMPTY_PLACES: any[] = []
 
-export default function TripDetail() {
-  const { id } = useParams()
-  const router = useRouter()
+function TripDetailContent() {
   const searchParams = useSearchParams()
+  const id = searchParams.get('id')
+  const router = useRouter()
   const { updateTrip: updateTripContext, deleteTrip, userProfile, setIsEditingProfile } = useTrips()
   const { 
     isExpanded,
@@ -4668,5 +4668,13 @@ export default function TripDetail() {
         }}
       />
     </div>
+  )
+}
+
+export default function TripDetail() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0e0e0e] flex items-center justify-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>}>
+      <TripDetailContent />
+    </Suspense>
   )
 }
