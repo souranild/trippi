@@ -17,8 +17,8 @@ import { useMapContext } from '@/context/MapContext'
 import { getLiveStatus } from '@/lib/live-status'
 
 
-function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[] }) {
-  const { setIsExpanded } = useMapContext()
+function GlobalFootprintSection({ trips, places, isMobileMapOpen }: { trips: Trip[], places: any[], isMobileMapOpen?: boolean }) {
+  const { isExpanded, setIsExpanded } = useMapContext()
   const uniqueCountries = new Set(places.map(p => p.country).filter(Boolean)).size
   const totalPlaces = places.length
 
@@ -34,6 +34,7 @@ function GlobalFootprintSection({ trips, places }: { trips: Trip[], places: any[
             showDayNumbers={false} 
             onMapClick={() => setIsExpanded(true)}
             className="absolute inset-0 w-full h-full bg-neutral-900" 
+            isActiveOverride={!isExpanded && !isMobileMapOpen}
           />
         </div>
       </div>
@@ -324,6 +325,38 @@ export default function Home() {
                           <div className="mt-2 h-4" /> {/* Spacer to match year text height */}
                         </div>
                       )}
+                      {!hasMorePast && pastTrips.length === 1 && (
+                        <>
+                          <div className="hidden sm:flex flex-col animate-fade-in h-full">
+                            <div className="flex-1 p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3 opacity-30">
+                              <span className="material-symbols-outlined text-4xl text-neutral-600">history</span>
+                              <div>
+                                <h4 className="text-sm font-bold text-white">More Memories Await</h4>
+                                <p className="text-xs text-neutral-500">Your future past adventures will appear here.</p>
+                              </div>
+                            </div>
+                            <div className="mt-2 h-4" />
+                          </div>
+                          <div className="hidden xl:flex flex-col animate-fade-in h-full">
+                            <div className="flex-1 p-8 rounded-[2rem] border border-dashed border-white/5 flex flex-col items-center justify-center text-center space-y-3 opacity-20">
+                              <span className="material-symbols-outlined text-4xl text-neutral-700">travel_explore</span>
+                            </div>
+                            <div className="mt-2 h-4" />
+                          </div>
+                        </>
+                      )}
+                      {!hasMorePast && pastTrips.length === 2 && (
+                        <div className="hidden xl:flex flex-col animate-fade-in h-full">
+                          <div className="flex-1 p-8 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3 opacity-30">
+                            <span className="material-symbols-outlined text-4xl text-neutral-600">history</span>
+                            <div>
+                              <h4 className="text-sm font-bold text-white">More Memories Await</h4>
+                              <p className="text-xs text-neutral-500">Your future past adventures will appear here.</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 h-4" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : trips.length < 3 && (
@@ -358,7 +391,7 @@ export default function Home() {
               {/* Right Column: Global Footprint (Map) */}
               <div className="hidden lg:block min-w-0 lg:pl-6">
                 <div className="sticky top-28">
-                  <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} />
+                  <GlobalFootprintSection trips={trips} places={allPlacesWithEmojis} isMobileMapOpen={isMobileMapOpen} />
                 </div>
               </div>
             </div>
@@ -455,6 +488,7 @@ export default function Home() {
                   places={allPlacesWithEmojis} 
                   showDayNumbers={false} 
                   className="w-full h-full" 
+                  isActiveOverride={isMobileMapOpen}
                 />
               </div>
               

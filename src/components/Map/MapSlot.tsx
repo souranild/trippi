@@ -29,6 +29,7 @@ interface MapSlotProps {
   livePlaceId?: string | null
   liveTransportId?: string | null
   onOpenTransport?: (transport: any, fromName: string, toName: string) => void
+  isActiveOverride?: boolean
 }
 
 export default function MapSlot(props: MapSlotProps) {
@@ -41,9 +42,10 @@ export default function MapSlot(props: MapSlotProps) {
 
   // logic to determine whether this specific slot should be holding the map
   const shouldBeActive = useMemo(() => {
+    if (props.isActiveOverride !== undefined) return props.isActiveOverride;
     if (props.isModal) return isExpanded;
     return !isExpanded;
-  }, [props.isModal, isExpanded]);
+  }, [props.isModal, isExpanded, props.isActiveOverride]);
 
   const currentMapState = useMemo(() => ({
     places: props.places,
