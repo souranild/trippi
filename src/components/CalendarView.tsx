@@ -390,7 +390,7 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
 
                         return (
                           <div 
-                            key={item.id} 
+                            key={`${item.id}-${item.type}-${dayNum}`} 
                             onClick={() => onPlaceClick(item.data)} 
                             className={`px-2 py-1 text-[9px] font-bold truncate cursor-pointer transition-all active:scale-[0.98] flex items-center gap-1.5 relative ${roundingClass} ${marginClass} ${getTypeStyles(item.type, item.isLive)}`}
                           >
@@ -440,7 +440,7 @@ export default function CalendarView({ trip, places, onPlaceClick, onAddPlace, t
                   return (
                     <div key={day.toString()} className="p-1 space-y-1 border-r border-white/5">
                       {allDayItems.map(item => (
-                        <div key={item.id} onClick={() => onPlaceClick(item.data)} className={`px-2 py-1 rounded border-l-2 text-[9px] font-bold truncate cursor-pointer hover:brightness-125 transition-all flex items-center gap-1.5 ${getTypeStyles(item.type, item.isLive)}`}>
+                        <div key={`${item.id}-${item.type}-${dayNum}`} onClick={() => onPlaceClick(item.data)} className={`px-2 py-1 rounded border-l-2 text-[9px] font-bold truncate cursor-pointer hover:brightness-125 transition-all flex items-center gap-1.5 ${getTypeStyles(item.type, item.isLive)}`}>
                           {item.emoji && item.emoji.length > 2 ? (
                             <span className="material-symbols-outlined text-[12px]">{item.emoji}</span>
                           ) : (

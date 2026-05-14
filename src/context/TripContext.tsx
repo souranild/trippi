@@ -7,6 +7,8 @@ export interface UserProfile {
   name: string
   skinTone: string
   avatar: string
+  email?: string
+  isGoogleAuth?: boolean
 }
 
 interface TripContextType {

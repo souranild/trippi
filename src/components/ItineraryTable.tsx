@@ -73,6 +73,38 @@ export default function ItineraryTable({
     const timer = setInterval(() => setNow(new Date()), 60000)
     return () => clearInterval(timer)
   }, [])
+  
+  const getTransportLiveStatus = (leg: any, currentDayNum: number) => {
+    if (!trip || !trip.startDate) return false;
+    const now = new Date();
+    const nowTimeMins = now.getHours() * 60 + now.getMinutes();
+    const startParts = trip.startDate.split('-').map(Number);
+    const startObj = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+    const rowDayObj = addDays(startObj, currentDayNum - 1);
+    const isToday = isSameDay(rowDayObj, now);
+    if (!isToday) return false;
+
+    if (!leg.departure || !leg.arrival) return false;
+    
+    const depDay = leg.departureDay ?? currentDayNum;
+    const arrDay = leg.arrivalDay ?? depDay;
+    
+    if (currentDayNum < depDay || currentDayNum > arrDay) return false;
+    
+    const [dh, dm] = leg.departure.split(':').map(Number);
+    const [ah, am] = leg.arrival.split(':').map(Number);
+    const depMins = dh * 60 + dm;
+    const arrMins = ah * 60 + am;
+    
+    if (currentDayNum === depDay && currentDayNum === arrDay) {
+      return nowTimeMins >= depMins && nowTimeMins <= arrMins;
+    } else if (currentDayNum === depDay) {
+      return nowTimeMins >= depMins;
+    } else if (currentDayNum === arrDay) {
+      return nowTimeMins <= arrMins;
+    }
+    return true; // Middle day of multi-day transport
+  }
 
   const allRows = useMemo(() => {
     const rows: ItineraryRow[] = []
@@ -300,38 +332,6 @@ export default function ItineraryTable({
     }
   }
 
-  const getTransportLiveStatus = (leg: any, currentDayNum: number) => {
-    if (!trip || !trip.startDate) return false;
-    const now = new Date();
-    const nowTimeMins = now.getHours() * 60 + now.getMinutes();
-    const startParts = trip.startDate.split('-').map(Number);
-    const startObj = new Date(startParts[0], startParts[1] - 1, startParts[2]);
-    const rowDayObj = addDays(startObj, currentDayNum - 1);
-    const isToday = isSameDay(rowDayObj, now);
-    if (!isToday) return false;
-
-    if (!leg.departure || !leg.arrival) return false;
-    
-    const depDay = leg.departureDay ?? currentDayNum;
-    const arrDay = leg.arrivalDay ?? depDay;
-    
-    if (currentDayNum < depDay || currentDayNum > arrDay) return false;
-    
-    const [dh, dm] = leg.departure.split(':').map(Number);
-    const [ah, am] = leg.arrival.split(':').map(Number);
-    const depMins = dh * 60 + dm;
-    const arrMins = ah * 60 + am;
-    
-    if (currentDayNum === depDay && currentDayNum === arrDay) {
-      return nowTimeMins >= depMins && nowTimeMins <= arrMins;
-    } else if (currentDayNum === depDay) {
-      return nowTimeMins >= depMins;
-    } else if (currentDayNum === arrDay) {
-      return nowTimeMins <= arrMins;
-    } else {
-      return true; // Mid-day of a multi-day trip
-    }
-  };
 
   const isOngoing = (row: ItineraryRow) => {
     if (!row.startTime || !row.endTime) return false

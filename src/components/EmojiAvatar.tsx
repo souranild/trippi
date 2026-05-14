@@ -7,8 +7,9 @@ interface EmojiAvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
-export default function EmojiAvatar({ emoji, skinTone, className = '', size = 'md' }: EmojiAvatarProps) {
-  const modifiedEmoji = applySkinTone(emoji, skinTone)
+export default function EmojiAvatar({ emoji = '✈️', skinTone, className = '', size = 'md' }: EmojiAvatarProps) {
+  const isUrl = emoji?.startsWith('http') || emoji?.startsWith('/')
+  const modifiedEmoji = !isUrl ? applySkinTone(emoji || '✈️', skinTone) : emoji
 
   const sizeClasses = {
     sm: 'text-lg w-7 h-7',
@@ -19,9 +20,13 @@ export default function EmojiAvatar({ emoji, skinTone, className = '', size = 'm
 
   return (
     <div className={`flex items-center justify-center rounded-2xl bg-slate-800 shadow-inner overflow-hidden ${sizeClasses[size]} ${className}`}>
-      <span>
-        {modifiedEmoji}
-      </span>
+      {isUrl ? (
+        <img src={emoji} alt="Avatar" className="w-full h-full object-cover" />
+      ) : (
+        <span>
+          {modifiedEmoji}
+        </span>
+      )}
     </div>
   )
 }

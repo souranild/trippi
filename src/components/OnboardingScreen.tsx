@@ -6,11 +6,14 @@ import { generateFunnyName } from '@/lib/funny-names'
 import EmojiAvatar from '@/components/EmojiAvatar'
 import EmojiPicker from '@/components/EmojiPicker'
 import { useTrips } from '@/context/TripContext'
+import { useAuth } from '@/hooks/useAuth'
 
 interface UserProfile {
   name: string
   skinTone: string
   avatar: string
+  email?: string
+  isGoogleAuth?: boolean
 }
 
 interface OnboardingScreenProps {
@@ -26,6 +29,9 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
   const [name, setName] = useState(initialProfile?.name || '')
   const [selectedSkinTone, setSelectedSkinTone] = useState(initialProfile?.skinTone || 'medium')
   const [selectedAvatar, setSelectedAvatar] = useState(initialProfile?.avatar || '✈️')
+  const [isGoogleAuth, setIsGoogleAuth] = useState(initialProfile?.isGoogleAuth || false)
+  const [email, setEmail] = useState(initialProfile?.email || '')
+  const { signInWithGoogle, logout } = useAuth()
   const isEditing = !!initialProfile
 
   const stats = useMemo(() => {
@@ -53,7 +59,9 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
     const profile: UserProfile = {
       name: name.trim() || 'Anonymous Explorer',
       skinTone: selectedSkinTone,
-      avatar: selectedAvatar
+      avatar: selectedAvatar,
+      email: email,
+      isGoogleAuth: isGoogleAuth
     }
     
     // Save to localStorage
@@ -133,6 +141,29 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                     </div>
                   </div>
 
+                  {!isGoogleAuth && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const user = await signInWithGoogle()
+                          if (user) {
+                            if (user.displayName) setName(user.displayName)
+                            if (user.photoURL) setSelectedAvatar(user.photoURL)
+                            setEmail(user.email || '')
+                            setIsGoogleAuth(true)
+                          }
+                        } catch (error: any) {
+                          console.error('Login failed', error)
+                          alert(error.message || 'Login failed. Please check your Firebase configuration.')
+                        }
+                      }}
+                      className="w-full py-3 px-6 rounded-2xl bg-white/5 border border-white/10 text-neutral-400 hover:text-cyan-400 transition-all flex items-center justify-center gap-2 font-bold uppercase tracking-widest text-[10px]"
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
+                      Sign in with Google to import profile
+                    </button>
+                  )}
+
                   <div className="flex gap-4 pt-4">
                     <button
                       onClick={() => setShowEditor(true)}
@@ -176,13 +207,36 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                         />
                       </div>
                       
-                      <button
-                        onClick={generateName}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-cyan-400 transition-all text-xs font-bold uppercase tracking-widest"
-                      >
-                        <span className="material-symbols-outlined text-sm">refresh</span>
-                        Surprise Me
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={generateName}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-cyan-400 transition-all text-xs font-bold uppercase tracking-widest"
+                        >
+                          <span className="material-symbols-outlined text-sm">refresh</span>
+                          Surprise Me
+                        </button>
+                        
+                        <button
+                          onClick={async () => {
+                            try {
+                              const user = await signInWithGoogle()
+                              if (user) {
+                                if (user.displayName) setName(user.displayName)
+                                if (user.photoURL) setSelectedAvatar(user.photoURL)
+                                setEmail(user.email || '')
+                                setIsGoogleAuth(true)
+                              }
+                            } catch (error: any) {
+                              console.error('Login failed', error)
+                              alert(error.message || 'Login failed. Please check your Firebase configuration.')
+                            }
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-cyan-400 transition-all text-xs font-bold uppercase tracking-widest"
+                        >
+                          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
+                          Sign in with Google
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -195,19 +249,39 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                       onSkinToneChange={setSelectedSkinTone}
                     />
 
-                    <div className="p-6 sm:p-8 bg-slate-900 border-t border-white/5 flex gap-4">
-                      <button
-                        onClick={isEditing ? () => setShowEditor(false) : onCancel}
-                        className="flex-1 py-4 px-6 rounded-2xl border-2 border-white/10 text-white font-bold hover:bg-white/5 transition-all active:scale-95"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleComplete}
-                        className="flex-[2] py-4 px-6 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all active:scale-95"
-                      >
-                        {isEditing ? 'Save Changes' : 'All Set, Let\'s Go!'}
-                      </button>
+                    <div className="p-6 sm:p-8 bg-slate-900 border-t border-white/5 flex flex-col gap-4">
+                      {isGoogleAuth && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await logout();
+                              setIsGoogleAuth(false);
+                              setEmail('');
+                              // We don't necessarily reset name/avatar unless they want to
+                            } catch (error) {
+                              console.error('Logout failed', error);
+                            }
+                          }}
+                          className="w-full py-2 px-4 rounded-xl border border-red-500/30 text-red-400 text-xs font-bold uppercase tracking-widest hover:bg-red-500/10 transition-all flex items-center justify-center gap-2"
+                        >
+                          <span className="material-symbols-outlined text-sm">logout</span>
+                          Disconnect Google Account
+                        </button>
+                      )}
+                      <div className="flex gap-4">
+                        <button
+                          onClick={isEditing ? () => setShowEditor(false) : onCancel}
+                          className="flex-1 py-4 px-6 rounded-2xl border-2 border-white/10 text-white font-bold hover:bg-white/5 transition-all active:scale-95"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleComplete}
+                          className="flex-[2] py-4 px-6 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all active:scale-95"
+                        >
+                          {isEditing ? 'Save Changes' : 'All Set, Let\'s Go!'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
