@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -10,28 +10,33 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Debug log to check if environment variables are loaded
-if (typeof window !== 'undefined') {
-  const missingKeys = Object.entries(firebaseConfig)
-    .filter(([_, value]) => !value || value === 'your_api_key' || value.includes('your_'))
-    .map(([key]) => key);
-    
-  if (missingKeys.length > 0) {
-    console.warn('Firebase configuration is incomplete or using placeholders. Missing keys:', missingKeys);
+// Lazy singletons — only initialize on the client, never during SSR/build
+let _app: FirebaseApp | null = null;
+let _auth: Auth | null = null;
+let _googleProvider: GoogleAuthProvider | null = null;
+
+function getFirebaseApp(): FirebaseApp {
+  if (_app) return _app;
+  _app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  return _app;
+}
+
+export function getFirebaseAuth(): Auth {
+  if (_auth) return _auth;
+  _auth = getAuth(getFirebaseApp());
+
+  // Set persistence to local (survives tab close)
+  if (typeof window !== 'undefined') {
+    setPersistence(_auth, browserLocalPersistence).catch(err => {
+      console.error('Firebase persistence error:', err);
+    });
   }
+
+  return _auth;
 }
 
-// Initialize Firebase
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-// Set persistence to local (survives tab close)
-if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch(err => {
-    console.error('Firebase persistence error:', err);
-  });
+export function getGoogleProvider(): GoogleAuthProvider {
+  if (_googleProvider) return _googleProvider;
+  _googleProvider = new GoogleAuthProvider();
+  return _googleProvider;
 }
-
-const googleProvider = new GoogleAuthProvider();
-
-export { auth, googleProvider };

@@ -147,10 +147,25 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                         try {
                           const user = await signInWithGoogle()
                           if (user) {
-                            if (user.displayName) setName(user.displayName)
-                            if (user.photoURL) setSelectedAvatar(user.photoURL)
-                            setEmail(user.email || '')
+                            const googleName = user.displayName || name
+                            const googleAvatar = user.photoURL || selectedAvatar
+                            const googleEmail = user.email || ''
+                            
+                            setName(googleName)
+                            setSelectedAvatar(googleAvatar)
+                            setEmail(googleEmail)
                             setIsGoogleAuth(true)
+                            
+                            // Auto-save immediately so it persists
+                            const profile: UserProfile = {
+                              name: googleName,
+                              skinTone: selectedSkinTone,
+                              avatar: googleAvatar,
+                              email: googleEmail,
+                              isGoogleAuth: true
+                            }
+                            localStorage.setItem('userProfile', JSON.stringify(profile))
+                            onComplete(profile)
                           }
                         } catch (error: any) {
                           console.error('Login failed', error)
@@ -221,10 +236,25 @@ export default function OnboardingScreen({ onComplete, initialProfile, onCancel 
                             try {
                               const user = await signInWithGoogle()
                               if (user) {
-                                if (user.displayName) setName(user.displayName)
-                                if (user.photoURL) setSelectedAvatar(user.photoURL)
-                                setEmail(user.email || '')
+                                const googleName = user.displayName || name
+                                const googleAvatar = user.photoURL || selectedAvatar
+                                const googleEmail = user.email || ''
+                                
+                                setName(googleName)
+                                setSelectedAvatar(googleAvatar)
+                                setEmail(googleEmail)
                                 setIsGoogleAuth(true)
+                                
+                                // Auto-save immediately so it persists
+                                const profile: UserProfile = {
+                                  name: googleName,
+                                  skinTone: selectedSkinTone,
+                                  avatar: googleAvatar,
+                                  email: googleEmail,
+                                  isGoogleAuth: true
+                                }
+                                localStorage.setItem('userProfile', JSON.stringify(profile))
+                                onComplete(profile)
                               }
                             } catch (error: any) {
                               console.error('Login failed', error)
