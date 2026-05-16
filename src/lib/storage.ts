@@ -196,6 +196,7 @@ export interface Trip {
 }
 
 import { db } from './db'
+import { syncTripsToDrive, isDriveSyncAvailable } from './google-drive'
 
 const STORAGE_KEY = 'trippi-trips'
 
@@ -329,6 +330,25 @@ export async function saveTrips(trips: Trip[]) {
       console.error('LocalStorage fallback also failed', quotaError)
       throw quotaError // Re-throw so UI can handle it
     }
+  }
+
+  // Background sync to Google Drive (non-blocking)
+  if (isDriveSyncAvailable()) {
+    // Strip heavy data (photos, file blobs) to keep Drive backup lightweight
+    const lightweight = trips.map(t => ({
+      ...t,
+      places: t.places.map(p => ({
+        ...p,
+        photos: [],
+        documents: p.documents.map(d => ({ ...d, file: undefined })),
+        accommodations: p.accommodations.map(a => ({ ...a, photos: [] })),
+        events: p.events.map(e => ({ ...e, photos: [] })),
+        transport: (p.transport || []).map(tr => ({ ...tr, photos: [] })),
+      }))
+    }))
+    syncTripsToDrive(lightweight).catch(() => {
+      // Silently ignore — Drive sync is best-effort
+    })
   }
 }
 

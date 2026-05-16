@@ -3,9 +3,11 @@ import {
   signInWithPopup, 
   signOut, 
   onAuthStateChanged, 
+  GoogleAuthProvider,
   User 
 } from 'firebase/auth';
 import { getFirebaseAuth, getGoogleProvider } from '@/lib/firebase';
+import { setAccessToken, clearAccessToken } from '@/lib/google-drive';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -41,6 +43,13 @@ export function useAuth() {
       const auth = getFirebaseAuth();
       const provider = getGoogleProvider();
       const result = await signInWithPopup(auth, provider);
+      
+      // Extract and store the Google access token for Drive API access
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setAccessToken(credential.accessToken);
+      }
+      
       return result.user;
     } catch (error: any) {
       console.error('Google Sign-In Error:', error.code, error.message);
@@ -52,6 +61,7 @@ export function useAuth() {
     try {
       const auth = getFirebaseAuth();
       await signOut(auth);
+      clearAccessToken();
     } catch (error) {
       console.error('Error signing out', error);
     }

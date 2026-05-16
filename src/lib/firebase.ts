@@ -38,5 +38,7 @@ export function getFirebaseAuth(): Auth {
 export function getGoogleProvider(): GoogleAuthProvider {
   if (_googleProvider) return _googleProvider;
   _googleProvider = new GoogleAuthProvider();
+  // Request Drive scope so we can save trip data to the user's Google Drive
+  _googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
   return _googleProvider;
 }
