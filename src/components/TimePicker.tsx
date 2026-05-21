@@ -54,13 +54,14 @@ export default function TimePicker({
   const [period, setPeriod] = useState<'AM' | 'PM'>(parsed.period)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Sync external value changes (don't fire onChange)
-  useEffect(() => {
-    const p = parse(value)
-    setHour(p.hour)
-    setMinute(p.minute)
-    setPeriod(p.period)
-  }, [value])
+  const [prevValue, setPrevValue] = useState(value)
+
+  if (value !== prevValue) {
+    setPrevValue(value)
+    setHour(parsed.hour)
+    setMinute(parsed.minute)
+    setPeriod(parsed.period)
+  }
 
   // Close on outside click
   useEffect(() => {

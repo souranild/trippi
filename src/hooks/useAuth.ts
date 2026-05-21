@@ -14,12 +14,6 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Only run on client
-    if (typeof window === 'undefined') {
-      setLoading(false);
-      return;
-    }
-
     const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);

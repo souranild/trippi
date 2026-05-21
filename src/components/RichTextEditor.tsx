@@ -28,6 +28,28 @@ const TaskListInputRule = new InputRule({
   },
 })
 
+interface ToolbarButtonProps {
+  onClick: () => void
+  active?: boolean
+  icon: string
+  title: string
+}
+
+const ToolbarButton = ({ onClick, active, icon, title }: ToolbarButtonProps) => (
+  <button
+    type="button"
+    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
+    className={`p-1 rounded-md transition-all ${
+      active 
+        ? 'bg-primary text-black shadow-[0_0_8px_rgba(143,245,255,0.4)]' 
+        : 'text-neutral-500 hover:text-white hover:bg-white/5'
+    }`}
+    title={title}
+  >
+    <span className="material-symbols-outlined text-[16px]">{icon}</span>
+  </button>
+)
+
 export default function RichTextEditor({ content, onChange, placeholder = 'Write something...', showToolbar = false, onToggleToolbar }: RichTextEditorProps) {
 
   const editor = useEditor({
@@ -87,21 +109,6 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Write
   }, [content, editor])
 
   if (!editor) return null
-
-  const ToolbarButton = ({ onClick, active, icon, title }: { onClick: () => void, active?: boolean, icon: string, title: string }) => (
-    <button
-      type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
-      className={`p-1 rounded-md transition-all ${
-        active 
-          ? 'bg-primary text-black shadow-[0_0_8px_rgba(143,245,255,0.4)]' 
-          : 'text-neutral-500 hover:text-white hover:bg-white/5'
-      }`}
-      title={title}
-    >
-      <span className="material-symbols-outlined text-[16px]">{icon}</span>
-    </button>
-  )
 
   return (
     <div className="flex flex-col w-full">
