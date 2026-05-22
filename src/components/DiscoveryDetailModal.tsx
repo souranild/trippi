@@ -7,10 +7,7 @@ import { Button } from '@/components/Button'
 import { FormLabel } from '@/components/FormLayout'
 import dynamic from 'next/dynamic'
 
-const MapPreview = dynamic(() => import('./Map'), {
-  ssr: false,
-  loading: () => <div className="h-48 bg-neutral-800/50 rounded-xl flex items-center justify-center text-neutral-500">Loading map...</div>
-})
+import MapSlot from '@/components/Map/MapSlot'
 
 interface DiscoveryDetailModalProps {
   discovery: DiscoveryResult | null
@@ -142,7 +139,8 @@ export default function DiscoveryDetailModal({
 
   const rightColumn = (
     <div className="h-full rounded-[2rem] overflow-hidden border border-white/10 bg-neutral-900 shadow-2xl relative">
-      <MapPreview
+      <MapSlot
+        isModal={true}
         places={[{
           id: discovery.id,
           name: discovery.name,

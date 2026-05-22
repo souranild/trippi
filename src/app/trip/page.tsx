@@ -987,6 +987,7 @@ function TripDetailContent() {
   }
 
   const [mapError, setMapError] = useState(false)
+  const [tripError, setTripError] = useState(false)
   const [editingPlace, setEditingPlace] = useState<Place | null>(null)
   const [placeModalMode, setPlaceModalMode] = useState<'add' | 'edit'>('add')
   const [isEventModalOpen, setIsEventModalOpen] = useState(false)
@@ -1377,7 +1378,12 @@ function TripDetailContent() {
         if (loadedPlaces.length === 0) {
           setIsEditMode(true)
         }
+      } else {
+        // Handle trip not found
+        setTripError(true)
       }
+    }).catch(() => {
+      setTripError(true)
     })
   }, [id])
 
@@ -1626,6 +1632,20 @@ function TripDetailContent() {
       return () => clearInterval(pollTimer);
     }
   }, [searchParams, trip]);
+
+  if (tripError) {
+    return (
+      <div className="min-h-screen bg-background text-on-surface font-body flex items-center justify-center">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-6xl text-red-500/80 mb-4">error</span>
+          <p className="text-white font-bold text-lg mb-2">Trip Not Found</p>
+          <p className="text-neutral-400 text-sm max-w-sm mx-auto">
+            We couldn't find this trip. It might be private, deleted, or Firebase public sharing is not configured properly yet.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!trip) {
     return (

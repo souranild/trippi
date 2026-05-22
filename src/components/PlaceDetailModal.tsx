@@ -29,10 +29,7 @@ import { ConfirmationModal } from './ConfirmationModal'
 import RichTextEditor from '@/components/RichTextEditor'
 import { getDocumentIconAndBadge, getOnlineDocumentDetails } from '@/lib/document-utils'
 
-const MapPreview = dynamic(() => import('./Map'), {
-  ssr: false,
-  loading: () => <div className="h-48 bg-neutral-800/50 rounded-xl flex items-center justify-center text-neutral-500">Loading map...</div>
-})
+import MapSlot from '@/components/Map/MapSlot'
 
 function getMediaType(url: string): 'image' | 'video' | 'pdf' | 'other' {
   if (url.match(/\.(mp4|webm|ogg)$/i) || url.startsWith('data:video')) return 'video'
@@ -1241,8 +1238,9 @@ export default function PlaceDetailModal({
 
   const rightColumnContent = (
     <div className="h-full bg-neutral-900 relative">
-      <MapPreview
+      <MapSlot
         className="w-full h-full"
+        isModal={true}
         places={allPlaces}
         focusedPlaceId={place.id}
         showDayNumbers={true}
