@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,6 +15,7 @@ const firebaseConfig = {
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;
 let _googleProvider: GoogleAuthProvider | null = null;
+let _db: Firestore | null = null;
 
 function getFirebaseApp(): FirebaseApp {
   if (_app) return _app;
@@ -41,4 +43,10 @@ export function getGoogleProvider(): GoogleAuthProvider {
   // Request Drive scope so we can save trip data to the user's Google Drive
   _googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
   return _googleProvider;
+}
+
+export function getFirestoreDB(): Firestore {
+  if (_db) return _db;
+  _db = getFirestore(getFirebaseApp());
+  return _db;
 }

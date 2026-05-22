@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import TimePicker from '@/components/TimePicker'
 import { normalizeUrl } from '@/lib/storage'
+import { getOnlineDocumentDetails } from '@/lib/document-utils'
 import { searchWallpapers } from '@/lib/wallpaper-search'
 import { getDayWithDate } from '@/lib/date-utils'
 import {
@@ -446,8 +447,32 @@ export default function AttachmentModal({
                       label="URL (Optional)"
                       labelVariant="secondary"
                       value={docUrl}
-                      onChange={e => setDocUrl(e.target.value)}
+                      placeholder="Paste Google Drive or any public document link..."
+                      onChange={e => {
+                        const url = e.target.value
+                        setDocUrl(url)
+                        if (url) {
+                          const details = getOnlineDocumentDetails(url)
+                          if (details) {
+                            if (!docName || docName.trim() === '' || docName.trim().toLowerCase() === 'new document') {
+                              let autoName = 'Online Document'
+                              if (details.type === 'google-doc') autoName = 'Google Doc'
+                              else if (details.type === 'google-sheet') autoName = 'Google Sheet'
+                              else if (details.type === 'google-slide') autoName = 'Google Slide'
+                              else if (details.type === 'google-form') autoName = 'Google Form'
+                              else if (details.type === 'drive-file') autoName = 'Google Drive File'
+                              else if (details.type === 'pdf') autoName = 'PDF Document'
+                              
+                              setDocName(autoName)
+                            }
+                          }
+                        }
+                      }}
                     />
+                    <p className="text-[10px] text-neutral-400 font-medium leading-relaxed !mt-1 flex items-start gap-1">
+                      <span className="material-symbols-outlined text-[12px] text-primary shrink-0 mt-0.5">info</span>
+                      <span>Paste Google Drive or any public link (PDF, Docs, Sheets, etc.) here to preview it instantly.</span>
+                    </p>
                     <div className="space-y-2">
                       <FormLabel variant="secondary">Upload File</FormLabel>
                       <label className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-dashed border-white/20 cursor-pointer hover:bg-white/10 transition-all">

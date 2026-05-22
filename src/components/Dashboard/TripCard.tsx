@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Trip } from '@/lib/storage'
 import { formatDuration, formatTime } from '@/lib/date-utils'
 import { ConfirmationModal } from '../ConfirmationModal'
+import { getDocumentIconAndBadge } from '@/lib/document-utils'
 
 interface TripCardProps {
   trip: Trip
@@ -273,12 +274,15 @@ export default function TripCard({ trip, onDelete, className = '', isCurrent = f
                              const dDay = doc.day || currentPlace.day || 1;
                              const dEndDay = doc.endDay || dDay;
                              return day >= dDay && day <= dEndDay;
-                          }).slice(0, 2).map((doc: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-2 px-1">
-                              <span className="material-symbols-outlined text-[14px] text-blue-400/60 shrink-0">description</span>
-                              <p className="text-[10px] text-blue-100/60 truncate">{doc.title || doc.file?.name}</p>
-                            </div>
-                          ))}
+                          }).slice(0, 2).map((doc: any, idx: number) => {
+                            const info = getDocumentIconAndBadge(doc.url, doc.file)
+                            return (
+                              <div key={idx} className="flex items-center gap-2 px-1 animate-in fade-in slide-in-from-left-1 duration-355">
+                                <span className={`material-symbols-outlined text-[14px] shrink-0 ${info.color}`}>{info.icon}</span>
+                                <p className="text-[10px] text-white/90 font-semibold truncate">{doc.name || doc.title || doc.file?.name || 'Untitled Document'}</p>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
 

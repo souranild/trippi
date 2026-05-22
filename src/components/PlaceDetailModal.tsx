@@ -27,6 +27,7 @@ import { fetchLocationInfo } from '@/lib/image-utils'
 import { isWithinBounds } from '@/lib/itinerary-utils'
 import { ConfirmationModal } from './ConfirmationModal'
 import RichTextEditor from '@/components/RichTextEditor'
+import { getDocumentIconAndBadge, getOnlineDocumentDetails } from '@/lib/document-utils'
 
 const MapPreview = dynamic(() => import('./Map'), {
   ssr: false,
@@ -133,6 +134,8 @@ export default function PlaceDetailModal({
   const [arrivalTime, setArrivalTime] = useState(updatedPlace.arrival || '')
   const [departureTime, setDepartureTime] = useState(updatedPlace.departure || '')
   const [attachmentDetail, setAttachmentDetail] = useState<AttachmentDetailData | null>(initialAttachmentDetail || null)
+  const [inlineLinkInput, setInlineLinkInput] = useState(false)
+  const [inlineLinkUrl, setInlineLinkUrl] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
   const [mediaViewer, setMediaViewer] = useState<{ items: any[]; index: number } | null>(null)
   const [isImageSearchOpen, setIsImageSearchOpen] = useState(false)
@@ -247,42 +250,34 @@ export default function PlaceDetailModal({
   // --- 3. Handlers ---
 
 
-  const handleArrivalChange = (val: string) => {
+  const validateAndSave = (proposedPlace: Place): boolean => {
     const error = getBoundsError(
-      updatedPlace.day || 1, val,
-      updatedPlace.endDay || updatedPlace.day || 1, departureTime,
+      proposedPlace.day || 1, proposedPlace.arrival || '',
+      proposedPlace.endDay || proposedPlace.day || 1, proposedPlace.departure || '',
       minDay || 1, minTime || '',
       maxDay || 999, maxTime || '',
       'Place'
     )
+    setArrivalTime(proposedPlace.arrival || '')
+    setDepartureTime(proposedPlace.departure || '')
     if (error) {
       setValidationError(error)
+      setUpdatedPlace(proposedPlace)
+      return false
     } else {
       setValidationError(null)
+      setUpdatedPlace(proposedPlace)
+      if (!isNew) onSave(proposedPlace)
+      return true
     }
-    setArrivalTime(val)
-    const next = { ...updatedPlace, arrival: val }
-    setUpdatedPlace(next)
-    if (!isNew) onSave(next)
+  }
+
+  const handleArrivalChange = (val: string) => {
+    validateAndSave({ ...updatedPlace, arrival: val })
   }
 
   const handleDepartureChange = (val: string) => {
-    const error = getBoundsError(
-      updatedPlace.day || 1, arrivalTime,
-      updatedPlace.endDay || updatedPlace.day || 1, val,
-      minDay || 1, minTime || '',
-      maxDay || 999, maxTime || '',
-      'Place'
-    )
-    if (error) {
-      setValidationError(error)
-    } else {
-      setValidationError(null)
-    }
-    setDepartureTime(val)
-    const next = { ...updatedPlace, departure: val }
-    setUpdatedPlace(next)
-    if (!isNew) onSave(next)
+    validateAndSave({ ...updatedPlace, departure: val })
   }
 
   const handleNoteChange = (id: string, text: string) => {
@@ -507,6 +502,35 @@ export default function PlaceDetailModal({
     const updated = { ...updatedPlace, links: updatedPlace.links?.filter(l => l.id !== id) }
     setUpdatedPlace(updated)
     if (!isNew) onSave(updated)
+  }
+
+  const handleSaveInlineLink = () => {
+    if (!inlineLinkUrl.trim()) return
+    let url = inlineLinkUrl.trim()
+    if (!/^[a-zA-Z][a-zA-Z\d.+\-]*:/.test(url)) {
+      url = `https://${url}`
+    }
+    const details = getOnlineDocumentDetails(url)
+    let autoName = 'Online Document'
+    if (details) {
+      if (details.type === 'google-doc') autoName = 'Google Doc'
+      else if (details.type === 'google-sheet') autoName = 'Google Sheet'
+      else if (details.type === 'google-slide') autoName = 'Google Slide'
+      else if (details.type === 'google-form') autoName = 'Google Form'
+      else if (details.type === 'drive-file') autoName = 'Google Drive File'
+      else if (details.type === 'pdf') autoName = 'PDF Document'
+    }
+    const newDoc = {
+      id: Date.now().toString(),
+      name: autoName,
+      type: 'other' as const,
+      url: url,
+      day: currentMediaDay
+    }
+    const nextPlace = { ...updatedPlace, documents: [...(updatedPlace.documents || []), newDoc] }
+    commitPlaceUpdate(nextPlace)
+    setInlineLinkInput(false)
+    setInlineLinkUrl('')
   }
 
   const commitPlaceUpdate = (nextPlace: Place) => {
@@ -812,9 +836,7 @@ export default function PlaceDetailModal({
             timeValue={arrivalTime}
             dayOptions={dayOptions}
             onDayChange={(d) => {
-              const updated = { ...updatedPlace, day: d }
-              setUpdatedPlace(updated)
-              if (!isNew) onSave(updated)
+              validateAndSave({ ...updatedPlace, day: d })
             }}
             onTimeChange={handleArrivalChange}
             disabled={!isEditMode}
@@ -828,9 +850,7 @@ export default function PlaceDetailModal({
             timeValue={departureTime}
             dayOptions={dayOptions}
             onDayChange={(d) => {
-              const updated = { ...updatedPlace, endDay: d }
-              setUpdatedPlace(updated)
-              if (!isNew) onSave(updated)
+              validateAndSave({ ...updatedPlace, endDay: d })
             }}
             onTimeChange={handleDepartureChange}
             disabled={!isEditMode}
@@ -979,27 +999,113 @@ export default function PlaceDetailModal({
                 <button
                   type="button"
                   onClick={() => handleAddAttachment('document')}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/20 hover:bg-blue-400/20 transition-colors"
-                  title="Add Document"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/20 hover:bg-blue-400/20 transition-colors cursor-pointer"
+                  title="Add File"
                 >
-                  <span className="material-symbols-outlined text-xs">add</span>
-                  <span className="material-symbols-outlined text-xs text-blue-400">description</span>
+                  <span className="material-symbols-outlined text-xs">upload_file</span>
+                  <span>Add File</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInlineLinkInput(!inlineLinkInput)
+                    setInlineLinkUrl('')
+                  }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] border transition-all cursor-pointer ${
+                    inlineLinkInput 
+                      ? 'text-rose-400 bg-rose-400/10 border-rose-400/20 hover:bg-rose-400/20' 
+                      : 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 hover:bg-emerald-400/20'
+                  }`}
+                  title="Add Document Link (Google Drive, public PDF, etc.)"
+                >
+                  <span className="material-symbols-outlined text-xs">{inlineLinkInput ? 'close' : 'link'}</span>
+                  <span>{inlineLinkInput ? 'Cancel' : 'Add Link'}</span>
                 </button>
               </div>
             )}
           </div>
-          <div className="space-y-2">
-            {updatedPlace.documents?.map((doc, idx) => (
-              <FormListItem key={doc.id || `doc-${idx}`} onDelete={isEditMode ? () => handleDeleteDocument(doc.id) : undefined} className="border-blue-400/20" onClick={() => setAttachmentDetail({ type: 'document', document: doc })}>
-                <div className="flex items-center gap-3 w-full p-1">
-                  <span className="text-blue-400 material-symbols-outlined text-base">description</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-bold truncate">{doc.name}</p>
-                    <p className="text-blue-400/60 text-[10px]">{doc.type}</p>
-                  </div>
+          {inlineLinkInput && (
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2 animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm text-neutral-400">link</span>
+                <input
+                  type="text"
+                  value={inlineLinkUrl}
+                  onChange={(e) => setInlineLinkUrl(e.target.value)}
+                  placeholder="Paste Google Drive, PDF, Doc, or Sheet link..."
+                  className="flex-1 bg-transparent border-none text-xs text-white focus:outline-none placeholder-white/30"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveInlineLink()
+                    } else if (e.key === 'Escape') {
+                      setInlineLinkInput(false)
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-neutral-400">💡 Instant preview & badge generated</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInlineLinkInput(false)}
+                    className="text-neutral-400 hover:text-white transition-colors px-2 py-1 rounded cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveInlineLink}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold px-3 py-1 rounded-md transition-all shadow-md cursor-pointer"
+                  >
+                    Add Link
+                  </button>
                 </div>
-              </FormListItem>
-            ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            {updatedPlace.documents?.map((doc, idx) => {
+              const info = getDocumentIconAndBadge(doc.url, doc.file)
+              return (
+                <FormListItem 
+                  key={doc.id || `doc-${idx}`} 
+                  onDelete={isEditMode ? () => handleDeleteDocument(doc.id) : undefined} 
+                  className={`border-l-4 ${info.border} ${info.bg}`} 
+                  onClick={() => setAttachmentDetail({ type: 'document', document: doc })}
+                >
+                  <div className="flex items-center gap-3 w-full p-1">
+                    <span className={`${info.color} material-symbols-outlined text-base shrink-0`}>{info.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-bold truncate">{doc.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${info.bg} ${info.color} border ${info.border}`}>
+                          {info.label}
+                        </span>
+                        {doc.url && (
+                          <span className="text-neutral-400 text-[8px] truncate max-w-[150px] font-medium opacity-60">
+                            {doc.url.replace(/^https?:\/\/(www\.)?/, '')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {doc.url && (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-all shrink-0 flex items-center justify-center border border-transparent hover:border-white/10"
+                        title="Open Document Link"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                      </a>
+                    )}
+                  </div>
+                </FormListItem>
+              )
+            })}
             {isEditMode && !updatedPlace.documents?.length && (
               <p className="text-neutral-200/40 text-[10px] font-bold text-center py-2">No documents added</p>
             )}
@@ -1229,10 +1335,12 @@ export default function PlaceDetailModal({
                   >
                     Cancel
                   </button>
-                  <Button variant="modal-primary" icon="check_circle" onClick={() => {
-                    onSave(updatedPlace)
-                    onClose()
-                    setIsEditMode(false)
+                   <Button variant="modal-primary" icon="check_circle" onClick={() => {
+                    if (validateAndSave(updatedPlace)) {
+                      if (isNew) onSave(updatedPlace)
+                      onClose()
+                      setIsEditMode(false)
+                    }
                   }}>Save Changes</Button>
                 </React.Fragment>
               ) : (

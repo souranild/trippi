@@ -14,6 +14,7 @@ import { ConfirmationModal } from './ConfirmationModal'
 import { fetchLocationInfo } from '@/lib/image-utils'
 import { FormInput, FormSelect, FormTextarea, FormGrid, FormLabel, FormInputGroup } from '@/components/FormLayout'
 import { getBoundsError } from '@/lib/itinerary-utils'
+import { getOnlineDocumentDetails, getDocumentIconAndBadge } from '@/lib/document-utils'
 
 import Map from '@/components/Map'
 import { MediaGrid } from '@/components/MediaGrid'
@@ -551,8 +552,36 @@ export default function AttachmentDetailModal({
             labelVariant="primary"
             disabled={!isEditMode}
             value={draft.document.url || ''}
-            onChange={e => setDraft({ ...draft, document: { ...draft.document!, url: e.target.value } })}
+            placeholder="Paste Google Drive or any public document link..."
+            onChange={e => {
+              const url = e.target.value
+              const details = getOnlineDocumentDetails(url)
+              let updatedName = draft.document!.name
+              if (url && details) {
+                if (!updatedName || updatedName.trim() === '' || updatedName.trim().toLowerCase() === 'new document') {
+                  if (details.type === 'google-doc') updatedName = 'Google Doc'
+                  else if (details.type === 'google-sheet') updatedName = 'Google Sheet'
+                  else if (details.type === 'google-slide') updatedName = 'Google Slide'
+                  else if (details.type === 'google-form') updatedName = 'Google Form'
+                  else if (details.type === 'drive-file') updatedName = 'Google Drive File'
+                  else if (details.type === 'pdf') updatedName = 'PDF Document'
+                  else updatedName = 'Online Document'
+                }
+              }
+              setDraft({
+                ...draft,
+                document: {
+                  ...draft.document!,
+                  url: url,
+                  name: updatedName
+                }
+              })
+            }}
           />
+          <p className="text-[10px] text-neutral-400 font-medium leading-relaxed !mt-1 flex items-start gap-1">
+            <span className="material-symbols-outlined text-[12px] text-primary shrink-0 mt-0.5">info</span>
+            <span>Paste Google Drive or any public link (PDF, Docs, Sheets, etc.) here to preview it instantly.</span>
+          </p>
           
           <div className="space-y-2">
             <FormLabel variant="primary">File Attachment</FormLabel>
@@ -837,6 +866,36 @@ export default function AttachmentDetailModal({
           
           {draft.document?.file && draft.document?.mimeType?.startsWith('image/') ? (
             <img src={draft.document.file} className="w-full h-full object-cover" alt="Document Preview" />
+          ) : draft.type === 'document' && draft.document?.url && draft.document.url.match(/^https?:\/\//) ? (
+            (() => {
+              const details = getOnlineDocumentDetails(draft.document.url)
+              if (details && details.embedUrl) {
+                return (
+                  <div className="w-full h-full flex flex-col p-4 bg-black/20 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+                    <iframe 
+                      src={details.embedUrl} 
+                      className="w-full h-full border-none rounded-2xl bg-white shadow-2xl" 
+                      title={draft.document.name}
+                      allow="autoplay"
+                    />
+                  </div>
+                )
+              }
+              const info = getDocumentIconAndBadge(draft.document.url, undefined)
+              return (
+                <div className="flex flex-col items-center justify-center space-y-6 w-full max-w-[280px] px-8 animate-in fade-in zoom-in-95 duration-500 relative z-10">
+                  <div className={`w-32 h-32 rounded-[2.5rem] ${info.bg} ${info.border} border flex items-center justify-center overflow-hidden p-2 shadow-2xl relative transition-transform duration-500 hover:scale-105`}>
+                    <span className={`material-symbols-outlined ${info.color} text-5xl`}>{info.icon}</span>
+                  </div>
+                  <div className="text-center w-full space-y-3">
+                    <div className="text-white text-lg font-bold truncate tracking-tight px-2 drop-shadow-md">{draft.document.name}</div>
+                    <div className={`inline-block px-4 py-1.5 rounded-full ${info.bg} border ${info.border} ${info.color} text-[10px] font-black uppercase tracking-[0.2em] truncate max-w-full shadow-inner backdrop-blur-md`}>
+                      {info.label}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()
           ) : draft.type === 'link' && draft.link?.url && draft.link.url.match(/^https?:\/\//) ? (
             <div className="flex flex-col items-center justify-center space-y-6 w-full max-w-[280px] px-8 animate-in fade-in zoom-in-95 duration-500 relative z-10">
               {(() => {

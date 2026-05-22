@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'rea
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Trip, loadTrips, updateTrip, updatePlace, removePlace, Document, Link as PlaceLink } from '@/lib/storage'
+import { Trip, loadTrips, getTripById, updateTrip, updatePlace, removePlace, Document, Link as PlaceLink } from '@/lib/storage'
 import { useTrips } from '@/context/TripContext'
 import EmojiAvatar from '@/components/EmojiAvatar'
 import { searchWallpapers, getRandomPlaceholder, searchWikipediaImages } from '@/lib/wallpaper-search'
@@ -40,6 +40,7 @@ import AppHeader from '@/components/AppHeader'
 import ItineraryTable from '@/components/ItineraryTable'
 import MediaViewer from '@/components/MediaViewer'
 import { formatDate, formatDuration, formatDateShort, formatTime, calculateTimeDuration } from '@/lib/date-utils'
+import { getDocumentIconAndBadge } from '@/lib/document-utils'
 import { isSameDay } from 'date-fns'
 import CalendarView from '@/components/CalendarView'
 import LocationPickerModal from '@/components/LocationPickerModal'
@@ -1103,8 +1104,7 @@ function TripDetailContent() {
     if (!trip) return
     if (confirm("Are you sure you want to delete this place?")) {
       await removePlace(trip.id, placeId)
-      const updatedTrips = await loadTrips()
-      const found = updatedTrips.find(t => t.id === id)
+      const found = await getTripById(id as string)
       if (found) {
         setTrip(found)
         setPlaces(migratePlaces(found.places || []))
@@ -1348,8 +1348,8 @@ function TripDetailContent() {
 
 
   useEffect(() => {
-    loadTrips().then(trips => {
-      const found = trips.find(t => t.id === id)
+    if (!id) return
+    getTripById(id).then(found => {
       if (found) {
         setTrip(found)
         // Load places from trip data and migrate to ensure required arrays exist
@@ -1725,13 +1725,27 @@ function TripDetailContent() {
                 <div className="flex items-center gap-2">
                   <h1 className="text-4xl font-bold font-headline text-white">{trip.title}</h1>
                   {isEditMode && (
-                    <button
-                      onClick={() => setIsEditModalOpen(true)}
-                      className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                      title="Edit trip details"
-                    >
-                      <span className="material-symbols-outlined text-white text-base">edit</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                        title="Edit trip details"
+                      >
+                        <span className="material-symbols-outlined text-white text-base">edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this trip?")) {
+                            deleteTrip(trip!.id)
+                            window.location.href = '/'
+                          }
+                        }}
+                        className="p-1.5 rounded-full bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 hover:text-rose-300 transition-colors"
+                        title="Delete trip"
+                      >
+                        <span className="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-neutral-400 font-medium tracking-wide">
@@ -2468,26 +2482,11 @@ function TripDetailContent() {
                                                       {leg.documents && showDocuments && leg.documents.length > 0 && (
                                                         <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
                                                           {leg.documents.map((doc, docIdx) => {
-                                                            const ext = doc.name.split('.').pop()?.toLowerCase();
-                                                            const isPDF = ext === 'pdf';
-                                                            const isDoc = ['doc', 'docx'].includes(ext || '');
-                                                            const isSheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
-                                                            const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || '');
-                                                            const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
-                                                            
-                                                            const getFileIcon = () => {
-                                                              if (isPDF) return 'picture_as_pdf';
-                                                              if (isDoc) return 'description';
-                                                              if (isSheet) return 'table_chart';
-                                                              if (isAudio) return 'audio_file';
-                                                              if (isImg) return 'image';
-                                                              return 'draft';
-                                                            };
-                                                            
+                                                            const info = getDocumentIconAndBadge(doc.url, doc.file);
                                                             return (
                                                               <div
                                                                 key={doc.id || `leg-doc-${docIdx}`}
-                                                                className="px-3 py-2.5 rounded-xl border border-blue-400/20 bg-blue-400/10 backdrop-blur-md hover:bg-blue-400/20 transition-all group/item shadow-sm cursor-pointer"
+                                                                className={`px-3 py-2.5 rounded-xl border border-l-4 ${info.border} ${info.bg} backdrop-blur-md hover:brightness-110 hover:-translate-y-[1px] active:translate-y-0 transition-all group/item shadow-sm cursor-pointer`}
                                                                 onClick={(e) => { 
                                                                   e.stopPropagation(); 
                                                                   setAttachmentDetail({ 
@@ -2498,13 +2497,13 @@ function TripDetailContent() {
                                                                 }}
                                                               >
                                                                 <div className="flex items-center gap-3">
-                                                                  <div className="w-9 h-9 rounded-xl bg-blue-400/20 border border-blue-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-blue-400/30 transition-colors">
-                                                                    <span className="material-symbols-outlined text-blue-400 text-lg">{getFileIcon()}</span>
+                                                                  <div className={`w-9 h-9 rounded-xl ${info.bg} border ${info.border} flex items-center justify-center shrink-0 group-hover/item:scale-105 transition-transform`}>
+                                                                    <span className={`material-symbols-outlined ${info.color} text-lg`}>{info.icon}</span>
                                                                   </div>
                                                                   <div className="flex-1 min-w-0">
-                                                                    <div className="text-blue-100 text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
-                                                                    <div className="text-blue-400/60 text-[10px] font-mono leading-none flex items-center gap-2">
-                                                                      <span>{isImg ? 'PHOTO' : isPDF ? 'PDF' : isAudio ? 'AUDIO' : isDoc ? 'DOCUMENT' : isSheet ? 'SHEET' : 'FILE'}</span>
+                                                                    <div className="text-white text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
+                                                                    <div className={`${info.color}/60 text-[10px] font-mono leading-none flex items-center gap-2`}>
+                                                                      <span className="uppercase">{info.label}</span>
                                                                       {doc.file && (
                                                                          <>
                                                                            <span className="opacity-30">|</span>
@@ -2514,9 +2513,32 @@ function TripDetailContent() {
                                                                            </span>
                                                                          </>
                                                                       )}
+                                                                      {doc.url && (
+                                                                         <>
+                                                                           <span className="opacity-30">|</span>
+                                                                           <span className="truncate max-w-[120px] opacity-60">
+                                                                             {doc.url.replace(/^https?:\/\/(www\.)?/, '')}
+                                                                           </span>
+                                                                         </>
+                                                                      )}
                                                                     </div>
                                                                   </div>
-                                                                  <span className="material-symbols-outlined text-neutral-500 group-hover/item:text-blue-400 transition-colors">open_in_new</span>
+                                                                  {doc.url ? (
+                                                                    <a
+                                                                      href={doc.url}
+                                                                      target="_blank"
+                                                                      rel="noopener noreferrer"
+                                                                      onClick={(e) => e.stopPropagation()}
+                                                                      className={`w-7 h-7 rounded-lg hover:${info.bg} flex items-center justify-center transition-all shrink-0 text-neutral-400 hover:${info.color}`}
+                                                                      title="Open link in new tab"
+                                                                    >
+                                                                      <span className="material-symbols-outlined text-base">open_in_new</span>
+                                                                    </a>
+                                                                  ) : (
+                                                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-neutral-500 group-hover/item:text-white transition-colors">
+                                                                      <span className="material-symbols-outlined text-base" title="View attachment">visibility</span>
+                                                                    </div>
+                                                                  )}
                                                                 </div>
                                                               </div>
                                                             );
@@ -2533,7 +2555,7 @@ function TripDetailContent() {
                                               const isSameLocation = prevPlace && (prevPlace.location === place.location || prevPlace.name === place.name);
                                               const isFirstDayOfStay = day.dayNumber === (place.day || 1);
                                               
-                                              if (isEditMode && isFirstDayOfStay && globalPlaceIndex !== 0 && !isSameLocation) {
+                                              if (isEditMode && (legs.length > 0 || (isFirstDayOfStay && globalPlaceIndex !== 0 && !isSameLocation))) {
                                                 return (
                                                   <div className="relative flex items-center gap-4 py-2 group/add">
                                                     <div className="relative flex flex-col items-center w-[50px] shrink-0">
@@ -2889,52 +2911,61 @@ function TripDetailContent() {
                                                     const end = doc.endDay || start;
                                                     return day.dayNumber >= start && day.dayNumber <= end;
                                                   })
-                                                  .map((doc, docIdx) => {
-                                                    const ext = doc.name.split('.').pop()?.toLowerCase();
-                                                    const isPDF = ext === 'pdf';
-                                                    const isDoc = ['doc', 'docx'].includes(ext || '');
-                                                    const isSheet = ['xls', 'xlsx', 'csv'].includes(ext || '');
-                                                    const isAudio = ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || '');
-                                                    const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '');
-
-                                                    const getFileIcon = () => {
-                                                      if (isPDF) return 'picture_as_pdf';
-                                                      if (isDoc) return 'description';
-                                                      if (isSheet) return 'table_chart';
-                                                      if (isAudio) return 'audio_file';
-                                                      if (isImg) return 'image';
-                                                      return 'draft';
-                                                    };
-                                                    return (
-                                                      <div
-                                                        key={`doc-${docIdx}`}
-                                                        className="px-3 py-2.5 rounded-xl border border-blue-400/20 bg-blue-400/10 backdrop-blur-md hover:bg-blue-400/20 transition-all group/item shadow-sm cursor-pointer"
-                                                        onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'document', document: doc }, placeId: place.id }) }}
-                                                      >
-                                                        <div className="flex items-center gap-3">
-                                                          <div className="w-9 h-9 rounded-xl bg-blue-400/20 border border-blue-400/30 flex items-center justify-center shrink-0 group-hover/item:bg-blue-400/30 transition-colors">
-                                                            <span className="material-symbols-outlined text-blue-400 text-lg">{getFileIcon()}</span>
-                                                          </div>
-                                                          <div className="flex-1 min-w-0">
-                                                            <div className="text-blue-100 text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
-                                                            <div className="text-blue-400/60 text-[10px] font-mono leading-none flex items-center gap-2">
-                                                              <span>{isImg ? 'PHOTO' : isPDF ? 'PDF' : isAudio ? 'AUDIO' : isDoc ? 'DOCUMENT' : isSheet ? 'SHEET' : 'FILE'}</span>
-                                                              {doc.file && (
-                                                                 <>
-                                                                   <span className="opacity-30">|</span>
-                                                                   <span className="flex items-center gap-1 opacity-60">
-                                                                     <span className="material-symbols-outlined text-[10px]">attach_file</span>
-                                                                     <span>UPLOADED</span>
-                                                                   </span>
-                                                                 </>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                          <span className="material-symbols-outlined text-neutral-500 group-hover/item:text-blue-400 transition-colors">open_in_new</span>
-                                                        </div>
-                                                      </div>
-                                                    )
-                                                  })
+                                                   .map((doc, docIdx) => {
+                                                     const info = getDocumentIconAndBadge(doc.url, doc.file);
+                                                     return (
+                                                       <div
+                                                         key={`doc-${docIdx}`}
+                                                         className={`px-3 py-2.5 rounded-xl border border-l-4 ${info.border} ${info.bg} backdrop-blur-md hover:brightness-110 hover:-translate-y-[1px] active:translate-y-0 transition-all group/item shadow-sm cursor-pointer`}
+                                                         onClick={(e) => { e.stopPropagation(); setAttachmentDetail({ data: { type: 'document', document: doc }, placeId: place.id }) }}
+                                                       >
+                                                         <div className="flex items-center gap-3">
+                                                           <div className={`w-9 h-9 rounded-xl ${info.bg} border ${info.border} flex items-center justify-center shrink-0 group-hover/item:scale-105 transition-transform`}>
+                                                             <span className={`material-symbols-outlined ${info.color} text-lg`}>{info.icon}</span>
+                                                           </div>
+                                                           <div className="flex-1 min-w-0">
+                                                             <div className="text-white text-xs font-bold truncate tracking-tight mb-0.5">{doc.name}</div>
+                                                             <div className={`${info.color}/60 text-[10px] font-mono leading-none flex items-center gap-2`}>
+                                                               <span className="uppercase">{info.label}</span>
+                                                               {doc.file && (
+                                                                  <>
+                                                                    <span className="opacity-30">|</span>
+                                                                    <span className="flex items-center gap-1 opacity-60">
+                                                                      <span className="material-symbols-outlined text-[10px]">attach_file</span>
+                                                                      <span>UPLOADED</span>
+                                                                    </span>
+                                                                  </>
+                                                               )}
+                                                               {doc.url && (
+                                                                  <>
+                                                                    <span className="opacity-30">|</span>
+                                                                    <span className="truncate max-w-[120px] opacity-60">
+                                                                      {doc.url.replace(/^https?:\/\/(www\.)?/, '')}
+                                                                    </span>
+                                                                  </>
+                                                               )}
+                                                             </div>
+                                                           </div>
+                                                           {doc.url ? (
+                                                             <a
+                                                               href={doc.url}
+                                                               target="_blank"
+                                                               rel="noopener noreferrer"
+                                                               onClick={(e) => e.stopPropagation()}
+                                                               className={`w-7 h-7 rounded-lg hover:${info.bg} flex items-center justify-center transition-all shrink-0 text-neutral-400 hover:${info.color}`}
+                                                               title="Open link in new tab"
+                                                             >
+                                                               <span className="material-symbols-outlined text-base">open_in_new</span>
+                                                             </a>
+                                                           ) : (
+                                                             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-neutral-500 group-hover/item:text-white transition-colors">
+                                                               <span className="material-symbols-outlined text-base" title="View attachment">visibility</span>
+                                                             </div>
+                                                           )}
+                                                         </div>
+                                                       </div>
+                                                     )
+                                                   })
                                                 }
 
                                                 {/* Links for this place */}
@@ -4032,8 +4063,7 @@ function TripDetailContent() {
           }}
           onSave={async (updatedPlace) => {
             await updateTripContext({ ...trip, places: places.map(p => p.id === updatedPlace.id ? updatedPlace : p) })
-            const updatedTrips = await loadTrips()
-            const found = updatedTrips.find(t => t.id === id)
+            const found = await getTripById(id as string)
             if (found) {
               setTrip(found)
               setPlaces(found.places || [])

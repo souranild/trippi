@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "@/styles/design-system.css";
 import { Providers } from "./providers";
@@ -6,6 +6,22 @@ import { Providers } from "./providers";
 export const metadata: Metadata = {
   title: "Trippi",
   description: "Global travel companion for the modern explorer",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Trippi",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#8ff5ff",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

@@ -197,6 +197,8 @@ export interface Trip {
 
 import { db } from './db'
 import { syncTripsToDrive, isDriveSyncAvailable } from './google-drive'
+import { getFirestoreDB } from './firebase'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 
 const STORAGE_KEY = 'trippi-trips'
 
@@ -350,6 +352,60 @@ export async function saveTrips(trips: Trip[]) {
       // Silently ignore — Drive sync is best-effort
     })
   }
+
+  // Background sync to Firebase Firestore for public sharing
+  try {
+    const firestoreDb = getFirestoreDB()
+    const syncPromises = trips.map(t => {
+      // Create a lightweight copy for Firestore to avoid document size limits
+      const lightweight = {
+        ...t,
+        places: t.places.map(p => ({
+          ...p,
+          photos: [],
+          documents: p.documents.map(d => ({ ...d, file: undefined })),
+          accommodations: p.accommodations.map(a => ({ ...a, photos: [] })),
+          events: p.events.map(e => ({ ...e, photos: [] })),
+          transport: (p.transport || []).map(tr => ({ ...tr, photos: [] })),
+        }))
+      }
+      return setDoc(doc(firestoreDb, 'trips', t.id), lightweight, { merge: true })
+    })
+    // Execute all syncs concurrently without blocking
+    Promise.all(syncPromises).catch(err => console.error('Firestore sync error:', err))
+  } catch (e) {
+    console.error('Failed to initialize Firestore for sync', e)
+  }
+}
+
+/**
+ * Gets a trip by ID. Checks local storage first.
+ * If not found locally, attempts to fetch from Firestore (for shared links).
+ * If fetched from cloud, it saves it locally for future offline access.
+ */
+export async function getTripById(id: string): Promise<Trip | null> {
+  const trips = await loadTrips()
+  const localTrip = trips.find(t => t.id === id)
+  if (localTrip) return localTrip
+
+  // Not found locally, attempt to fetch from Firestore
+  try {
+    const firestoreDb = getFirestoreDB()
+    const docRef = doc(firestoreDb, 'trips', id)
+    const docSnap = await getDoc(docRef)
+    
+    if (docSnap.exists()) {
+      const cloudTrip = docSnap.data() as Trip
+      // Save it locally so the user has it for next time
+      trips.push(cloudTrip)
+      await saveTrips(trips)
+      return cloudTrip
+    }
+  } catch (e) {
+    console.error('Failed to fetch trip from Firestore:', e)
+  }
+
+  return null
 }
 
 const emojis = ['🌍', '🏖️', '🏔️', '🏙️', '🌴', '⛰️', '🏕️', '🏝️', '🌄', '🌅']
