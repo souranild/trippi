@@ -12,10 +12,15 @@ import { MapProvider } from '@/context/MapContext'
 import PersistentMapHost from '@/components/Map/PersistentMapHost'
 import ExpandedMapModal from '@/components/Map/ExpandedMapModal'
 
+import { usePathname, useSearchParams } from 'next/navigation'
+
 function ProvidersContent({ children }: { children: React.ReactNode }) {
   const { setUserProfile, hasCompletedOnboarding, trips } = useTrips()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const isPublicTripView = pathname === '/trip' && !!searchParams?.get('id')
 
-  if (!hasCompletedOnboarding) {
+  if (!hasCompletedOnboarding && !isPublicTripView) {
     return (
       <OnboardingScreen
         onComplete={(profile: UserProfile) => {
